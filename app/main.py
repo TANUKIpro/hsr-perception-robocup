@@ -783,40 +783,6 @@ def show_collection():
                     st.success(f"Imported {len(images)} images")
                     st.rerun()
 
-    # Show collected images
-    st.markdown("---")
-    st.subheader("Collected Images")
-
-    collected = registry.get_collected_images(selected_id)
-
-    if collected:
-        # Sync button
-        if st.button("Sync to Datasets Directory"):
-            try:
-                synced_path = path_coordinator.sync_app_to_datasets(obj.name)
-                st.success(f"Synced to: {synced_path}")
-            except Exception as e:
-                st.error(f"Sync failed: {e}")
-
-        # Pagination
-        images_per_page = 20
-        total_pages = (len(collected) + images_per_page - 1) // images_per_page
-        page = st.number_input("Page", min_value=1, max_value=max(1, total_pages), value=1)
-
-        start_idx = (page - 1) * images_per_page
-        end_idx = start_idx + images_per_page
-        page_images = collected[start_idx:end_idx]
-
-        cols = st.columns(5)
-        for i, img_path in enumerate(page_images):
-            with cols[i % 5]:
-                st.image(img_path, width=120)
-                st.caption(Path(img_path).name[:15])
-
-        st.write(f"Showing {start_idx+1}-{min(end_idx, len(collected))} of {len(collected)}")
-    else:
-        st.info("No images collected yet")
-
 
 def _show_ros2_collection_tab(obj, registry, path_coordinator):
     """Show ROS2 collection tab content."""
@@ -839,8 +805,10 @@ def _show_ros2_collection_tab(obj, registry, path_coordinator):
         )
 
         st.code(
-            "# Start the capture node:\n"
-            "ros2 launch hsr_perception capture.launch.py",
+            "# HSR capture node:\n"
+            "ros2 launch hsr_perception capture.launch.py\n\n"
+            "# Xtion camera (see docs/xtion_setup.md):\n"
+            "ros2 launch openni2_camera camera_only.launch.py",
             language="bash"
         )
         return
@@ -852,91 +820,98 @@ def _show_ros2_collection_tab(obj, registry, path_coordinator):
         st.success("Capture node is running")
     else:
         st.warning("Capture node not detected. Start it with:")
-        st.code("ros2 launch hsr_perception capture.launch.py", language="bash")
+        st.code(
+            "# HSR capture node:\n"
+            "ros2 launch hsr_perception capture.launch.py\n\n"
+            "# Xtion camera:\n"
+            "ros2 launch openni2_camera camera_only.launch.py",
+            language="bash"
+        )
 
+    # Capture Application
     st.markdown("---")
+    st.subheader("Image Capture Application")
 
-    # Topic selection
+    st.markdown("""
+    Use the standalone GUI application for image capture.
+    The application provides all capture controls in one place.
+    """)
+
+    col1, col2 = st.columns([1, 2])
+
+    with col1:
+        # Get default output directory
+        default_output = str(path_coordinator.get_path("raw_captures_dir"))
+
+        if st.button("Launch Capture App", type="primary"):
+            if ros2_bridge.open_capture_app(output_dir=default_output):
+                st.success("Capture application launched!")
+            else:
+                st.error("Failed to launch capture application")
+
+    with col2:
+        st.markdown("""
+        **Application Features:**
+        - Topic selection (auto-detected)
+        - Real-time preview with center reticle
+        - Single capture / Burst capture
+        - Configurable parameters (count, interval, class name, output)
+        """)
+
+    # Application usage guide
+    with st.expander("How to Use", expanded=False):
+        st.markdown("""
+        ### Basic Operation
+
+        1. **Topic Selection**: Select camera topic from dropdown
+        2. **Class Name**: Enter the object class name
+        3. **Output Directory**: Set the save directory
+
+        ### Capture Modes
+
+        - **Single Capture**: Capture one image
+        - **Start Burst Capture**: Start continuous capture (3-second countdown)
+
+        ### Parameters
+
+        | Parameter | Description | Recommended |
+        |-----------|-------------|-------------|
+        | Images | Number of images | 50-100 |
+        | Interval | Capture interval (sec) | 0.2-0.5 |
+        | Overwrite | Start numbering from 1 | ON |
+        """)
+
+    # Collected Images
+    st.markdown("---")
+    st.subheader("Collected Images")
+
+    raw_captures_dir = path_coordinator.get_path("raw_captures_dir")
+
     col1, col2 = st.columns([3, 1])
 
-    with col1:
-        available_topics = ros2_bridge.list_image_topics()
-        if available_topics:
-            topic_options = [t.name for t in available_topics]
-        else:
-            topic_options = ros2_bridge.get_common_topics()
-
-        selected_topic = st.selectbox(
-            "Image Topic",
-            options=topic_options,
-            index=0 if topic_options else None
-        )
-
     with col2:
-        if st.button("Refresh Topics"):
-            ros2_bridge.refresh_availability()
+        if st.button("Refresh", key="refresh_captures"):
             st.rerun()
 
-    st.markdown("---")
-
-    # Capture controls
-    st.subheader("Capture Controls")
-
-    # Set class
-    col1, col2 = st.columns(2)
-
     with col1:
-        if st.button("Set Capture Class", type="secondary"):
-            result = ros2_bridge.set_capture_class(obj.id - 1)  # 0-indexed
-            if result.success:
-                st.success(f"Class set to: {obj.name} (ID: {obj.id - 1})")
+        if raw_captures_dir.exists():
+            subdirs = sorted([d for d in raw_captures_dir.iterdir() if d.is_dir()])
+
+            if subdirs:
+                # Build tree structure
+                tree_lines = [f"📁 {raw_captures_dir.name}/"]
+
+                for i, subdir in enumerate(subdirs):
+                    # Count image files
+                    img_count = len(list(subdir.glob("*.jpg"))) + len(list(subdir.glob("*.png")))
+                    prefix = "└──" if i == len(subdirs) - 1 else "├──"
+                    tree_lines.append(f"  {prefix} 📂 {subdir.name} ({img_count} images)")
+
+                st.code("\n".join(tree_lines), language=None)
             else:
-                st.error(f"Failed: {result.message}")
-
-    with col2:
-        status_result = ros2_bridge.get_capture_status()
-        if status_result.success and status_result.data:
-            st.info(f"Current class: {status_result.data.get('current_class', 'N/A')}")
-
-    st.markdown("---")
-
-    # Burst capture
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        num_images = st.number_input(
-            "Number of Images",
-            min_value=10,
-            max_value=500,
-            value=50,
-            step=10
-        )
-
-    with col2:
-        interval = st.number_input(
-            "Interval (seconds)",
-            min_value=0.1,
-            max_value=2.0,
-            value=0.2,
-            step=0.1
-        )
-
-    with col3:
-        estimated_time = num_images * interval
-        st.metric("Estimated Time", f"{estimated_time:.0f}s")
-
-    if st.button("Start Burst Capture", type="primary"):
-        result = ros2_bridge.start_burst_capture(
-            class_id=obj.id - 1,
-            num_images=num_images,
-            interval=interval
-        )
-
-        if result.success:
-            st.success(f"Burst capture started: {num_images} images at {interval}s intervals")
-            st.info("Images will be saved to datasets/raw_captures/")
+                st.info("No captured images yet. Launch the Capture App to start collecting.")
         else:
-            st.error(f"Failed: {result.message}")
+            st.info("Capture directory not created yet.")
 
 
 def show_settings():

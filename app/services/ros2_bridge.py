@@ -5,6 +5,7 @@ Provides bridge between Streamlit app and ROS2 system.
 Uses subprocess to call ros2 CLI commands, avoiding direct rclpy imports.
 """
 
+import shlex
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -121,8 +122,9 @@ class ROS2Bridge:
         """
         timeout = timeout or self.timeout
 
-        # Build full command with source
-        full_cmd = f"source {self.source_script} 2>/dev/null && ros2 " + " ".join(cmd)
+        # Build full command with source (escape arguments for shell)
+        escaped_args = " ".join(shlex.quote(arg) for arg in cmd)
+        full_cmd = f"source {self.source_script} 2>/dev/null && ros2 {escaped_args}"
 
         try:
             result = subprocess.run(
@@ -467,3 +469,180 @@ class ROS2Bridge:
             diagnostics["capture_services"] = self.check_capture_services_available()
 
         return diagnostics
+
+    def capture_preview_image(
+        self,
+        topic: str,
+        output_path: str = "/tmp/preview_frame.jpg",
+        timeout: float = 2.0
+    ) -> Optional[str]:
+        """
+        Capture a single frame from an image topic.
+
+        Uses a separate Python script to avoid rclpy import issues with Streamlit.
+
+        Args:
+            topic: Image topic to capture from
+            output_path: Path to save the captured image
+            timeout: Timeout in seconds
+
+        Returns:
+            Path to saved image if successful, None otherwise
+        """
+        script_path = Path(__file__).parent.parent.parent / "scripts/utils/capture_frame.py"
+
+        if not script_path.exists():
+            return None
+
+        # Build command with ROS2 environment sourced
+        # Note: Cannot use _run_ros2_cmd as it adds 'ros2' prefix
+        full_cmd = (
+            f"source {self.source_script} 2>/dev/null && "
+            f"python3 {script_path} --topic {topic} --output {output_path} --timeout {timeout}"
+        )
+
+        try:
+            result = subprocess.run(
+                ["bash", "-c", full_cmd],
+                capture_output=True,
+                text=True,
+                timeout=timeout + 2.0,  # Extra time for setup
+            )
+
+            if result.returncode == 0 and Path(output_path).exists():
+                return output_path
+            return None
+
+        except subprocess.TimeoutExpired:
+            return None
+        except Exception:
+            return None
+
+    def open_preview_window(self, topic: str) -> bool:
+        """
+        Open a real-time preview window for the specified topic.
+
+        Launches a separate OpenCV window process that displays the camera
+        feed with a center reticle overlay.
+
+        Args:
+            topic: Image topic to display
+
+        Returns:
+            True if successfully launched, False otherwise
+        """
+        script_path = Path(__file__).parent.parent.parent / "scripts/utils/preview_window.py"
+
+        if not script_path.exists():
+            return False
+
+        # Build command with ROS2 environment sourced
+        full_cmd = (
+            f"source {self.source_script} 2>/dev/null && "
+            f"python3 {script_path} --topic {topic}"
+        )
+
+        try:
+            # Run in background (non-blocking)
+            subprocess.Popen(
+                ["bash", "-c", full_cmd],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            return True
+        except Exception:
+            return False
+
+    def open_capture_app(self, output_dir: Optional[str] = None) -> bool:
+        """
+        Open the capture application with full GUI.
+
+        Launches the Tkinter-based capture application with:
+        - Topic selection from available ROS2 topics
+        - Real-time preview with center reticle
+        - Single and burst capture controls
+        - Configurable parameters
+
+        Args:
+            output_dir: Default output directory for captures
+
+        Returns:
+            True if successfully launched, False otherwise
+        """
+        script_path = Path(__file__).parent.parent.parent / "scripts/utils/capture_app.py"
+
+        if not script_path.exists():
+            return False
+
+        # Build command with ROS2 environment sourced
+        cmd_parts = [
+            f"source {self.source_script} 2>/dev/null",
+            f"python3 {script_path}"
+        ]
+
+        if output_dir:
+            cmd_parts[1] += f" --output-dir {shlex.quote(output_dir)}"
+
+        full_cmd = " && ".join(cmd_parts)
+
+        try:
+            # Run in background (non-blocking)
+            subprocess.Popen(
+                ["bash", "-c", full_cmd],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            return True
+        except Exception:
+            return False
+
+    def start_direct_burst_capture(
+        self,
+        topic: str,
+        output_dir: str,
+        class_name: str,
+        count: int = 50,
+        interval: float = 0.2,
+    ) -> bool:
+        """
+        Start burst capture directly from a topic.
+
+        Captures images from the specified topic without needing
+        the continuous_capture_node.
+
+        Args:
+            topic: Image topic to capture from
+            output_dir: Directory to save captured images
+            class_name: Class name for filename prefix
+            count: Number of images to capture
+            interval: Interval between captures in seconds
+
+        Returns:
+            True if capture started successfully
+        """
+        script_path = Path(__file__).parent.parent.parent / "scripts/utils/burst_capture.py"
+
+        if not script_path.exists():
+            return False
+
+        # Build command with ROS2 environment sourced
+        full_cmd = (
+            f"source {self.source_script} 2>/dev/null && "
+            f"python3 {script_path} "
+            f"--topic {shlex.quote(topic)} "
+            f"--output-dir {shlex.quote(output_dir)} "
+            f"--class-name {shlex.quote(class_name)} "
+            f"--count {count} "
+            f"--interval {interval}"
+        )
+
+        try:
+            # Run in background (non-blocking)
+            subprocess.Popen(
+                ["bash", "-c", full_cmd],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            return True
+        except Exception:
+            return False

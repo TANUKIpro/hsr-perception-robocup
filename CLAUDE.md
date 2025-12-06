@@ -9,6 +9,9 @@ HSR (Human Support Robot) perception pipeline for RoboCup@Home competitions. The
 
 **Environment**: Ubuntu 22.04 / ROS2 Humble / Python
 
+**Python Virtual Environment**: `/home/roboworks/Documents/hsr-perception-robocup/venv/perception/bin/python`
+- Use this venv when running Python scripts locally for testing
+
 ## Architecture
 
 ### Competition Day Workflow

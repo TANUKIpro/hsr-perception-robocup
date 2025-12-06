@@ -46,8 +46,12 @@ isort>=5.12.0                   # Import sorting
 mypy>=1.5.0                     # Type checking
 
 # =============================================================================
-# ROS2 Dependencies (Install via apt, not pip)
+# System Dependencies (Install via apt, not pip)
 # =============================================================================
+# Tkinter for capture application GUI:
+# sudo apt install python3-tk
+#
+# ROS2 packages:
 # sudo apt install ros-humble-cv-bridge
 # sudo apt install ros-humble-vision-msgs
 # sudo apt install ros-humble-sensor-msgs
