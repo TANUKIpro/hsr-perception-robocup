@@ -31,6 +31,12 @@ tabulate>=0.9.0                 # Table formatting for reports
 matplotlib>=3.7.0               # Plotting and visualization
 
 # =============================================================================
+# Web Application (Streamlit UI)
+# =============================================================================
+streamlit>=1.28.0               # Web application framework
+streamlit-paste-button>=0.1.0   # Clipboard paste support for images
+
+# =============================================================================
 # Development & Testing
 # =============================================================================
 pytest>=7.4.0                   # Testing framework
