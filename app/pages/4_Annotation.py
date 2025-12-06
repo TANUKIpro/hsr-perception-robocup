@@ -179,8 +179,6 @@ def _render_run_annotation(task_manager: TaskManager, path_coordinator: PathCoor
             value=500,
             help="Minimum pixel area for detected contours (background method only)"
         )
-    else:
-        min_area = 500
 
     # Session name
     st.markdown("---")

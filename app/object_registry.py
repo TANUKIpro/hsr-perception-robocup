@@ -44,6 +44,7 @@ class RegisteredObject:
     target_samples: int = 100
     collected_samples: int = 0
     last_updated: Optional[str] = None
+    thumbnail_path: Optional[str] = None
 
     def to_dict(self) -> dict:
         return {
@@ -57,6 +58,7 @@ class RegisteredObject:
             "target_samples": self.target_samples,
             "collected_samples": self.collected_samples,
             "last_updated": self.last_updated,
+            "thumbnail_path": self.thumbnail_path,
         }
 
     @classmethod
@@ -74,6 +76,7 @@ class RegisteredObject:
             target_samples=data.get("target_samples", 100),
             collected_samples=data.get("collected_samples", 0),
             last_updated=data.get("last_updated"),
+            thumbnail_path=data.get("thumbnail_path"),
         )
 
 
@@ -172,6 +175,96 @@ class ObjectRegistry:
         if category not in self.categories:
             self.categories.append(category)
             self._save()
+
+    def update_object(self, obj_id: int, updates: dict) -> bool:
+        """Update object fields."""
+        obj = self.get_object(obj_id)
+        if not obj:
+            return False
+
+        old_name = obj.name
+
+        # Apply updates to simple fields
+        for key in ['display_name', 'category', 'remarks', 'target_samples']:
+            if key in updates:
+                setattr(obj, key, updates[key])
+
+        # Handle name change (requires renaming directories)
+        if 'name' in updates and updates['name'] != old_name:
+            new_name = updates['name']
+            # Rename collected images directory
+            old_collected_dir = self.collected_images_dir / old_name
+            new_collected_dir = self.collected_images_dir / new_name
+            if old_collected_dir.exists():
+                old_collected_dir.rename(new_collected_dir)
+            # Rename reference images directory
+            old_ref_dir = self.reference_images_dir / old_name
+            new_ref_dir = self.reference_images_dir / new_name
+            if old_ref_dir.exists():
+                old_ref_dir.rename(new_ref_dir)
+            obj.name = new_name
+
+        # Handle properties update
+        if 'properties' in updates:
+            props = updates['properties']
+            if isinstance(props, dict):
+                obj.properties = ObjectProperties(**props)
+            elif isinstance(props, ObjectProperties):
+                obj.properties = props
+
+        obj.last_updated = datetime.now().isoformat()
+        self._save()
+        return True
+
+    # Thumbnail Management
+    def set_thumbnail(self, obj_id: int, image_path: str) -> Optional[str]:
+        """Set thumbnail image for an object."""
+        obj = self.get_object(obj_id)
+        if not obj:
+            return None
+
+        # Create thumbnails directory
+        thumbnails_dir = self.data_dir / "thumbnails"
+        thumbnails_dir.mkdir(exist_ok=True)
+
+        # Copy image
+        src = Path(image_path)
+        dst = thumbnails_dir / f"{obj.name}{src.suffix}"
+        shutil.copy2(src, dst)
+
+        # Update object
+        obj.thumbnail_path = str(dst.relative_to(self.data_dir))
+        obj.last_updated = datetime.now().isoformat()
+        self._save()
+        return str(dst)
+
+    def save_thumbnail_from_bytes(self, obj_id: int, image_data: bytes, extension: str = ".jpg") -> Optional[str]:
+        """Save thumbnail from bytes (for clipboard paste)."""
+        obj = self.get_object(obj_id)
+        if not obj:
+            return None
+
+        thumbnails_dir = self.data_dir / "thumbnails"
+        thumbnails_dir.mkdir(exist_ok=True)
+
+        dst = thumbnails_dir / f"{obj.name}{extension}"
+        with open(dst, "wb") as f:
+            f.write(image_data)
+
+        obj.thumbnail_path = str(dst.relative_to(self.data_dir))
+        obj.last_updated = datetime.now().isoformat()
+        self._save()
+        return str(dst)
+
+    def get_thumbnail_path(self, obj_id: int) -> Optional[str]:
+        """Get full path to thumbnail image."""
+        obj = self.get_object(obj_id)
+        if not obj or not obj.thumbnail_path:
+            return None
+        full_path = self.data_dir / obj.thumbnail_path
+        if full_path.exists():
+            return str(full_path)
+        return None
 
     # Reference Image Management
     def add_reference_image(self, obj_id: int, image_path: str, version: int = 1) -> Optional[str]:

@@ -26,12 +26,20 @@ st.set_page_config(
 )
 
 import sys
+import base64
 from pathlib import Path
 
 # Add app directory to path
 app_dir = Path(__file__).parent
 if str(app_dir) not in sys.path:
     sys.path.insert(0, str(app_dir))
+
+# Optional: clipboard paste support
+try:
+    from streamlit_paste_button import paste_image_button
+    PASTE_BUTTON_AVAILABLE = True
+except ImportError:
+    PASTE_BUTTON_AVAILABLE = False
 
 from object_registry import ObjectRegistry, RegisteredObject, ObjectProperties
 from services.path_coordinator import PathCoordinator
@@ -255,67 +263,270 @@ def show_registry():
 
             # Display objects
             for obj in objects:
+                edit_key = f"edit_mode_{obj.id}"
+                if edit_key not in st.session_state:
+                    st.session_state[edit_key] = False
+
                 with st.expander(f"**{obj.id}. {obj.display_name}** - {obj.category}", expanded=False):
-                    col1, col2 = st.columns([1, 2])
+                    # Check if in edit mode
+                    if st.session_state[edit_key]:
+                        # === EDIT MODE ===
+                        st.markdown("### Edit Object")
 
-                    with col1:
-                        ref_images = registry.get_reference_images(obj.id)
-                        if ref_images:
-                            st.write("**Reference Images:**")
-                            img_cols = st.columns(min(len(ref_images), 3))
-                            for i, img_path in enumerate(ref_images[:3]):
-                                with img_cols[i]:
-                                    st.image(img_path, width=150)
-                        else:
-                            st.write("No reference images")
+                        # Thumbnail upload section - use session state to prevent infinite rerun
+                        thumb_processed_key = f"thumb_processed_{obj.id}"
+                        paste_processed_key = f"paste_processed_{obj.id}"
+                        if thumb_processed_key not in st.session_state:
+                            st.session_state[thumb_processed_key] = None
+                        if paste_processed_key not in st.session_state:
+                            st.session_state[paste_processed_key] = False
 
-                        uploaded = st.file_uploader(
-                            "Add reference image",
-                            type=["jpg", "jpeg", "png"],
-                            key=f"ref_upload_{obj.id}"
+                        thumb_col1, thumb_col2, thumb_col3 = st.columns([1, 1, 1])
+                        with thumb_col1:
+                            thumbnail_path = registry.get_thumbnail_path(obj.id)
+                            if thumbnail_path:
+                                st.image(thumbnail_path, caption="Current Thumbnail", width=120)
+                            else:
+                                st.info("No thumbnail")
+
+                        with thumb_col2:
+                            thumb_upload = st.file_uploader(
+                                "Upload thumbnail",
+                                type=["jpg", "jpeg", "png"],
+                                key=f"thumb_edit_{obj.id}"
+                            )
+                            if thumb_upload:
+                                # Create unique ID for this file to detect new uploads
+                                file_id = f"{thumb_upload.name}_{thumb_upload.size}"
+                                if st.session_state[thumb_processed_key] != file_id:
+                                    temp_path = f"/tmp/thumb_{thumb_upload.name}"
+                                    with open(temp_path, "wb") as f:
+                                        f.write(thumb_upload.read())
+                                    registry.set_thumbnail(obj.id, temp_path)
+                                    st.session_state[thumb_processed_key] = file_id
+                                    st.success("Thumbnail updated")
+                                    st.rerun()
+
+                        with thumb_col3:
+                            if PASTE_BUTTON_AVAILABLE:
+                                paste_result = paste_image_button(
+                                    label="Paste from clipboard",
+                                    key=f"paste_thumb_{obj.id}"
+                                )
+                                if paste_result.image_data is not None and not st.session_state[paste_processed_key]:
+                                    # Save pasted image
+                                    registry.save_thumbnail_from_bytes(
+                                        obj.id,
+                                        paste_result.image_data,
+                                        ".png"
+                                    )
+                                    st.session_state[paste_processed_key] = True
+                                    st.success("Thumbnail pasted")
+                                    st.rerun()
+                            else:
+                                st.caption("Install streamlit-paste-button for clipboard paste")
+
+                        st.markdown("---")
+
+                        # Editable fields
+                        edit_col1, edit_col2 = st.columns(2)
+
+                        with edit_col1:
+                            edit_name = st.text_input(
+                                "Name (lowercase, no spaces)",
+                                value=obj.name,
+                                key=f"edit_name_{obj.id}"
+                            )
+                            edit_display_name = st.text_input(
+                                "Display Name",
+                                value=obj.display_name,
+                                key=f"edit_display_{obj.id}"
+                            )
+                            edit_category = st.selectbox(
+                                "Category",
+                                registry.categories,
+                                index=registry.categories.index(obj.category) if obj.category in registry.categories else 0,
+                                key=f"edit_cat_{obj.id}"
+                            )
+
+                        with edit_col2:
+                            edit_target = st.number_input(
+                                "Target Samples",
+                                min_value=10,
+                                value=obj.target_samples,
+                                key=f"edit_target_{obj.id}"
+                            )
+                            edit_remarks = st.text_area(
+                                "Remarks",
+                                value=obj.remarks or "",
+                                key=f"edit_remarks_{obj.id}"
+                            )
+
+                        st.write("**Properties:**")
+                        prop_col1, prop_col2, prop_col3 = st.columns(3)
+                        with prop_col1:
+                            edit_heavy = st.checkbox("Heavy Item", value=obj.properties.is_heavy, key=f"edit_heavy_{obj.id}")
+                        with prop_col2:
+                            edit_tiny = st.checkbox("Tiny Item", value=obj.properties.is_tiny, key=f"edit_tiny_{obj.id}")
+                        with prop_col3:
+                            edit_liquid = st.checkbox("Has Liquid", value=obj.properties.has_liquid, key=f"edit_liquid_{obj.id}")
+
+                        edit_size = st.text_input(
+                            "Size (cm)",
+                            value=obj.properties.size_cm or "",
+                            key=f"edit_size_{obj.id}"
                         )
-                        if uploaded:
-                            temp_path = f"/tmp/{uploaded.name}"
-                            with open(temp_path, "wb") as f:
-                                f.write(uploaded.read())
-                            version = len(obj.versions) + 1
-                            registry.add_reference_image(obj.id, temp_path, version)
-                            st.success(f"Added reference image v{version}")
-                            st.rerun()
 
-                    with col2:
-                        st.write(f"**Name:** {obj.name}")
-                        st.write(f"**Category:** {obj.category}")
-                        st.write(f"**Target Samples:** {obj.target_samples}")
-                        st.write(f"**Collected:** {obj.collected_samples}")
+                        # Save/Cancel buttons
+                        btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 2])
+                        with btn_col1:
+                            if st.button("Save", key=f"save_{obj.id}", type="primary"):
+                                # Validate name
+                                new_name = edit_name.lower().replace(" ", "_")
+                                if new_name != obj.name:
+                                    existing = registry.get_object_by_name(new_name)
+                                    if existing and existing.id != obj.id:
+                                        st.error(f"Name '{new_name}' already exists")
+                                        st.stop()
 
-                        if obj.remarks:
-                            st.write(f"**Remarks:** {obj.remarks}")
-
-                        props = []
-                        if obj.properties.is_heavy:
-                            props.append("Heavy Item")
-                        if obj.properties.is_tiny:
-                            props.append("Tiny Item")
-                        if obj.properties.has_liquid:
-                            props.append("Has Liquid")
-                        if obj.properties.size_cm:
-                            props.append(f"Size: {obj.properties.size_cm}")
-                        if props:
-                            st.write(f"**Properties:** {', '.join(props)}")
-
-                        col_a, col_b = st.columns(2)
-                        with col_a:
-                            if st.button("📸 Collect", key=f"collect_{obj.id}"):
-                                st.session_state.current_object_id = obj.id
-                                st.info("Please navigate to Collection page")
-                        with col_b:
-                            if st.button("🗑️ Delete", key=f"delete_{obj.id}"):
-                                registry.remove_object(obj.id)
+                                # Build updates
+                                updates = {
+                                    'name': new_name,
+                                    'display_name': edit_display_name,
+                                    'category': edit_category,
+                                    'target_samples': edit_target,
+                                    'remarks': edit_remarks,
+                                    'properties': {
+                                        'is_heavy': edit_heavy,
+                                        'is_tiny': edit_tiny,
+                                        'has_liquid': edit_liquid,
+                                        'size_cm': edit_size if edit_size else None,
+                                    }
+                                }
+                                registry.update_object(obj.id, updates)
+                                # Clear edit mode and processed states
+                                st.session_state[edit_key] = False
+                                st.session_state[thumb_processed_key] = None
+                                st.session_state[paste_processed_key] = False
+                                st.success("Object updated")
                                 st.rerun()
+
+                        with btn_col2:
+                            if st.button("Cancel", key=f"cancel_{obj.id}"):
+                                # Clear edit mode and processed states
+                                st.session_state[edit_key] = False
+                                st.session_state[thumb_processed_key] = None
+                                st.session_state[paste_processed_key] = False
+                                st.rerun()
+
+                    else:
+                        # === VIEW MODE ===
+                        col1, col2 = st.columns([1, 2])
+
+                        with col1:
+                            # Display thumbnail
+                            thumbnail_path = registry.get_thumbnail_path(obj.id)
+                            if thumbnail_path:
+                                st.image(thumbnail_path, caption="Thumbnail", width=120)
+
+                            # Reference images
+                            ref_images = registry.get_reference_images(obj.id)
+                            if ref_images:
+                                st.write("**Reference Images:**")
+                                img_cols = st.columns(min(len(ref_images), 3))
+                                for i, img_path in enumerate(ref_images[:3]):
+                                    with img_cols[i]:
+                                        st.image(img_path, width=100)
+                            else:
+                                st.write("No reference images")
+
+                            uploaded = st.file_uploader(
+                                "Add reference image",
+                                type=["jpg", "jpeg", "png"],
+                                key=f"ref_upload_{obj.id}"
+                            )
+                            if uploaded:
+                                temp_path = f"/tmp/{uploaded.name}"
+                                with open(temp_path, "wb") as f:
+                                    f.write(uploaded.read())
+                                version = len(obj.versions) + 1
+                                registry.add_reference_image(obj.id, temp_path, version)
+                                st.success(f"Added reference image v{version}")
+                                st.rerun()
+
+                        with col2:
+                            st.write(f"**Name:** {obj.name}")
+                            st.write(f"**Category:** {obj.category}")
+                            st.write(f"**Target Samples:** {obj.target_samples}")
+                            st.write(f"**Collected:** {obj.collected_samples}")
+
+                            if obj.remarks:
+                                st.write(f"**Remarks:** {obj.remarks}")
+
+                            props = []
+                            if obj.properties.is_heavy:
+                                props.append("Heavy Item")
+                            if obj.properties.is_tiny:
+                                props.append("Tiny Item")
+                            if obj.properties.has_liquid:
+                                props.append("Has Liquid")
+                            if obj.properties.size_cm:
+                                props.append(f"Size: {obj.properties.size_cm}")
+                            if props:
+                                st.write(f"**Properties:** {', '.join(props)}")
+
+                            col_a, col_b, col_c = st.columns(3)
+                            with col_a:
+                                if st.button("📸 Collect", key=f"collect_{obj.id}"):
+                                    st.session_state.current_object_id = obj.id
+                                    st.info("Please navigate to Collection page")
+                            with col_b:
+                                if st.button("✏️ Edit", key=f"edit_btn_{obj.id}"):
+                                    st.session_state[edit_key] = True
+                                    st.rerun()
+                            with col_c:
+                                if st.button("🗑️ Delete", key=f"delete_{obj.id}"):
+                                    registry.remove_object(obj.id)
+                                    st.rerun()
 
     with tab2:
         st.subheader("Add New Object")
+
+        # Thumbnail upload (outside form for proper file handling)
+        st.write("**Thumbnail (optional):**")
+
+        # Initialize session state for pasted thumbnail
+        if "new_obj_pasted_thumb" not in st.session_state:
+            st.session_state.new_obj_pasted_thumb = None
+
+        thumb_col1, thumb_col2, thumb_col3 = st.columns([1, 1, 1])
+        with thumb_col1:
+            new_thumbnail = st.file_uploader(
+                "Upload thumbnail",
+                type=["jpg", "jpeg", "png"],
+                key="new_obj_thumbnail",
+                help="Upload a thumbnail image for this object"
+            )
+        with thumb_col2:
+            if PASTE_BUTTON_AVAILABLE:
+                paste_result = paste_image_button(
+                    label="Paste from clipboard",
+                    key="paste_new_thumb"
+                )
+                if paste_result.image_data is not None:
+                    st.session_state.new_obj_pasted_thumb = paste_result.image_data
+            else:
+                st.caption("Install streamlit-paste-button for clipboard paste")
+
+        with thumb_col3:
+            if new_thumbnail:
+                st.image(new_thumbnail, caption="Preview (uploaded)", width=120)
+            elif st.session_state.new_obj_pasted_thumb:
+                st.image(st.session_state.new_obj_pasted_thumb, caption="Preview (pasted)", width=120)
+            else:
+                st.info("No thumbnail")
+
+        st.markdown("---")
 
         with st.form("add_object_form"):
             col1, col2 = st.columns(2)
@@ -359,6 +570,21 @@ def show_registry():
                         ),
                     )
                     registry.add_object(obj)
+
+                    # Save thumbnail if uploaded or pasted
+                    if new_thumbnail:
+                        temp_path = f"/tmp/thumb_{new_thumbnail.name}"
+                        with open(temp_path, "wb") as f:
+                            f.write(new_thumbnail.getvalue())
+                        registry.set_thumbnail(obj.id, temp_path)
+                    elif st.session_state.new_obj_pasted_thumb:
+                        registry.save_thumbnail_from_bytes(
+                            obj.id,
+                            st.session_state.new_obj_pasted_thumb,
+                            ".png"
+                        )
+                        st.session_state.new_obj_pasted_thumb = None
+
                     st.success(f"Added object: {new_display_name}")
                     st.rerun()
 
@@ -474,17 +700,33 @@ def show_collection():
         st.subheader("Camera Capture")
         st.write("Use your device camera to capture images.")
 
-        camera_image = st.camera_input("Take a photo")
+        # Initialize camera state - only show camera when explicitly enabled
+        camera_key = f"camera_enabled_{selected_id}"
+        if camera_key not in st.session_state:
+            st.session_state[camera_key] = False
 
-        if camera_image:
-            image_bytes = camera_image.getvalue()
-            saved_path = registry.save_collected_image(selected_id, image_bytes, ".jpg")
+        # Toggle button to enable/disable camera
+        if not st.session_state[camera_key]:
+            st.info("Click the button below to start the camera.")
+            if st.button("📷 Start Camera", key="start_camera"):
+                st.session_state[camera_key] = True
+                st.rerun()
+        else:
+            if st.button("⏹️ Stop Camera", key="stop_camera"):
+                st.session_state[camera_key] = False
+                st.rerun()
 
-            if saved_path:
-                st.success(f"Saved: {Path(saved_path).name}")
-                st.image(camera_image, width=300)
-                new_count = registry.update_collection_count(selected_id)
-                st.write(f"Total collected: {new_count}")
+            camera_image = st.camera_input("Take a photo")
+
+            if camera_image:
+                image_bytes = camera_image.getvalue()
+                saved_path = registry.save_collected_image(selected_id, image_bytes, ".jpg")
+
+                if saved_path:
+                    st.success(f"Saved: {Path(saved_path).name}")
+                    st.image(camera_image, width=300)
+                    new_count = registry.update_collection_count(selected_id)
+                    st.write(f"Total collected: {new_count}")
 
     with tab3:
         st.subheader("File Upload")
