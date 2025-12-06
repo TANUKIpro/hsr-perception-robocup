@@ -1,0 +1,41 @@
+# Virtual Environment
+venv/
+.venv/
+env/
+.env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+
+# Data (large files)
+datasets/
+models/pretrained/
+models/finetuned/
+app/data/collected_images/
+app/data/reference_images/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs
+*.log
+
+# Temporary files
+/tmp/
+*.tmp

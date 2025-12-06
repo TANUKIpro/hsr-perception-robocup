@@ -1,0 +1,4 @@
+# HSR Object Manager - Streamlit App Dependencies
+
+streamlit>=1.28.0
+Pillow>=10.0.0

@@ -1,0 +1,49 @@
+# HSR Perception Pipeline - Python Dependencies
+# For RoboCup@Home Competition Day Workflow
+
+# =============================================================================
+# Core ML/Computer Vision
+# =============================================================================
+ultralytics>=8.3.0              # YOLOv8 object detection
+torch>=2.1.0                    # PyTorch (install CUDA version for GPU support)
+torchvision>=0.16.0             # PyTorch vision utilities
+opencv-python>=4.8.0            # OpenCV for image processing
+numpy>=1.24.0                   # Numerical computing
+pillow>=10.0.0                  # Image loading
+
+# =============================================================================
+# SAM2 (Segment Anything 2) - For fallback annotation
+# =============================================================================
+# Install separately:
+# pip install git+https://github.com/facebookresearch/segment-anything-2.git
+
+# =============================================================================
+# Utilities
+# =============================================================================
+pyyaml>=6.0                     # YAML configuration files
+tqdm>=4.66.0                    # Progress bars
+colorama>=0.4.6                 # Colored terminal output
+tabulate>=0.9.0                 # Table formatting for reports
+
+# =============================================================================
+# Visualization
+# =============================================================================
+matplotlib>=3.7.0               # Plotting and visualization
+
+# =============================================================================
+# Development & Testing
+# =============================================================================
+pytest>=7.4.0                   # Testing framework
+pytest-cov>=4.1.0               # Test coverage
+black>=23.0.0                   # Code formatting
+isort>=5.12.0                   # Import sorting
+mypy>=1.5.0                     # Type checking
+
+# =============================================================================
+# ROS2 Dependencies (Install via apt, not pip)
+# =============================================================================
+# sudo apt install ros-humble-cv-bridge
+# sudo apt install ros-humble-vision-msgs
+# sudo apt install ros-humble-sensor-msgs
+# sudo apt install ros-humble-std-srvs
+# sudo apt install ros-humble-image-transport

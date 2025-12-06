@@ -1,0 +1,10 @@
+# Request: Start burst capture mode
+int32 class_id                    # Class to capture (-1 = use current)
+int32 num_images                  # Number of images (0 = continuous until stop)
+float32 interval_seconds          # Interval between captures (default: 0.2)
+---
+# Response
+bool success
+string message
+int32 class_id
+string class_name

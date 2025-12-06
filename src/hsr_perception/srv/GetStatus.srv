@@ -1,0 +1,12 @@
+# Request: Get current capture status
+---
+# Response
+string current_class
+int32 current_class_id
+int32 current_count
+int32 target_count
+bool is_capturing
+string[] all_class_names
+int32[] all_class_counts
+int32[] all_target_counts
+string output_directory

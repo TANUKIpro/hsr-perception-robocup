@@ -1,0 +1,9 @@
+# Request: Set current capture class
+int32 class_id
+---
+# Response
+bool success
+string class_name
+int32 current_count
+int32 target_count
+string message
