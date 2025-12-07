@@ -1,9 +1,50 @@
 {
   "version": "1.0.0",
-  "categories": [],
-  "objects": [],
+  "categories": [
+    {
+      "id": 0,
+      "name": "kitchen_item",
+      "display_name": "Kitchen Item"
+    },
+    {
+      "id": 1,
+      "name": "task_item",
+      "display_name": "Task Item"
+    },
+    {
+      "id": 2,
+      "name": "drink",
+      "display_name": "Drink"
+    }
+  ],
+  "objects": [
+    {
+      "class_id": 0,
+      "class_name": "bottle01",
+      "category_id": 2,
+      "object_type": "consistent",
+      "target_samples": 100,
+      "collected_samples": 150
+    },
+    {
+      "class_id": 1,
+      "class_name": "bottle02",
+      "category_id": 1,
+      "object_type": "consistent",
+      "target_samples": 100,
+      "collected_samples": 100
+    },
+    {
+      "class_id": 2,
+      "class_name": "postbox",
+      "category_id": 0,
+      "object_type": "consistent",
+      "target_samples": 100,
+      "collected_samples": 100
+    }
+  ],
   "settings": {
-    "default_target_samples": 200,
+    "default_target_samples": 100,
     "min_samples_for_training": 50,
     "train_val_split": 0.85
   }
