@@ -358,22 +358,28 @@ class TaskManager:
     def start_training(
         self,
         dataset_yaml: str,
-        base_model: str = "yolov8m.pt",
+        base_model: Optional[str] = None,
         output_dir: str = "models/finetuned",
         epochs: int = 50,
-        batch_size: int = 16,
+        batch_size: Optional[int] = None,
         fast_mode: bool = False,
+        auto_scale: bool = True,
+        enable_tensorboard: bool = True,
+        tensorboard_port: int = 6006,
     ) -> str:
         """
         Start training task.
 
         Args:
             dataset_yaml: Path to dataset YAML configuration
-            base_model: Base model path or name
+            base_model: Base model path or name (auto-detected if None with auto_scale)
             output_dir: Output directory for trained model
             epochs: Number of training epochs
-            batch_size: Batch size
+            batch_size: Batch size (auto-scaled if None with auto_scale)
             fast_mode: Use fast training configuration
+            auto_scale: Enable GPU auto-scaling for model/batch selection
+            enable_tensorboard: Enable TensorBoard monitoring
+            tensorboard_port: Port for TensorBoard server
 
         Returns:
             Task ID
@@ -392,6 +398,8 @@ class TaskManager:
                 "base_model": base_model,
                 "epochs": epochs,
                 "fast_mode": fast_mode,
+                "auto_scale": auto_scale,
+                "enable_tensorboard": enable_tensorboard,
             }
         )
         self._save_status(task)
@@ -404,14 +412,33 @@ class TaskManager:
             "--task-id", task_id,
             "--tasks-dir", str(self.tasks_dir),
             "--dataset", dataset_yaml,
-            "--model", base_model,
             "--output", output_dir,
             "--epochs", str(epochs),
-            "--batch", str(batch_size),
         ]
+
+        # Add model if specified (otherwise auto-detected)
+        if base_model:
+            cmd.extend(["--model", base_model])
+
+        # Add batch size if specified (otherwise auto-scaled)
+        if batch_size:
+            cmd.extend(["--batch", str(batch_size)])
 
         if fast_mode:
             cmd.append("--fast")
+
+        # GPU auto-scaling
+        if auto_scale:
+            cmd.append("--auto-scale")
+        else:
+            cmd.append("--no-auto-scale")
+
+        # TensorBoard options
+        if enable_tensorboard:
+            cmd.append("--tensorboard")
+            cmd.extend(["--tensorboard-port", str(tensorboard_port)])
+        else:
+            cmd.append("--no-tensorboard")
 
         self._launch_subprocess(cmd, task)
         return task_id
