@@ -39,3 +39,6 @@ Thumbs.db
 # Temporary files
 /tmp/
 *.tmp
+
+# Models
+*.pt

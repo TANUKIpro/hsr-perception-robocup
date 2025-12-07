@@ -489,7 +489,7 @@ class ROS2Bridge:
         Returns:
             Path to saved image if successful, None otherwise
         """
-        script_path = Path(__file__).parent.parent.parent / "scripts/utils/capture_frame.py"
+        script_path = Path(__file__).parent.parent.parent / "scripts/capture/capture_frame.py"
 
         if not script_path.exists():
             return None
@@ -531,7 +531,7 @@ class ROS2Bridge:
         Returns:
             True if successfully launched, False otherwise
         """
-        script_path = Path(__file__).parent.parent.parent / "scripts/utils/preview_window.py"
+        script_path = Path(__file__).parent.parent.parent / "scripts/capture/preview_window.py"
 
         if not script_path.exists():
             return False
@@ -569,7 +569,7 @@ class ROS2Bridge:
         Returns:
             True if successfully launched, False otherwise
         """
-        script_path = Path(__file__).parent.parent.parent / "scripts/utils/capture_app.py"
+        script_path = Path(__file__).parent.parent.parent / "scripts/capture/capture_app.py"
 
         if not script_path.exists():
             return False
@@ -620,7 +620,7 @@ class ROS2Bridge:
         Returns:
             True if capture started successfully
         """
-        script_path = Path(__file__).parent.parent.parent / "scripts/utils/burst_capture.py"
+        script_path = Path(__file__).parent.parent.parent / "scripts/capture/burst_capture.py"
 
         if not script_path.exists():
             return False

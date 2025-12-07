@@ -7,6 +7,7 @@ Use as fallback when background subtraction fails or for complex backgrounds.
 """
 
 import argparse
+import sys
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
@@ -15,6 +16,21 @@ import numpy as np
 from tqdm import tqdm
 
 from annotation_utils import AnnotationResult, bbox_to_yolo, write_yolo_label
+
+# Add scripts directory to path for common module imports
+_scripts_dir = Path(__file__).parent.parent
+if str(_scripts_dir) not in sys.path:
+    sys.path.insert(0, str(_scripts_dir))
+
+from common.constants import (
+    IMAGE_EXTENSIONS,
+    DEFAULT_BBOX_MARGIN_RATIO,
+    SAM2_DEFAULT_POINTS_PER_SIDE,
+    SAM2_DEFAULT_PRED_IOU_THRESH,
+    SAM2_DEFAULT_STABILITY_SCORE_THRESH,
+    SAM2_DEFAULT_MIN_MASK_REGION_AREA,
+)
+from common.config_utils import get_sam2_model_config
 
 
 class SAM2Annotator:
@@ -29,11 +45,11 @@ class SAM2Annotator:
         self,
         model_path: str = "sam2_b.pt",
         device: str = "cuda",
-        points_per_side: int = 32,
-        pred_iou_thresh: float = 0.88,
-        stability_score_thresh: float = 0.92,
-        min_mask_region_area: int = 100,
-        box_margin: float = 0.02,
+        points_per_side: int = SAM2_DEFAULT_POINTS_PER_SIDE,
+        pred_iou_thresh: float = SAM2_DEFAULT_PRED_IOU_THRESH,
+        stability_score_thresh: float = SAM2_DEFAULT_STABILITY_SCORE_THRESH,
+        min_mask_region_area: int = SAM2_DEFAULT_MIN_MASK_REGION_AREA,
+        bbox_margin_ratio: float = DEFAULT_BBOX_MARGIN_RATIO,
     ):
         """
         Initialize SAM2 annotator.
@@ -45,14 +61,14 @@ class SAM2Annotator:
             pred_iou_thresh: Predicted IoU threshold for filtering masks
             stability_score_thresh: Stability score threshold
             min_mask_region_area: Minimum mask area in pixels
-            box_margin: Margin to add to bounding boxes (ratio)
+            bbox_margin_ratio: Margin to add to bounding boxes (ratio)
         """
         self.device = device
         self.points_per_side = points_per_side
         self.pred_iou_thresh = pred_iou_thresh
         self.stability_score_thresh = stability_score_thresh
         self.min_mask_region_area = min_mask_region_area
-        self.box_margin = box_margin
+        self.bbox_margin_ratio = bbox_margin_ratio
 
         # Lazy load SAM2 to avoid import errors when not using this method
         self.model = None
@@ -75,31 +91,8 @@ class SAM2Annotator:
 
         print(f"Loading SAM2 model: {self.model_path}")
 
-        # Determine model config based on model path
-        # Config paths use format: configs/sam2.1/sam2.1_hiera_X.yaml
-        model_path_lower = self.model_path.lower()
-        if "sam2.1" in model_path_lower or "sam2_1" in model_path_lower:
-            # SAM2.1 models
-            if "base" in model_path_lower or "_b" in model_path_lower:
-                model_cfg = "configs/sam2.1/sam2.1_hiera_b+.yaml"
-            elif "large" in model_path_lower or "_l" in model_path_lower:
-                model_cfg = "configs/sam2.1/sam2.1_hiera_l.yaml"
-            elif "small" in model_path_lower or "_s" in model_path_lower:
-                model_cfg = "configs/sam2.1/sam2.1_hiera_s.yaml"
-            elif "tiny" in model_path_lower or "_t" in model_path_lower:
-                model_cfg = "configs/sam2.1/sam2.1_hiera_t.yaml"
-            else:
-                model_cfg = "configs/sam2.1/sam2.1_hiera_b+.yaml"
-        else:
-            # SAM2 models - use SAM2.1 config for compatibility with newer checkpoints
-            if "sam2_b" in model_path_lower or "base" in model_path_lower:
-                model_cfg = "configs/sam2.1/sam2.1_hiera_b+.yaml"
-            elif "sam2_l" in model_path_lower or "large" in model_path_lower:
-                model_cfg = "configs/sam2.1/sam2.1_hiera_l.yaml"
-            elif "sam2_t" in model_path_lower or "tiny" in model_path_lower:
-                model_cfg = "configs/sam2.1/sam2.1_hiera_t.yaml"
-            else:
-                model_cfg = "configs/sam2.1/sam2.1_hiera_b+.yaml"  # Default to base
+        # Determine model config using shared utility
+        model_cfg = get_sam2_model_config(self.model_path)
 
         self.model = build_sam2(model_cfg, self.model_path, device=self.device)
 
@@ -201,8 +194,8 @@ class SAM2Annotator:
 
         # Add margin
         h, w = image_shape
-        margin_x = int((x_max - x_min) * self.box_margin)
-        margin_y = int((y_max - y_min) * self.box_margin)
+        margin_x = int((x_max - x_min) * self.bbox_margin_ratio)
+        margin_y = int((y_max - y_min) * self.bbox_margin_ratio)
 
         x_min = max(0, x_min - margin_x)
         y_min = max(0, y_min - margin_y)
@@ -299,10 +292,9 @@ class SAM2Annotator:
             masks_path.mkdir(exist_ok=True)
 
         # Find images
-        image_extensions = [".jpg", ".jpeg", ".png", ".bmp"]
         images = [
             f for f in image_path.iterdir()
-            if f.suffix.lower() in image_extensions
+            if f.suffix.lower() in IMAGE_EXTENSIONS
         ]
 
         result = AnnotationResult(total_images=len(images))
