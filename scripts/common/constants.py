@@ -83,3 +83,52 @@ DEFAULT_EPOCHS: int = 50
 DEFAULT_BATCH_SIZE: int = 16
 DEFAULT_IMAGE_SIZE: int = 640
 DEFAULT_PATIENCE: int = 10
+
+
+# =============================================================================
+# GPU Scaling Constants
+# =============================================================================
+# VRAM thresholds for GPU classification (GB)
+GPU_VRAM_THRESHOLDS: dict = {
+    "low": (0, 6),
+    "medium": (6, 12),
+    "high": (12, 24),
+    "workstation": (24, float("inf")),
+}
+
+# Model VRAM overhead (empirical values in GB)
+MODEL_VRAM_OVERHEAD: dict = {
+    "yolov8n.pt": 1.2,
+    "yolov8s.pt": 1.8,
+    "yolov8m.pt": 2.5,
+    "yolov8l.pt": 3.5,
+    "yolov8x.pt": 5.0,
+}
+
+# Per-sample memory at 640x640 (empirical, in MB)
+MODEL_PER_SAMPLE_MEMORY_MB: dict = {
+    "yolov8n.pt": 180,
+    "yolov8s.pt": 250,
+    "yolov8m.pt": 380,
+    "yolov8l.pt": 550,
+    "yolov8x.pt": 750,
+}
+
+# Standard image sizes for training
+STANDARD_IMAGE_SIZES: List[int] = [320, 480, 640, 800, 1024, 1280]
+
+# GPU scaling safety margins
+DEFAULT_VRAM_SAFETY_MARGIN: float = 0.15  # 15% safety margin
+DEFAULT_MAX_VRAM_UTILIZATION: float = 0.85  # Max 85% utilization
+
+# OOM recovery settings
+OOM_BATCH_REDUCTION_FACTOR: float = 0.5  # Reduce to 50% on OOM
+MAX_OOM_RETRIES: int = 3
+
+
+# =============================================================================
+# TensorBoard Settings
+# =============================================================================
+TENSORBOARD_DEFAULT_PORT: int = 6006
+TENSORBOARD_FLUSH_SECS: int = 30
+TENSORBOARD_LOG_FREQUENCY: int = 1  # Log every epoch

@@ -2,7 +2,12 @@
 """
 Quick Fine-Tuning Script for Competition Day
 
-Optimized YOLOv8m fine-tuning for rapid model adaptation during competitions.
+Optimized YOLOv8 fine-tuning for rapid model adaptation during competitions.
+Features:
+- GPU hardware auto-scaling for various GPU configurations
+- TensorBoard integration with competition-specific metrics
+- OOM recovery with automatic parameter adjustment
+
 Designed to complete training within ~45-60 minutes on a capable GPU.
 """
 
@@ -13,7 +18,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import yaml
 from colorama import Fore, Style, init as colorama_init
@@ -28,7 +33,18 @@ if str(_scripts_dir) not in sys.path:
 from common.device_utils import log_gpu_status
 from common.constants import TARGET_MAP50
 
-# Competition-optimized training configuration
+# Import new modules
+from .gpu_scaler import GPUScaler, GPUScalingConfig, OOMRecoveryStrategy
+from .tensorboard_monitor import (
+    CompetitionTensorBoardCallback,
+    TensorBoardServer,
+    TensorBoardManager,
+    enable_ultralytics_tensorboard,
+    check_tensorboard_available,
+)
+from .training_config import TrainingConfig
+
+# Competition-optimized training configuration (legacy compatibility)
 COMPETITION_CONFIG = {
     # Model settings
     "model": "yolov8m.pt",
@@ -132,27 +148,61 @@ class CompetitionTrainer:
     """
     Competition-day YOLOv8 fine-tuning handler.
 
-    Optimized for rapid training with early stopping and checkpoint management.
+    Features:
+    - GPU hardware auto-scaling
+    - TensorBoard integration with competition metrics
+    - OOM recovery with automatic parameter adjustment
+    - Optimized for rapid training with early stopping
     """
 
     def __init__(
         self,
-        base_model: str = "models/pretrained/yolov8m.pt",
+        base_model: Optional[str] = None,
         output_dir: str = "models/finetuned",
         config: Optional[Dict] = None,
+        auto_scale: bool = True,
+        tensorboard: bool = True,
+        tensorboard_port: int = 6006,
     ):
         """
         Initialize trainer.
 
         Args:
-            base_model: Path to pretrained model (or model name like 'yolov8m.pt')
+            base_model: Path to pretrained model (auto-detected if None)
             output_dir: Directory for training outputs
-            config: Training configuration (uses COMPETITION_CONFIG if None)
+            config: Training configuration (auto-scaled if None)
+            auto_scale: Enable GPU auto-scaling
+            tensorboard: Enable TensorBoard monitoring
+            tensorboard_port: TensorBoard server port
         """
-        self.base_model = base_model
         self.output_dir = Path(output_dir)
+        self.auto_scale = auto_scale
+        self.tensorboard_enabled = tensorboard
+        self.tensorboard_port = tensorboard_port
+
+        # GPU scaling
+        self.gpu_scaler: Optional[GPUScaler] = None
+        if auto_scale:
+            self.gpu_scaler = GPUScaler()
+            if config is None:
+                config = self.gpu_scaler.get_optimal_config()
+                print(f"{Fore.CYAN}GPU Auto-scaling enabled:{Style.RESET_ALL}")
+                print(self.gpu_scaler.get_summary())
+
         self.config = config or COMPETITION_CONFIG.copy()
+
+        # Set base model from config or default
+        if base_model is None:
+            self.base_model = self.config.get("model", "yolov8m.pt")
+        else:
+            self.base_model = base_model
+
         self.run_name = self._generate_run_name()
+
+        # TensorBoard setup
+        self.tensorboard_server: Optional[TensorBoardServer] = None
+        self.tensorboard_callback: Optional[CompetitionTensorBoardCallback] = None
+        self.tensorboard_url: str = ""
 
         # Verify CUDA availability
         self._check_cuda()
@@ -208,11 +258,74 @@ class CompetitionTrainer:
 
         return True
 
+    def _setup_tensorboard(self, model: Any) -> None:
+        """Setup TensorBoard monitoring."""
+        if not self.tensorboard_enabled:
+            return
+
+        if not check_tensorboard_available():
+            print(
+                f"{Fore.YELLOW}Warning: TensorBoard not available. "
+                f"Install with: pip install tensorboard{Style.RESET_ALL}"
+            )
+            return
+
+        # Enable Ultralytics built-in TensorBoard
+        enable_ultralytics_tensorboard()
+
+        # Create log directory
+        log_dir = self.output_dir / self.run_name / "tensorboard"
+
+        # Create custom callback
+        self.tensorboard_callback = CompetitionTensorBoardCallback(
+            log_dir=str(log_dir),
+            target_map50=TARGET_MAP50,
+        )
+
+        # Register callbacks
+        model.add_callback(
+            "on_pretrain_routine_start",
+            self.tensorboard_callback.on_pretrain_routine_start,
+        )
+        model.add_callback(
+            "on_train_epoch_start",
+            self.tensorboard_callback.on_train_epoch_start,
+        )
+        model.add_callback(
+            "on_train_epoch_end",
+            self.tensorboard_callback.on_train_epoch_end,
+        )
+        model.add_callback(
+            "on_fit_epoch_end",
+            self.tensorboard_callback.on_fit_epoch_end,
+        )
+        model.add_callback(
+            "on_train_end",
+            self.tensorboard_callback.on_train_end,
+        )
+
+        # Start TensorBoard server
+        self.tensorboard_server = TensorBoardServer(
+            str(log_dir),
+            port=self.tensorboard_port,
+        )
+        self.tensorboard_url = self.tensorboard_server.start()
+
+    def _cleanup_tensorboard(self) -> None:
+        """Cleanup TensorBoard resources (server remains running for user access)."""
+        # Note: We don't stop the server here so users can view results after training
+        pass
+
+    def get_tensorboard_url(self) -> str:
+        """Get TensorBoard URL if available."""
+        return self.tensorboard_url
+
     def train(
         self,
         dataset_yaml: str,
         resume: bool = False,
         verbose: bool = True,
+        enable_oom_recovery: bool = True,
     ) -> TrainingResult:
         """
         Execute fine-tuning.
@@ -221,6 +334,7 @@ class CompetitionTrainer:
             dataset_yaml: Path to dataset configuration YAML
             resume: Resume from checkpoint if available
             verbose: Enable verbose output
+            enable_oom_recovery: Enable automatic OOM recovery
 
         Returns:
             TrainingResult with metrics and paths
@@ -238,21 +352,70 @@ class CompetitionTrainer:
         # Prepare output directory
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
+        # Setup TensorBoard
+        self._setup_tensorboard(model)
+
         # Start training
         print(f"\n{Fore.GREEN}Starting training...{Style.RESET_ALL}")
         print(f"Run name: {self.run_name}")
         print(f"Output: {self.output_dir / self.run_name}")
+        if self.tensorboard_url:
+            print(f"TensorBoard: {self.tensorboard_url}")
+
+        # Print configuration summary
+        print(f"\nConfiguration:")
+        print(f"  Model: {self.config.get('model', self.base_model)}")
+        print(f"  Batch Size: {self.config.get('batch', 16)}")
+        print(f"  Image Size: {self.config.get('imgsz', 640)}")
+        print(f"  Epochs: {self.config.get('epochs', 50)}")
 
         start_time = time.time()
+        results = None
 
-        results = model.train(
-            data=dataset_yaml,
-            project=str(self.output_dir),
-            name=self.run_name,
-            resume=resume,
-            verbose=verbose,
-            **self.config,
-        )
+        # Training with OOM recovery
+        if enable_oom_recovery:
+            oom_recovery = OOMRecoveryStrategy(self.config)
+            current_config = self.config.copy()
+
+            while True:
+                try:
+                    results = model.train(
+                        data=dataset_yaml,
+                        project=str(self.output_dir),
+                        name=self.run_name,
+                        resume=resume,
+                        verbose=verbose,
+                        **current_config,
+                    )
+                    break  # Success
+
+                except RuntimeError as e:
+                    if "out of memory" in str(e).lower() or "CUDA" in str(e):
+                        print(f"\n{Fore.YELLOW}OOM detected. Attempting recovery...{Style.RESET_ALL}")
+
+                        recovery_config = oom_recovery.get_recovery_config()
+                        if recovery_config is None:
+                            print(f"{Fore.RED}Max OOM retries exceeded.{Style.RESET_ALL}")
+                            raise
+
+                        print(f"Recovery attempt {oom_recovery.retry_count}: "
+                              f"{oom_recovery.get_changes_summary()}")
+                        current_config = recovery_config
+
+                        # Reload model for retry
+                        model = YOLO(self.base_model)
+                        self._setup_tensorboard(model)
+                    else:
+                        raise
+        else:
+            results = model.train(
+                data=dataset_yaml,
+                project=str(self.output_dir),
+                name=self.run_name,
+                resume=resume,
+                verbose=verbose,
+                **self.config,
+            )
 
         training_time = (time.time() - start_time) / 60  # minutes
 
@@ -277,6 +440,16 @@ class CompetitionTrainer:
         result_path = run_dir / "training_result.json"
         with open(result_path, "w") as f:
             json.dump(result.to_dict(), f, indent=2)
+
+        # Add TensorBoard URL to result
+        if self.tensorboard_url:
+            result_data = result.to_dict()
+            result_data["tensorboard_url"] = self.tensorboard_url
+            with open(result_path, "w") as f:
+                json.dump(result_data, f, indent=2)
+
+        # Cleanup
+        self._cleanup_tensorboard()
 
         return result
 
@@ -351,21 +524,27 @@ class CompetitionTrainer:
 def main():
     """Command-line interface for training."""
     parser = argparse.ArgumentParser(
-        description="Competition-day YOLOv8 fine-tuning",
+        description="Competition-day YOLOv8 fine-tuning with GPU auto-scaling and TensorBoard",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Standard competition training
+  # Standard competition training (auto-scales to GPU)
   python quick_finetune.py --dataset datasets/competition_day/data.yaml
 
   # Fast training (smaller model, fewer epochs)
   python quick_finetune.py --dataset datasets/competition_day/data.yaml --fast
 
+  # Disable auto-scaling and use specific model
+  python quick_finetune.py --dataset data.yaml --model yolov8l.pt --no-auto-scale
+
+  # Disable TensorBoard
+  python quick_finetune.py --dataset data.yaml --no-tensorboard
+
   # Resume interrupted training
   python quick_finetune.py --dataset datasets/competition_day/data.yaml --resume
 
-  # Custom base model
-  python quick_finetune.py --dataset data.yaml --model models/pretrained/yolov8m.pt
+  # Force specific GPU tier settings
+  python quick_finetune.py --dataset data.yaml --gpu-tier medium
         """,
     )
 
@@ -378,8 +557,8 @@ Examples:
     parser.add_argument(
         "--model",
         "-m",
-        default="yolov8m.pt",
-        help="Base model path or name (default: yolov8m.pt)",
+        default=None,
+        help="Base model path or name (auto-detected by default)",
     )
     parser.add_argument(
         "--output",
@@ -418,15 +597,61 @@ Examples:
         help="Export model after training",
     )
 
+    # GPU scaling options
+    parser.add_argument(
+        "--no-auto-scale",
+        action="store_true",
+        help="Disable GPU auto-scaling",
+    )
+    parser.add_argument(
+        "--gpu-tier",
+        choices=["low", "medium", "high", "workstation"],
+        help="Force specific GPU tier settings",
+    )
+
+    # TensorBoard options
+    parser.add_argument(
+        "--no-tensorboard",
+        action="store_true",
+        help="Disable TensorBoard monitoring",
+    )
+    parser.add_argument(
+        "--tensorboard-port",
+        type=int,
+        default=6006,
+        help="TensorBoard server port (default: 6006)",
+    )
+
+    # OOM recovery
+    parser.add_argument(
+        "--no-oom-recovery",
+        action="store_true",
+        help="Disable automatic OOM recovery",
+    )
+
     args = parser.parse_args()
 
-    # Select configuration
-    config = FAST_CONFIG.copy() if args.fast else COMPETITION_CONFIG.copy()
+    # Determine configuration
+    auto_scale = not args.no_auto_scale
+    config = None
+
+    if args.fast:
+        config = FAST_CONFIG.copy()
+        auto_scale = False  # Fast mode uses fixed config
+    elif args.gpu_tier:
+        # Use specific tier config
+        from .gpu_scaler import GPUTier, TIER_CONFIGS
+        tier = GPUTier(args.gpu_tier)
+        config = TIER_CONFIGS[tier].copy()
+        auto_scale = False
 
     # Apply overrides
-    if args.epochs:
+    if config is None and not auto_scale:
+        config = COMPETITION_CONFIG.copy()
+
+    if config and args.epochs:
         config["epochs"] = args.epochs
-    if args.batch:
+    if config and args.batch:
         config["batch"] = args.batch
 
     # Create trainer
@@ -434,11 +659,17 @@ Examples:
         base_model=args.model,
         output_dir=args.output,
         config=config,
+        auto_scale=auto_scale,
+        tensorboard=not args.no_tensorboard,
+        tensorboard_port=args.tensorboard_port,
     )
 
     try:
         if args.validate_only:
             # Validation only mode
+            if args.model is None:
+                print(f"{Fore.RED}Error: --model is required for --validate-only{Style.RESET_ALL}")
+                sys.exit(1)
             metrics = trainer.validate(args.model, args.dataset)
             print("\nValidation Results:")
             for k, v in metrics.items():
@@ -448,9 +679,14 @@ Examples:
             result = trainer.train(
                 dataset_yaml=args.dataset,
                 resume=args.resume,
+                enable_oom_recovery=not args.no_oom_recovery,
             )
 
             print(result.summary())
+
+            # Show TensorBoard URL
+            if trainer.tensorboard_url:
+                print(f"\n{Fore.CYAN}TensorBoard: {trainer.tensorboard_url}{Style.RESET_ALL}")
 
             # Check target
             if result.meets_target():
@@ -468,6 +704,8 @@ Examples:
         sys.exit(1)
     except Exception as e:
         print(f"\n{Fore.RED}Error: {e}{Style.RESET_ALL}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 

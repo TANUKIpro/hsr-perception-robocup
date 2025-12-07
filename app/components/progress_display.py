@@ -295,3 +295,172 @@ def render_task_metrics(task: TaskInfo) -> None:
                     st.metric(key, f"{value:.4f}")
             else:
                 st.metric(key, str(value))
+
+
+# =============================================================================
+# Enhanced Training Progress Components (Mission Control Style)
+# =============================================================================
+
+def render_circular_progress(progress: float, size: int = 140, label: str = "Progress"):
+    """
+    Render progress indicator using Streamlit components.
+
+    Args:
+        progress: Progress value between 0.0 and 1.0
+        size: Size of the circle in pixels (unused, kept for compatibility)
+        label: Label text below the progress
+    """
+    percentage = int(progress * 100)
+    st.metric(label, f"{percentage}%")
+    st.progress(progress)
+
+
+def render_training_metric_cards(task: TaskInfo):
+    """
+    Render real-time metric cards during training.
+
+    Shows: Epoch, mAP@50, Loss, ETA
+
+    Args:
+        task: TaskInfo with extra_data containing training metrics
+    """
+    metrics = task.extra_data.get("metrics", {})
+    config = task.extra_data.get("config", {})
+    current_epoch = task.extra_data.get("epoch", 0)
+    total_epochs = config.get("epochs", 50)
+
+    # Extract values
+    map50 = metrics.get("mAP50", 0)
+    loss = metrics.get("loss", 0)
+    target_map50 = 0.85
+
+    # Calculate ETA
+    elapsed = task.elapsed_time or 0
+    if task.progress > 0.1:
+        eta_seconds = (elapsed / task.progress) * (1 - task.progress)
+        eta_minutes = eta_seconds / 60
+        eta_str = f"{eta_minutes:.0f}m"
+    else:
+        eta_str = "--"
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        with st.container(border=True):
+            st.metric("EPOCH", f"{current_epoch}/{total_epochs}")
+
+    with col2:
+        with st.container(border=True):
+            st.metric("MAP@50", f"{map50:.1%}", help=f"Target: {target_map50:.0%}")
+            st.caption(f"Target: {target_map50:.0%}")
+
+    with col3:
+        with st.container(border=True):
+            st.metric("LOSS", f"{loss:.4f}")
+
+    with col4:
+        with st.container(border=True):
+            st.metric("ETA", eta_str)
+
+
+def render_training_progress_bar(progress: float, current_step: str, animated: bool = True):
+    """
+    Render training progress bar using Streamlit components.
+
+    Args:
+        progress: Progress value between 0.0 and 1.0
+        current_step: Current step description
+        animated: Whether to show shimmer animation (unused)
+    """
+    width_percent = progress * 100
+    col1, col2 = st.columns([4, 1])
+    with col1:
+        st.caption(current_step)
+    with col2:
+        st.caption(f"{width_percent:.0f}%")
+    st.progress(progress)
+
+
+def render_training_active_banner(task: TaskInfo, task_manager: TaskManager):
+    """
+    Render enhanced active training task banner.
+
+    Features:
+    - Circular progress indicator
+    - Metric cards
+    - Progress bar with step info
+    - TensorBoard link (if available)
+
+    Args:
+        task: Active TaskInfo
+        task_manager: TaskManager instance
+    """
+    # Header with task info
+    with st.container(border=True):
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown(f"**{task.task_id}** · :green[● RUNNING]")
+        with col2:
+            st.caption(f"Elapsed: {task.elapsed_time_str}")
+
+    # Metric cards
+    render_training_metric_cards(task)
+
+    # Progress bar
+    render_training_progress_bar(task.progress, task.current_step)
+
+    # TensorBoard status
+    tensorboard_url = task.extra_data.get("tensorboard_url")
+    if tensorboard_url:
+        from .tensorboard_embed import render_tensorboard_status
+        render_tensorboard_status(tensorboard_url, is_running=True)
+
+    # Cancel button
+    if st.button("Cancel Training", key=f"cancel_training_{task.task_id}", type="secondary"):
+        if task_manager.cancel_task(task.task_id):
+            st.warning("Training cancelled")
+            st.rerun()
+
+
+def render_training_completed_banner(task: TaskInfo):
+    """
+    Render completion banner for finished training.
+
+    Args:
+        task: Completed TaskInfo
+    """
+    metrics = task.extra_data.get("metrics", {})
+    training_time = task.extra_data.get("training_time_minutes", 0)
+    epochs_completed = task.extra_data.get("epochs_completed", 0)
+
+    map50 = metrics.get("mAP50", 0)
+    map50_95 = metrics.get("mAP50-95", 0)
+    target_met = map50 >= 0.85
+
+    status_text = "Target Achieved" if target_met else "Below Target"
+
+    # Status banner
+    if target_met:
+        st.success(f"✓ Training Complete - {status_text}")
+    else:
+        st.warning(f"⚠ Training Complete - {status_text}")
+
+    st.caption(f"{epochs_completed} epochs in {training_time:.1f} minutes")
+
+    # Metrics
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("mAP@50", f"{map50:.1%}")
+    with col2:
+        st.metric("mAP@50-95", f"{map50_95:.1%}")
+    with col3:
+        st.metric("Precision", f"{metrics.get('precision', 0):.1%}")
+    with col4:
+        st.metric("Recall", f"{metrics.get('recall', 0):.1%}")
+
+    # Show best model path
+    best_model = task.extra_data.get("best_model")
+    if best_model:
+        with st.container(border=True):
+            st.caption("Best Model")
+            st.code(best_model, language=None)

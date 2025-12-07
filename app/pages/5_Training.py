@@ -2,6 +2,13 @@
 Training Page
 
 Provides UI for running YOLOv8 fine-tuning on annotated datasets.
+Features:
+- GPU auto-scaling integration
+- TensorBoard monitoring with embedded view + external link
+- Competition-optimized training presets
+- Real-time training progress with charts
+- Mission Control aesthetic UI
+
 Integrates with scripts/training/quick_finetune.py via TaskManager.
 """
 
@@ -11,22 +18,72 @@ import sys
 
 # Add app directory to path
 app_dir = Path(__file__).parent.parent
+project_root = app_dir.parent
 if str(app_dir) not in sys.path:
     sys.path.insert(0, str(app_dir))
+if str(project_root / "scripts") not in sys.path:
+    sys.path.insert(0, str(project_root / "scripts"))
 
 from services.task_manager import TaskManager, TaskStatus
 from services.path_coordinator import PathCoordinator
+
+# Import new Mission Control components
+from components.training_styles import inject_training_styles, COLORS, ICONS
+from components.training_charts import (
+    render_training_chart,
+    render_epoch_metrics_chart,
+)
+from components.tensorboard_embed import (
+    render_tensorboard_panel,
+    render_tensorboard_status,
+)
+from components.config_preview import (
+    validate_training_config,
+    render_validation_messages,
+    render_gpu_status_card,
+    render_gpu_not_available,
+    render_config_summary,
+    render_model_recommendation,
+    render_target_metrics_info,
+)
 from components.progress_display import (
     render_task_progress,
     render_active_task_banner,
     render_task_list,
     render_task_metrics,
+    render_training_active_banner,
+    render_training_completed_banner,
+    render_circular_progress,
+    render_training_metric_cards,
 )
 
 
 def show_training_page():
-    """Main training page."""
-    st.title("Model Training")
+    """Main training page with Mission Control aesthetic."""
+    # Inject custom CSS
+    inject_training_styles()
+
+    # Page header with Mission Control styling
+    st.markdown(f"""
+    <div class="mc-page-header mc-animate-fade">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 1.5rem;">{ICONS["model"]}</span>
+            <h1 style="
+                margin: 0;
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 1.75rem;
+                font-weight: 600;
+                color: {COLORS["text_primary"]};
+            ">Model Training</h1>
+        </div>
+        <div style="
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            color: {COLORS["text_muted"]};
+            margin-top: 4px;
+        ">Competition-optimized YOLOv8 fine-tuning with GPU auto-scaling</div>
+    </div>
+    """, unsafe_allow_html=True)
 
     # Get services from session state (profile-aware)
     if "task_manager" not in st.session_state or "path_coordinator" not in st.session_state:
@@ -37,21 +94,18 @@ def show_training_page():
     path_coordinator = st.session_state.path_coordinator
 
     # Check for active training task
-    active_task = render_active_task_banner("training", task_manager)
+    active_task = _get_active_training_task(task_manager)
 
     if active_task:
-        st.markdown("---")
-        st.subheader("Training in Progress")
-        task = render_task_progress(active_task.task_id, task_manager)
-
-        if task and task.status == TaskStatus.COMPLETED:
-            st.balloons()
-            render_task_metrics(task)
-
+        _render_active_training_view(active_task, task_manager, path_coordinator)
         return
 
     # Tabs for different sections
-    tab1, tab2, tab3 = st.tabs(["Start Training", "Models", "History"])
+    tab1, tab2, tab3 = st.tabs([
+        f"{ICONS['dataset']} Start Training",
+        f"{ICONS['model']} Models",
+        "📜 History"
+    ])
 
     with tab1:
         _render_start_training(task_manager, path_coordinator)
@@ -63,21 +117,175 @@ def show_training_page():
         _render_training_history(task_manager)
 
 
-def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoordinator):
-    """Render training configuration and start section."""
-    st.subheader("Configure Training")
+def _get_active_training_task(task_manager: TaskManager):
+    """Get active training task if exists."""
+    tasks = task_manager.get_active_tasks(task_type="training")
+    if tasks:
+        return tasks[0]
+    return None
 
-    # Dataset selection
-    st.markdown("### Dataset")
+
+def _render_active_training_view(active_task, task_manager: TaskManager, path_coordinator):
+    """Render the active training view with Mission Control aesthetic."""
+    task = task_manager.get_task(active_task.task_id)
+
+    if not task:
+        return
+
+    # Active training banner
+    render_training_active_banner(task, task_manager)
+
+    st.markdown("<div style='height: 24px'></div>", unsafe_allow_html=True)
+
+    # Training metrics cards
+    render_training_metric_cards(task)
+
+    st.markdown("<div style='height: 24px'></div>", unsafe_allow_html=True)
+
+    # Two-column layout: Chart + Config
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        # Training progress chart
+        st.markdown(f"""
+        <div style="
+            background: {COLORS["surface"]};
+            border: 1px solid {COLORS["surface_hover"]};
+            border-radius: 12px;
+            padding: 16px;
+        ">
+            <div style="
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 0.85rem;
+                color: {COLORS["text_secondary"]};
+                margin-bottom: 12px;
+            ">{ICONS["accuracy"]} Training Progress</div>
+        """, unsafe_allow_html=True)
+
+        training_history = task.extra_data.get("training_history", []) if task.extra_data else []
+        render_training_chart(training_history, target_map50=0.85, height=320)
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with col2:
+        # GPU and config info
+        if task.extra_data:
+            gpu_info = task.extra_data.get("gpu_info", "Unknown")
+            gpu_tier = task.extra_data.get("gpu_tier", "unknown")
+            gpu_memory = 0.0
+
+            # Extract memory from gpu_info if available
+            try:
+                if "GB" in gpu_info:
+                    import re
+                    match = re.search(r'(\d+\.?\d*)\s*GB', gpu_info)
+                    if match:
+                        gpu_memory = float(match.group(1))
+            except Exception:
+                pass
+
+            render_gpu_status_card(
+                gpu_name=gpu_info.split(" (")[0] if " (" in gpu_info else gpu_info,
+                gpu_memory=gpu_memory,
+                gpu_tier=gpu_tier,
+                auto_scale_enabled=True
+            )
+
+            # Config summary
+            config = task.extra_data.get("config", {})
+            if config:
+                st.markdown(f"""
+                <div style="
+                    background: {COLORS["surface"]};
+                    border: 1px solid {COLORS["surface_hover"]};
+                    border-radius: 12px;
+                    padding: 16px;
+                    margin-top: 16px;
+                ">
+                    <div style="
+                        font-family: 'JetBrains Mono', monospace;
+                        font-size: 0.75rem;
+                        color: {COLORS["text_muted"]};
+                        text-transform: uppercase;
+                        letter-spacing: 0.1em;
+                        margin-bottom: 12px;
+                    ">Configuration</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div>
+                            <div style="font-size: 0.7rem; color: {COLORS["text_muted"]};">Model</div>
+                            <div style="font-family: 'JetBrains Mono', monospace; color: {COLORS["text_primary"]};">{config.get("model", "N/A")}</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.7rem; color: {COLORS["text_muted"]};">Batch</div>
+                            <div style="font-family: 'JetBrains Mono', monospace; color: {COLORS["text_primary"]};">{config.get("batch", "N/A")}</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.7rem; color: {COLORS["text_muted"]};">Image Size</div>
+                            <div style="font-family: 'JetBrains Mono', monospace; color: {COLORS["text_primary"]};">{config.get("imgsz", 640)}</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.7rem; color: {COLORS["text_muted"]};">Epochs</div>
+                            <div style="font-family: 'JetBrains Mono', monospace; color: {COLORS["text_primary"]};">{config.get("epochs", "N/A")}</div>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+    st.markdown("<div style='height: 24px'></div>", unsafe_allow_html=True)
+
+    # TensorBoard section
+    if task.extra_data:
+        tensorboard_url = task.extra_data.get("tensorboard_url")
+        if tensorboard_url:
+            with st.expander(f"{ICONS['tensorboard']} TensorBoard", expanded=False):
+                render_tensorboard_panel(
+                    tensorboard_url=tensorboard_url,
+                    show_iframe=False,
+                    iframe_height=500,
+                )
+        else:
+            render_tensorboard_status(is_running=False)
+
+    # Check for completion
+    if task.status == TaskStatus.COMPLETED:
+        st.balloons()
+        render_training_completed_banner(task)
+
+
+def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoordinator):
+    """Render training configuration with Mission Control aesthetic."""
+
+    # Dataset selection section
+    st.markdown(f"""
+    <div style="
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.9rem;
+        color: {COLORS["text_primary"]};
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    ">
+        <span>{ICONS["dataset"]}</span>
+        <span>Dataset Selection</span>
+    </div>
+    """, unsafe_allow_html=True)
 
     sessions = path_coordinator.get_annotation_sessions()
     ready_sessions = [s for s in sessions if s["has_data_yaml"]]
 
     if not ready_sessions:
-        st.warning(
-            "No annotated datasets found. "
-            "Please run annotation first to create a dataset."
-        )
+        st.markdown(f"""
+        <div class="mc-validation warning mc-animate-fade">
+            <span class="icon">⚠</span>
+            <div>
+                <strong>No annotated datasets found</strong><br>
+                <span style="font-size: 0.85rem; opacity: 0.9;">
+                    Please run annotation first to create a dataset.
+                </span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         return
 
     # Check for pre-selected dataset
@@ -92,23 +300,25 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
         "Select Dataset",
         ready_sessions,
         index=default_idx,
-        format_func=lambda x: f"{x['name']} ({x['created'][:10]})"
+        format_func=lambda x: f"{x['name']} ({x['created'][:10]})",
+        label_visibility="collapsed"
     )
+
+    # Dataset info card
+    train_count = 0
+    val_count = 0
+    class_names = []
+    data_yaml = None
 
     if selected_session:
         session_path = Path(selected_session["path"])
         data_yaml = session_path / "data.yaml"
 
-        # Show dataset info
         try:
             import yaml
             with open(data_yaml) as f:
                 config = yaml.safe_load(f)
-
-            col1, col2, col3 = st.columns(3)
-
-            with col1:
-                st.metric("Classes", len(config.get("names", [])))
+            class_names = config.get("names", [])
 
             # Count images
             train_dir = session_path / "images" / "train"
@@ -116,42 +326,196 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
             train_count = len(list(train_dir.glob("*"))) if train_dir.exists() else 0
             val_count = len(list(val_dir.glob("*"))) if val_dir.exists() else 0
 
-            with col2:
-                st.metric("Train Images", train_count)
+            # Dataset info card
+            st.markdown(f"""
+            <div style="
+                background: {COLORS["surface"]};
+                border: 1px solid {COLORS["surface_hover"]};
+                border-radius: 12px;
+                padding: 16px;
+                margin: 12px 0;
+            ">
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+                    <div style="text-align: center;">
+                        <div style="
+                            font-family: 'JetBrains Mono', monospace;
+                            font-size: 1.5rem;
+                            font-weight: 600;
+                            color: {COLORS["accent_primary"]};
+                        ">{len(class_names)}</div>
+                        <div style="
+                            font-size: 0.75rem;
+                            color: {COLORS["text_muted"]};
+                        ">Classes</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="
+                            font-family: 'JetBrains Mono', monospace;
+                            font-size: 1.5rem;
+                            font-weight: 600;
+                            color: {COLORS["info"]};
+                        ">{train_count}</div>
+                        <div style="
+                            font-size: 0.75rem;
+                            color: {COLORS["text_muted"]};
+                        ">Train Images</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="
+                            font-family: 'JetBrains Mono', monospace;
+                            font-size: 1.5rem;
+                            font-weight: 600;
+                            color: {COLORS["tier_high"]};
+                        ">{val_count}</div>
+                        <div style="
+                            font-size: 0.75rem;
+                            color: {COLORS["text_muted"]};
+                        ">Val Images</div>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
-            with col3:
-                st.metric("Val Images", val_count)
-
-            # Class names
+            # Class names expander
             with st.expander("View Classes", expanded=False):
-                for i, name in enumerate(config.get("names", [])):
-                    st.write(f"  {i}: {name}")
+                cols = st.columns(3)
+                for i, name in enumerate(class_names):
+                    with cols[i % 3]:
+                        st.markdown(f"""
+                        <div style="
+                            background: {COLORS["surface_hover"]};
+                            border-radius: 4px;
+                            padding: 4px 8px;
+                            margin: 2px 0;
+                            font-family: 'JetBrains Mono', monospace;
+                            font-size: 0.8rem;
+                            color: {COLORS["text_secondary"]};
+                        ">
+                            <span style="color: {COLORS["text_muted"]};">{i}:</span> {name}
+                        </div>
+                        """, unsafe_allow_html=True)
 
         except Exception as e:
             st.error(f"Error reading dataset config: {e}")
             return
 
-    st.markdown("---")
+    st.markdown("<div style='height: 24px'></div>", unsafe_allow_html=True)
 
-    # Model configuration
-    st.markdown("### Model Configuration")
+    # Hardware detection section
+    st.markdown(f"""
+    <div style="
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.9rem;
+        color: {COLORS["text_primary"]};
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    ">
+        <span>⚡</span>
+        <span>Hardware & GPU Scaling</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    gpu_available = False
+    gpu_name = ""
+    gpu_memory = 0.0
+    gpu_tier = "unknown"
+
+    try:
+        import torch
+        if torch.cuda.is_available():
+            gpu_available = True
+            gpu_name = torch.cuda.get_device_name(0)
+            gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1e9
+
+            # Determine tier
+            if gpu_memory >= 24:
+                gpu_tier = "workstation"
+            elif gpu_memory >= 12:
+                gpu_tier = "high"
+            elif gpu_memory >= 6:
+                gpu_tier = "medium"
+            else:
+                gpu_tier = "low"
+
+            render_gpu_status_card(
+                gpu_name=gpu_name,
+                gpu_memory=gpu_memory,
+                gpu_tier=gpu_tier,
+                auto_scale_enabled=False
+            )
+        else:
+            render_gpu_not_available()
+    except ImportError:
+        st.warning("PyTorch not installed. Cannot check GPU availability.")
+
+    # Auto-scaling option
+    auto_scale = st.checkbox(
+        "Enable GPU Auto-Scaling",
+        value=True,
+        help="Automatically select optimal model, batch size, and settings based on GPU capabilities."
+    )
+
+    if auto_scale and gpu_available:
+        tier_models = {
+            "low": "yolov8s.pt",
+            "medium": "yolov8m.pt",
+            "high": "yolov8l.pt",
+            "workstation": "yolov8x.pt",
+        }
+        tier_batches = {
+            "low": 8,
+            "medium": 16,
+            "high": 32,
+            "workstation": 64,
+        }
+        recommended_model = tier_models.get(gpu_tier, "yolov8m.pt")
+        recommended_batch = tier_batches.get(gpu_tier, 16)
+
+        render_model_recommendation(
+            recommended_model=recommended_model,
+            recommended_batch=recommended_batch,
+            gpu_tier=gpu_tier
+        )
+
+    st.markdown("<div style='height: 24px'></div>", unsafe_allow_html=True)
+
+    # Model configuration section
+    st.markdown(f"""
+    <div style="
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.9rem;
+        color: {COLORS["text_primary"]};
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    ">
+        <span>{ICONS["model"]}</span>
+        <span>Model Configuration</span>
+    </div>
+    """, unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
 
     with col1:
         # Base model selection
-        pretrained_models = path_coordinator.get_pretrained_models()
-        model_options = ["yolov8m.pt", "yolov8s.pt", "yolov8n.pt"] + [
-            str(Path(m).name) for m in pretrained_models if m not in ["yolov8m.pt", "yolov8s.pt", "yolov8n.pt"]
-        ]
+        if auto_scale and gpu_available:
+            base_model = None  # Will be auto-selected
+        else:
+            pretrained_models = path_coordinator.get_pretrained_models()
+            model_options = ["yolov8m.pt", "yolov8s.pt", "yolov8n.pt", "yolov8l.pt", "yolov8x.pt"] + [
+                str(Path(m).name) for m in pretrained_models
+                if str(Path(m).name) not in ["yolov8m.pt", "yolov8s.pt", "yolov8n.pt", "yolov8l.pt", "yolov8x.pt"]
+            ]
 
-        base_model = st.selectbox(
-            "Base Model",
-            model_options,
-            index=0,
-            help="YOLOv8m is recommended for competition (best accuracy). "
-                 "YOLOv8s is faster but less accurate."
-        )
+            base_model = st.selectbox(
+                "Base Model",
+                model_options,
+                index=0,
+                help="YOLOv8m is recommended for competition. YOLOv8l/x for high-end GPUs."
+            )
 
         epochs = st.slider(
             "Epochs",
@@ -163,14 +527,17 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
         )
 
     with col2:
-        batch_size = st.slider(
-            "Batch Size",
-            min_value=4,
-            max_value=64,
-            value=16,
-            step=4,
-            help="Larger batch size = faster training but more GPU memory required."
-        )
+        if auto_scale and gpu_available:
+            batch_size = None  # Will be auto-selected
+        else:
+            batch_size = st.slider(
+                "Batch Size",
+                min_value=4,
+                max_value=64,
+                value=16,
+                step=4,
+                help="Larger batch size = faster training but more GPU memory required."
+            )
 
         fast_mode = st.checkbox(
             "Fast Mode (Testing)",
@@ -178,71 +545,198 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
             help="Use smaller model and fewer epochs for quick testing."
         )
 
-    # GPU check
-    st.markdown("---")
-    st.markdown("### Hardware")
+    st.markdown("<div style='height: 24px'></div>", unsafe_allow_html=True)
 
-    try:
-        import torch
-        if torch.cuda.is_available():
-            gpu_name = torch.cuda.get_device_name(0)
-            gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1e9
-            st.success(f"GPU Available: {gpu_name} ({gpu_memory:.1f} GB)")
-        else:
-            st.warning(
-                "CUDA not available. Training will be very slow on CPU. "
-                "Consider using a machine with GPU."
-            )
-    except ImportError:
-        st.warning("PyTorch not installed. Cannot check GPU availability.")
+    # Monitoring section
+    st.markdown(f"""
+    <div style="
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.9rem;
+        color: {COLORS["text_primary"]};
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    ">
+        <span>{ICONS["tensorboard"]}</span>
+        <span>Monitoring</span>
+    </div>
+    """, unsafe_allow_html=True)
 
-    # Estimated time
-    st.markdown("---")
-
-    # Rough estimate: ~1 minute per epoch for YOLOv8m on GPU
-    estimated_minutes = epochs * (2 if base_model == "yolov8m.pt" else 1)
-    if fast_mode:
-        estimated_minutes = epochs * 0.5
-
-    st.info(
-        f"**Estimated training time:** ~{estimated_minutes:.0f} minutes\n\n"
-        f"Target metrics: mAP@50 ≥ 85%, Inference ≤ 100ms"
+    enable_tensorboard = st.checkbox(
+        "Enable TensorBoard",
+        value=True,
+        help="View training progress in real-time with loss curves and metrics."
     )
 
-    # Start button
-    if st.button("Start Training", type="primary"):
-        task_id = task_manager.start_training(
+    if enable_tensorboard:
+        tensorboard_port = st.number_input(
+            "TensorBoard Port",
+            min_value=1024,
+            max_value=65535,
+            value=6006,
+            help="Port for TensorBoard server"
+        )
+    else:
+        tensorboard_port = 6006
+
+    st.markdown("<div style='height: 24px'></div>", unsafe_allow_html=True)
+
+    # Validation
+    if data_yaml:
+        current_batch = batch_size if batch_size else (recommended_batch if auto_scale and gpu_available else 16)
+        current_model = base_model if base_model else (recommended_model if auto_scale and gpu_available else "yolov8m.pt")
+
+        validation = validate_training_config(
             dataset_yaml=str(data_yaml),
-            base_model=base_model,
-            output_dir=str(path_coordinator.get_path("finetuned_dir")),
+            model=current_model,
+            batch_size=current_batch,
             epochs=epochs,
-            batch_size=batch_size,
-            fast_mode=fast_mode,
+            gpu_memory_gb=gpu_memory,
+            auto_scale=auto_scale
         )
 
-        st.success(f"Training started! Task ID: {task_id}")
-        st.rerun()
+        render_validation_messages(validation)
+
+    st.markdown("<div style='height: 16px'></div>", unsafe_allow_html=True)
+
+    # Target metrics
+    render_target_metrics_info()
+
+    st.markdown("<div style='height: 16px'></div>", unsafe_allow_html=True)
+
+    # Estimated time and config summary
+    if gpu_available:
+        tier_multipliers = {
+            "low": 2.0,
+            "medium": 1.0,
+            "high": 0.6,
+            "workstation": 0.4,
+        }
+        multiplier = tier_multipliers.get(gpu_tier, 1.0)
+    else:
+        multiplier = 5.0
+
+    estimated_minutes = epochs * multiplier
+    if fast_mode:
+        estimated_minutes = estimated_minutes * 0.5
+
+    if data_yaml and selected_session:
+        render_config_summary(
+            dataset_name=selected_session["name"],
+            train_count=train_count,
+            val_count=val_count,
+            model=base_model if base_model else (recommended_model if auto_scale and gpu_available else "yolov8m.pt"),
+            batch_size=batch_size if batch_size else (recommended_batch if auto_scale and gpu_available else 16),
+            epochs=epochs,
+            gpu_tier=gpu_tier,
+            estimated_time=estimated_minutes,
+            auto_scale=auto_scale
+        )
+
+    st.markdown("<div style='height: 24px'></div>", unsafe_allow_html=True)
+
+    # Start button
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("🚀 Start Training", type="primary", use_container_width=True):
+            task_id = task_manager.start_training(
+                dataset_yaml=str(data_yaml),
+                base_model=base_model,
+                output_dir=str(path_coordinator.get_path("finetuned_dir")),
+                epochs=epochs,
+                batch_size=batch_size,
+                fast_mode=fast_mode,
+                auto_scale=auto_scale,
+                enable_tensorboard=enable_tensorboard,
+                tensorboard_port=tensorboard_port,
+            )
+
+            st.markdown(f"""
+            <div class="mc-validation success mc-animate-fade" style="margin-top: 16px;">
+                <span class="icon">✓</span>
+                <div>
+                    <strong>Training started!</strong><br>
+                    <span style="font-size: 0.85rem; opacity: 0.9;">
+                        Task ID: {task_id}
+                    </span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            if enable_tensorboard:
+                st.info(f"TensorBoard will be available at http://localhost:{tensorboard_port}")
+
+            import time
+            time.sleep(1)
+            st.rerun()
 
 
 def _render_trained_models(path_coordinator: PathCoordinator):
-    """Render list of trained models."""
-    st.subheader("Trained Models")
+    """Render list of trained models with Mission Control aesthetic."""
+    st.markdown(f"""
+    <div style="
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.9rem;
+        color: {COLORS["text_primary"]};
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    ">
+        <span>{ICONS["model"]}</span>
+        <span>Trained Models</span>
+    </div>
+    """, unsafe_allow_html=True)
 
     models = path_coordinator.get_trained_models()
 
     if not models:
-        st.info("No trained models found. Run training to create one.")
+        st.markdown(f"""
+        <div style="
+            background: {COLORS["surface"]};
+            border: 1px dashed {COLORS["surface_hover"]};
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+        ">
+            <div style="
+                font-size: 2rem;
+                color: {COLORS["text_muted"]};
+                margin-bottom: 12px;
+            ">{ICONS["model"]}</div>
+            <div style="
+                font-family: 'Inter', sans-serif;
+                font-size: 0.9rem;
+                color: {COLORS["text_secondary"]};
+            ">No trained models found</div>
+            <div style="
+                font-family: 'Inter', sans-serif;
+                font-size: 0.8rem;
+                color: {COLORS["text_muted"]};
+                margin-top: 4px;
+            ">Run training to create one</div>
+        </div>
+        """, unsafe_allow_html=True)
         return
 
     for model in models:
         with st.expander(f"📦 {model['name']}", expanded=False):
-            st.write(f"**Created:** {model['created'][:19]}")
-
-            if model["best_path"]:
-                st.write(f"**Best Model:** `{model['best_path']}`")
-
-            if model["last_path"]:
-                st.write(f"**Last Model:** `{model['last_path']}`")
+            # Model info header
+            st.markdown(f"""
+            <div style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 12px;
+            ">
+                <div style="
+                    font-family: 'Inter', sans-serif;
+                    font-size: 0.8rem;
+                    color: {COLORS["text_muted"]};
+                ">Created: {model['created'][:19]}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
             # Check for training result
             model_dir = Path(model["best_path"]).parent.parent if model["best_path"] else None
@@ -254,40 +748,140 @@ def _render_trained_models(path_coordinator: PathCoordinator):
                         with open(result_file) as f:
                             result = json.load(f)
 
-                        col1, col2, col3, col4 = st.columns(4)
+                        metrics = result.get('metrics', {})
+                        mAP50 = metrics.get('mAP50', 0)
+                        mAP50_95 = metrics.get('mAP50-95', 0)
+                        training_time = result.get('training_time_minutes', 0)
+                        epochs_done = result.get('epochs_completed', 'N/A')
 
-                        with col1:
-                            st.metric("mAP@50", f"{result.get('metrics', {}).get('mAP50', 0):.2%}")
+                        # Target achievement badge
+                        target_achieved = mAP50 >= 0.85
+                        badge_color = COLORS["success"] if target_achieved else COLORS["warning"]
+                        badge_text = "TARGET MET" if target_achieved else "BELOW TARGET"
 
-                        with col2:
-                            st.metric("mAP@50-95", f"{result.get('metrics', {}).get('mAP50-95', 0):.2%}")
-
-                        with col3:
-                            st.metric("Training Time", f"{result.get('training_time_minutes', 0):.0f}min")
-
-                        with col4:
-                            st.metric("Epochs", result.get("epochs_completed", "N/A"))
+                        st.markdown(f"""
+                        <div style="
+                            background: {COLORS["surface"]};
+                            border-radius: 8px;
+                            padding: 16px;
+                            margin-bottom: 12px;
+                        ">
+                            <div style="
+                                display: flex;
+                                justify-content: space-between;
+                                align-items: center;
+                                margin-bottom: 16px;
+                            ">
+                                <span style="
+                                    background: {badge_color}22;
+                                    color: {badge_color};
+                                    padding: 4px 8px;
+                                    border-radius: 4px;
+                                    font-family: 'JetBrains Mono', monospace;
+                                    font-size: 0.7rem;
+                                    font-weight: 600;
+                                    letter-spacing: 0.05em;
+                                ">{badge_text}</span>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
+                                <div style="text-align: center;">
+                                    <div style="
+                                        font-family: 'JetBrains Mono', monospace;
+                                        font-size: 1.25rem;
+                                        font-weight: 600;
+                                        color: {COLORS["accent_primary"]};
+                                    ">{mAP50:.1%}</div>
+                                    <div style="font-size: 0.7rem; color: {COLORS["text_muted"]};">mAP@50</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="
+                                        font-family: 'JetBrains Mono', monospace;
+                                        font-size: 1.25rem;
+                                        font-weight: 600;
+                                        color: {COLORS["info"]};
+                                    ">{mAP50_95:.1%}</div>
+                                    <div style="font-size: 0.7rem; color: {COLORS["text_muted"]};">mAP@50-95</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="
+                                        font-family: 'JetBrains Mono', monospace;
+                                        font-size: 1.25rem;
+                                        font-weight: 600;
+                                        color: {COLORS["text_secondary"]};
+                                    ">{training_time:.0f}m</div>
+                                    <div style="font-size: 0.7rem; color: {COLORS["text_muted"]};">Time</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="
+                                        font-family: 'JetBrains Mono', monospace;
+                                        font-size: 1.25rem;
+                                        font-weight: 600;
+                                        color: {COLORS["text_secondary"]};
+                                    ">{epochs_done}</div>
+                                    <div style="font-size: 0.7rem; color: {COLORS["text_muted"]};">Epochs</div>
+                                </div>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
 
                     except Exception:
                         pass
 
-            # Action buttons
-            col1, col2 = st.columns(2)
+            # Model paths
+            if model["best_path"]:
+                st.markdown(f"""
+                <div style="
+                    background: {COLORS["surface_hover"]};
+                    border-radius: 6px;
+                    padding: 8px 12px;
+                    margin-bottom: 8px;
+                    font-family: 'JetBrains Mono', monospace;
+                    font-size: 0.75rem;
+                ">
+                    <span style="color: {COLORS["success"]};">●</span>
+                    <span style="color: {COLORS["text_muted"]};">Best:</span>
+                    <span style="color: {COLORS["text_secondary"]};">{model['best_path']}</span>
+                </div>
+                """, unsafe_allow_html=True)
 
-            with col1:
-                if st.button("Evaluate", key=f"eval_{model['name']}"):
-                    st.session_state["selected_model"] = model["best_path"] or model["last_path"]
-                    st.info("Go to Evaluation page to evaluate this model")
+            if model["last_path"]:
+                st.markdown(f"""
+                <div style="
+                    background: {COLORS["surface_hover"]};
+                    border-radius: 6px;
+                    padding: 8px 12px;
+                    font-family: 'JetBrains Mono', monospace;
+                    font-size: 0.75rem;
+                ">
+                    <span style="color: {COLORS["text_muted"]};">○</span>
+                    <span style="color: {COLORS["text_muted"]};">Last:</span>
+                    <span style="color: {COLORS["text_secondary"]};">{model['last_path']}</span>
+                </div>
+                """, unsafe_allow_html=True)
 
-            with col2:
-                if model["best_path"]:
-                    # Copy path button
-                    st.code(model["best_path"], language=None)
+            # Action button
+            st.markdown("<div style='height: 12px'></div>", unsafe_allow_html=True)
+            if st.button("📊 Evaluate", key=f"eval_{model['name']}", use_container_width=True):
+                st.session_state["selected_model"] = model["best_path"] or model["last_path"]
+                st.info("Go to Evaluation page to evaluate this model")
 
 
 def _render_training_history(task_manager: TaskManager):
     """Render training task history."""
-    st.subheader("Training History")
+    st.markdown(f"""
+    <div style="
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.9rem;
+        color: {COLORS["text_primary"]};
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    ">
+        <span>📜</span>
+        <span>Training History</span>
+    </div>
+    """, unsafe_allow_html=True)
 
     render_task_list(
         task_type="training",

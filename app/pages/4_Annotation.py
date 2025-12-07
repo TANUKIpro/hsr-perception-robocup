@@ -4,6 +4,9 @@ Annotation Page
 Provides UI for SAM2 interactive annotation application.
 Allows users to launch the annotation app for semi-automatic object annotation
 using SAM2 segmentation and video tracking.
+
+Also includes dataset preparation functionality to create
+training-ready datasets from annotated data.
 """
 
 import streamlit as st
@@ -17,16 +20,26 @@ if str(app_dir) not in sys.path:
 
 from services.task_manager import TaskManager, TaskStatus
 from services.path_coordinator import PathCoordinator
+from services.dataset_preparer import DatasetPreparer
 from components.progress_display import (
     render_task_progress,
     render_active_task_banner,
     render_task_list,
     render_task_metrics,
 )
+from components.dataset_status import (
+    render_class_status_grid,
+    render_dataset_preparation_panel,
+    render_dataset_result,
+)
+from components.training_styles import inject_training_styles, COLORS, ICONS
 
 
 def show_annotation_page():
     """Main annotation page."""
+    # Inject Mission Control styles
+    inject_training_styles()
+
     st.title("SAM2 Interactive Annotation")
 
     # Get services from session state (profile-aware)
@@ -38,15 +51,23 @@ def show_annotation_page():
     path_coordinator = st.session_state.path_coordinator
 
     # Tabs for different sections
-    tab1, tab2, tab3 = st.tabs(["Run Annotation", "Sessions", "History"])
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "🎯 Run Annotation",
+        "📦 Prepare Dataset",
+        "📁 Sessions",
+        "📜 History"
+    ])
 
     with tab1:
         _render_run_annotation(task_manager, path_coordinator)
 
     with tab2:
-        _render_annotation_sessions(path_coordinator)
+        _render_prepare_dataset(path_coordinator)
 
     with tab3:
+        _render_annotation_sessions(path_coordinator)
+
+    with tab4:
         _render_annotation_history(task_manager)
 
 
@@ -221,6 +242,68 @@ For large image sequences, the application automatically manages GPU memory:
 - For tracking mode, choose a representative first frame
 - Monitor the confidence indicators for tracking quality
         """)
+
+
+def _render_prepare_dataset(path_coordinator: PathCoordinator):
+    """Render dataset preparation section with class status."""
+    text_primary = COLORS["text_primary"]
+    st.markdown(f"""
+    <div style="
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.9rem;
+        color: {text_primary};
+        margin-bottom: 16px;
+    ">
+        Create training-ready datasets from your annotated data
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Get dataset preparer
+    preparer = DatasetPreparer(path_coordinator)
+    classes = preparer.get_available_classes()
+
+    # Class status section
+    st.markdown(f"""
+    <div style="
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.9rem;
+        color: {text_primary};
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    ">
+        <span>📊</span>
+        <span>Class Status</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    render_class_status_grid(classes, columns=2)
+
+    st.markdown("<div style='height: 24px'></div>", unsafe_allow_html=True)
+
+    # Dataset generation section
+    params = render_dataset_preparation_panel(classes)
+
+    if params:
+        # Generate dataset
+        with st.spinner("Generating dataset..."):
+            result = preparer.prepare_dataset(
+                class_names=params["classes"],
+                output_name=params["dataset_name"],
+                val_ratio=params["val_ratio"],
+            )
+
+        render_dataset_result(result, params["dataset_name"])
+
+        if result.success:
+            # Add button to go to training
+            st.markdown("<div style='height: 16px'></div>", unsafe_allow_html=True)
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                if st.button("🚀 Go to Training", use_container_width=True):
+                    st.session_state["selected_dataset"] = str(result.output_dir)
+                    st.switch_page("pages/5_Training.py")
 
 
 def _render_annotation_sessions(path_coordinator: PathCoordinator):
