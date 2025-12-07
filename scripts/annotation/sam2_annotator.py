@@ -76,14 +76,30 @@ class SAM2Annotator:
         print(f"Loading SAM2 model: {self.model_path}")
 
         # Determine model config based on model path
-        if "sam2_b" in self.model_path.lower() or "base" in self.model_path.lower():
-            model_cfg = "sam2_hiera_b+.yaml"
-        elif "sam2_l" in self.model_path.lower() or "large" in self.model_path.lower():
-            model_cfg = "sam2_hiera_l.yaml"
-        elif "sam2_t" in self.model_path.lower() or "tiny" in self.model_path.lower():
-            model_cfg = "sam2_hiera_t.yaml"
+        # Config paths use format: configs/sam2.1/sam2.1_hiera_X.yaml
+        model_path_lower = self.model_path.lower()
+        if "sam2.1" in model_path_lower or "sam2_1" in model_path_lower:
+            # SAM2.1 models
+            if "base" in model_path_lower or "_b" in model_path_lower:
+                model_cfg = "configs/sam2.1/sam2.1_hiera_b+.yaml"
+            elif "large" in model_path_lower or "_l" in model_path_lower:
+                model_cfg = "configs/sam2.1/sam2.1_hiera_l.yaml"
+            elif "small" in model_path_lower or "_s" in model_path_lower:
+                model_cfg = "configs/sam2.1/sam2.1_hiera_s.yaml"
+            elif "tiny" in model_path_lower or "_t" in model_path_lower:
+                model_cfg = "configs/sam2.1/sam2.1_hiera_t.yaml"
+            else:
+                model_cfg = "configs/sam2.1/sam2.1_hiera_b+.yaml"
         else:
-            model_cfg = "sam2_hiera_b+.yaml"  # Default to base
+            # SAM2 models - use SAM2.1 config for compatibility with newer checkpoints
+            if "sam2_b" in model_path_lower or "base" in model_path_lower:
+                model_cfg = "configs/sam2.1/sam2.1_hiera_b+.yaml"
+            elif "sam2_l" in model_path_lower or "large" in model_path_lower:
+                model_cfg = "configs/sam2.1/sam2.1_hiera_l.yaml"
+            elif "sam2_t" in model_path_lower or "tiny" in model_path_lower:
+                model_cfg = "configs/sam2.1/sam2.1_hiera_t.yaml"
+            else:
+                model_cfg = "configs/sam2.1/sam2.1_hiera_b+.yaml"  # Default to base
 
         self.model = build_sam2(model_cfg, self.model_path, device=self.device)
 

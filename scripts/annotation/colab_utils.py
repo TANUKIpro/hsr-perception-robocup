@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Colab Utilities for SAM3 Tracker
+Colab Utilities for SAM2 Annotator
 
 Helper functions for Google Colab environment including:
 - File upload/download utilities
