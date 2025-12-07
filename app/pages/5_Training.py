@@ -26,11 +26,15 @@ from components.progress_display import (
 
 def show_training_page():
     """Main training page."""
-    st.title("🎓 Model Training")
+    st.title("Model Training")
 
-    # Initialize services
-    task_manager = TaskManager()
-    path_coordinator = PathCoordinator()
+    # Get services from session state (profile-aware)
+    if "task_manager" not in st.session_state or "path_coordinator" not in st.session_state:
+        st.error("Services not initialized. Please reload the page.")
+        return
+
+    task_manager = st.session_state.task_manager
+    path_coordinator = st.session_state.path_coordinator
 
     # Check for active training task
     active_task = render_active_task_banner("training", task_manager)

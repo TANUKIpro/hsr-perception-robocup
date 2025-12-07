@@ -2,6 +2,7 @@
 Object Registry - Data Model and Operations
 
 Manages object definitions, reference images, and collection status.
+Supports profile-based data isolation via PathCoordinator.
 """
 
 import json
@@ -9,8 +10,10 @@ import shutil
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
-import os
+from typing import Dict, List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from services.path_coordinator import PathCoordinator
 
 
 @dataclass
@@ -83,18 +86,37 @@ class RegisteredObject:
 class ObjectRegistry:
     """
     Central registry for managing objects, reference images, and collection status.
+
+    Supports profile-based data isolation via PathCoordinator.
     """
 
-    def __init__(self, data_dir: str = "app/data"):
-        self.data_dir = Path(data_dir)
-        self.registry_file = self.data_dir / "object_registry.json"
-        self.reference_images_dir = self.data_dir / "reference_images"
-        self.collected_images_dir = self.data_dir / "collected_images"
+    def __init__(self, path_coordinator: Optional["PathCoordinator"] = None):
+        """
+        Initialize object registry.
+
+        Args:
+            path_coordinator: PathCoordinator instance for profile-aware paths.
+                            If None, creates a new one (uses active profile).
+        """
+        # Use path coordinator for profile-aware paths
+        if path_coordinator is None:
+            from services.path_coordinator import PathCoordinator
+            self._path_coordinator = PathCoordinator()
+        else:
+            self._path_coordinator = path_coordinator
+
+        # Get paths from coordinator (profile-aware)
+        self.data_dir = self._path_coordinator.get_path("app_data_dir")
+        self.registry_file = self._path_coordinator.get_path("app_registry_file")
+        self.reference_images_dir = self._path_coordinator.get_path("app_reference_dir")
+        self.collected_images_dir = self._path_coordinator.get_path("app_collected_dir")
+        self.thumbnails_dir = self._path_coordinator.get_path("app_thumbnails_dir")
 
         # Create directories
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.reference_images_dir.mkdir(exist_ok=True)
         self.collected_images_dir.mkdir(exist_ok=True)
+        self.thumbnails_dir.mkdir(exist_ok=True)
 
         # Load or initialize registry
         self.objects: Dict[int, RegisteredObject] = {}
@@ -223,16 +245,12 @@ class ObjectRegistry:
         if not obj:
             return None
 
-        # Create thumbnails directory
-        thumbnails_dir = self.data_dir / "thumbnails"
-        thumbnails_dir.mkdir(exist_ok=True)
-
-        # Copy image
+        # Copy image to thumbnails directory
         src = Path(image_path)
-        dst = thumbnails_dir / f"{obj.name}{src.suffix}"
+        dst = self.thumbnails_dir / f"{obj.name}{src.suffix}"
         shutil.copy2(src, dst)
 
-        # Update object
+        # Update object with relative path from data_dir
         obj.thumbnail_path = str(dst.relative_to(self.data_dir))
         obj.last_updated = datetime.now().isoformat()
         self._save()
@@ -244,10 +262,7 @@ class ObjectRegistry:
         if not obj:
             return None
 
-        thumbnails_dir = self.data_dir / "thumbnails"
-        thumbnails_dir.mkdir(exist_ok=True)
-
-        dst = thumbnails_dir / f"{obj.name}{extension}"
+        dst = self.thumbnails_dir / f"{obj.name}{extension}"
         with open(dst, "wb") as f:
             f.write(image_data)
 
