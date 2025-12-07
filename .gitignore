@@ -18,6 +18,7 @@ datasets/
 models/pretrained/
 models/finetuned/
 app/data/
+runs/
 
 # Profile data (user-specific)
 profiles/

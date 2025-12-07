@@ -525,7 +525,8 @@ class PathCoordinator:
         input_dir: str,
         output_dir: str,
         class_id: int = 0,
-        device: str = "cuda"
+        device: str = "cuda",
+        model_path: str = "models/sam2.1_hiera_base_plus.pt"
     ) -> bool:
         """
         Launch SAM2 Interactive Annotation Application.
@@ -538,6 +539,7 @@ class PathCoordinator:
             output_dir: Directory for YOLO label output
             class_id: YOLO class ID for annotations
             device: Device for inference ("cuda" or "cpu")
+            model_path: Path to SAM2 model file
 
         Returns:
             True if application launched successfully, False otherwise
@@ -559,7 +561,8 @@ class PathCoordinator:
             "--input-dir", input_dir,
             "--output-dir", output_dir,
             "--class-id", str(class_id),
-            "--device", device
+            "--device", device,
+            "--model", model_path
         ]
 
         try:

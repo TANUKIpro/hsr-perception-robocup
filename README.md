@@ -27,11 +27,56 @@ flowchart LR
 
 ## セットアップ
 
+### 必要環境
+
+| 項目 | 要件 |
+|------|------|
+| OS | Ubuntu 22.04 |
+| Python | 3.10+ |
+| GPU | CUDA対応GPU（VRAM 6GB以上推奨） |
+| ROS2 | Humble（データ収集機能使用時） |
+
+### 1. Python依存パッケージ
+
 ```bash
-# Python依存パッケージのインストール
+# 基本パッケージのインストール
 pip install -r requirements.txt
 
-# ROS2パッケージのビルド（ROS2 Humbleが必要）
+# GPU使用時: PyTorch CUDA版をインストール（推奨）
+# https://pytorch.org/get-started/locally/ で環境に合ったコマンドを確認
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+```
+
+### 2. SAM2のセットアップ（自動アノテーションで使用）
+
+```bash
+# SAM2パッケージのインストール
+pip install git+https://github.com/facebookresearch/segment-anything-2.git
+
+# SAM2モデルのダウンロード（Base Plusを推奨）
+# models/ ディレクトリに配置してください
+wget -P models https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_base_plus.pt
+```
+
+**利用可能なSAM2モデル:**
+| モデル | サイズ | 用途 |
+|--------|--------|------|
+| sam2.1_hiera_tiny.pt | 最小 | 高速処理優先 |
+| sam2.1_hiera_small.pt | 小 | バランス型 |
+| sam2.1_hiera_base_plus.pt | 中（推奨） | 精度と速度のバランス |
+| sam2.1_hiera_large.pt | 大 | 高精度優先 |
+
+### 3. YOLOモデルの事前取得（オプション）
+
+Ultralyticsは初回実行時に自動ダウンロードしますが、オフライン環境に備えて事前取得を推奨します。
+
+```bash
+python -c "from ultralytics import YOLO; YOLO('yolov8m.pt')"
+```
+
+### 4. ROS2パッケージのビルド（データ収集機能使用時）
+
+```bash
 cd src
 colcon build --packages-select hsr_perception
 source install/setup.bash

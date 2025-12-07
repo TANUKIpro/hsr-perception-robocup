@@ -153,6 +153,20 @@ def _render_run_annotation(task_manager: TaskManager, path_coordinator: PathCoor
         help="CUDA recommended for GPU acceleration. CPU is slower but works without GPU."
     )
 
+    # Model selection
+    model_dir = Path("models")
+    available_models = []
+    if model_dir.exists():
+        available_models = sorted([f.name for f in model_dir.glob("sam2*.pt")])
+    if not available_models:
+        available_models = ["sam2.1_hiera_base_plus.pt"]
+
+    selected_model = st.selectbox(
+        "SAM2 Model",
+        available_models,
+        help="使用するSAM2モデルを選択。models/ディレクトリ内のsam2*.ptファイルが表示されます。"
+    )
+
     st.markdown("---")
 
     # Launch button
@@ -161,7 +175,8 @@ def _render_run_annotation(task_manager: TaskManager, path_coordinator: PathCoor
             input_dir=input_dir,
             output_dir=output_dir,
             class_id=class_id,
-            device=device
+            device=device,
+            model_path=f"models/{selected_model}"
         ):
             st.success("Annotation application launched!")
         else:
