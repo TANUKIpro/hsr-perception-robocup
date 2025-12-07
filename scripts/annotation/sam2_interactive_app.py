@@ -44,7 +44,12 @@ from annotation_utils import (
     read_yolo_label,
     yolo_to_bbox,
 )
-from video_tracking_predictor import VideoTrackingPredictor, TrackingResult
+from video_tracking_predictor import (
+    VideoTrackingPredictor,
+    TrackingResult,
+    BatchInfo,
+    BatchTrackingProgress,
+)
 
 
 # =============================================================================
@@ -1244,11 +1249,11 @@ class SAM2AnnotationApp:
     def _show_vram_warning_dialog(self, vram_estimate, num_frames: int):
         """Show VRAM warning dialog for batch splitting."""
         message = (
-            f"VRAM容量警告\n\n"
-            f"処理対象: {num_frames}フレーム\n"
-            f"推定VRAM使用量: {vram_estimate.estimated_usage_gb:.1f}GB\n"
-            f"利用可能VRAM: {vram_estimate.available_gb:.1f}GB\n\n"
-            f"バッチ分割で処理します:\n"
+            f"VRAM Capacity Warning\n\n"
+            f"Target: {num_frames} frames\n"
+            f"Estimated VRAM usage: {vram_estimate.estimated_usage_gb:.1f}GB\n"
+            f"Available VRAM: {vram_estimate.available_gb:.1f}GB\n\n"
+            f"Processing with batch splitting:\n"
         )
 
         batch_size = vram_estimate.recommended_batch_size
@@ -1256,23 +1261,197 @@ class SAM2AnnotationApp:
             start = i * batch_size
             end = min((i + 1) * batch_size - 1, num_frames - 1)
             count = end - start + 1
-            message += f"- バッチ{i + 1}: フレーム {start}-{end} ({count}枚)\n"
+            message += f"- Batch {i + 1}: frames {start}-{end} ({count} images)\n"
 
         result = messagebox.askyesno(
-            "VRAM容量警告",
-            message + "\n続行しますか？",
+            "VRAM Capacity Warning",
+            message + "\nDo you want to continue?",
             icon="warning"
         )
 
         if result:
-            # TODO: Implement batch processing
-            self.status_var.set("Batch processing not yet implemented")
-            self.tracking_status_var.set("Tracking: Cancelled (batch needed)")
+            # Start batch processing
+            self._run_batch_tracking(vram_estimate, num_frames)
         else:
             self.tracking_status_var.set("Tracking: Cancelled")
+            self.progress_bar.pack_forget()
+            self._update_tracking_ui_state()
 
-        self.progress_bar.pack_forget()
-        self._update_tracking_ui_state()
+    def _run_batch_tracking(self, vram_estimate, num_frames: int):
+        """
+        Run tracking in batches to handle large sequences with limited VRAM.
+
+        Args:
+            vram_estimate: VRAMEstimate with batch configuration
+            num_frames: Total number of frames to process
+        """
+        self.tracking_status_var.set("Tracking: Starting batch processing...")
+        self.progress_var.set(0)
+
+        def batch_tracking_task():
+            try:
+                batch_size = vram_estimate.recommended_batch_size
+                num_batches = vram_estimate.num_batches
+                all_results: Dict[int, TrackingResult] = {}
+                current_mask = None
+                low_conf_batches = []
+
+                for batch_idx in range(num_batches):
+                    # Calculate batch frame range
+                    start_frame = batch_idx * batch_size
+                    end_frame = min((batch_idx + 1) * batch_size - 1, num_frames - 1)
+                    frame_count = end_frame - start_frame + 1
+
+                    batch_info = BatchInfo(
+                        batch_index=batch_idx,
+                        start_frame=start_frame,
+                        end_frame=end_frame,
+                        frame_count=frame_count,
+                        is_first_batch=(batch_idx == 0),
+                        is_last_batch=(batch_idx == num_batches - 1),
+                    )
+
+                    # Update UI for batch start
+                    self.root.after(0, lambda b=batch_idx, n=num_batches: (
+                        self.tracking_status_var.set(
+                            f"Tracking: Batch {b + 1}/{n} - Initializing..."
+                        )
+                    ))
+
+                    # Initialize batch sequence
+                    self.video_predictor.init_batch_sequence(
+                        image_paths=self.image_list,
+                        batch_info=batch_info,
+                        progress_callback=lambda msg: self.root.after(
+                            0, lambda m=msg: self.status_var.set(m)
+                        ),
+                    )
+
+                    # Set initial prompt or mask
+                    if batch_info.is_first_batch:
+                        # First batch: use user's points
+                        self.root.after(0, lambda: self.tracking_status_var.set(
+                            f"Tracking: Batch 1/{num_batches} - Setting initial prompt..."
+                        ))
+                        # Find the local frame index for the current frame
+                        local_frame_idx = self.current_index - start_frame
+                        if local_frame_idx < 0 or local_frame_idx >= frame_count:
+                            local_frame_idx = 0
+
+                        self.video_predictor.set_initial_prompt(
+                            frame_idx=local_frame_idx,
+                            obj_id=self.tracking_state.current_obj_id,
+                            foreground_points=self.state.foreground_points,
+                            background_points=self.state.background_points,
+                        )
+                    else:
+                        # Subsequent batches: use last mask from previous batch
+                        self.root.after(0, lambda b=batch_idx, n=num_batches: (
+                            self.tracking_status_var.set(
+                                f"Tracking: Batch {b + 1}/{n} - Setting initial mask..."
+                            )
+                        ))
+                        if current_mask is not None:
+                            self.video_predictor.set_initial_mask(
+                                frame_idx=0,
+                                obj_id=self.tracking_state.current_obj_id,
+                                mask=current_mask,
+                            )
+                        else:
+                            raise RuntimeError("No mask from previous batch")
+
+                    # Propagate tracking within batch
+                    frames_processed_before = len(all_results)
+
+                    def batch_progress_callback(current, total, local_frame_idx, mask):
+                        # Convert local to global frame index
+                        global_frame_idx = start_frame + local_frame_idx
+                        overall_processed = frames_processed_before + current
+
+                        def update_ui():
+                            # Update progress bar
+                            overall_pct = (overall_processed / num_frames) * 100
+                            self.progress_var.set(overall_pct)
+
+                            # Update status
+                            self.tracking_status_var.set(
+                                f"Tracking: Batch {batch_idx + 1}/{num_batches} "
+                                f"({current}/{total} frames)"
+                            )
+
+                            # Display current frame
+                            if global_frame_idx < len(self.image_list):
+                                self.current_index = global_frame_idx
+                                self.current_image_path = self.image_list[global_frame_idx]
+
+                                img = cv2.imread(str(self.current_image_path))
+                                if img is not None:
+                                    self.current_image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+                                    temp_result = TrackingResult.from_mask(
+                                        mask,
+                                        reference_area=self.video_predictor.reference_mask_area,
+                                    )
+                                    self.tracking_state.tracking_results[global_frame_idx] = temp_result
+                                    self.tracking_state.is_tracking_initialized = True
+
+                                    self._update_display()
+                                    self._update_image_listbox()
+
+                                    self.image_listbox.selection_clear(0, tk.END)
+                                    self.image_listbox.selection_set(global_frame_idx)
+                                    self.image_listbox.see(global_frame_idx)
+
+                        self.root.after(0, update_ui)
+
+                    batch_results = self.video_predictor.propagate_tracking(
+                        progress_callback=batch_progress_callback
+                    )
+
+                    # Convert local results to global frame indices
+                    for local_idx, result in batch_results.items():
+                        global_idx = start_frame + local_idx
+                        all_results[global_idx] = result
+                        self.tracking_frame_map[global_idx] = self.image_list[global_idx]
+
+                    # Check for low confidence in this batch
+                    batch_low_conf = [
+                        start_frame + local_idx
+                        for local_idx, result in batch_results.items()
+                        if result.is_low_confidence
+                    ]
+                    if batch_low_conf:
+                        low_conf_batches.append((batch_idx + 1, len(batch_low_conf)))
+
+                    # Save last mask for next batch
+                    if batch_results:
+                        last_local_idx = max(batch_results.keys())
+                        current_mask = batch_results[last_local_idx].mask
+
+                    # Clear VRAM before next batch (except for last batch)
+                    if not batch_info.is_last_batch:
+                        self.root.after(0, lambda b=batch_idx, n=num_batches: (
+                            self.status_var.set(
+                                f"Batch {b + 1}/{n} complete. Clearing VRAM..."
+                            )
+                        ))
+                        self.video_predictor.clear_vram()
+
+                # Show warning if any batches had low confidence frames
+                if low_conf_batches:
+                    warning_msg = "Low confidence frames detected:\n"
+                    for batch_num, count in low_conf_batches:
+                        warning_msg += f"- Batch {batch_num}: {count} frames\n"
+                    self.root.after(0, lambda: self.status_var.set(warning_msg.strip()))
+
+                # Complete - update state on main thread
+                self.root.after(0, lambda: self._on_tracking_complete(all_results))
+
+            except Exception as e:
+                self.root.after(0, lambda: self._on_tracking_error(str(e)))
+
+        thread = threading.Thread(target=batch_tracking_task, daemon=True)
+        thread.start()
 
     def _on_apply_tracking_results(self):
         """Apply tracking results and save all annotations."""
@@ -1286,8 +1465,8 @@ class SAM2AnnotationApp:
         if low_conf > 0:
             result = messagebox.askyesno(
                 "Confirm Save",
-                f"{total}フレームのアノテーションを保存しますか？\n\n"
-                f"注意: {low_conf}フレームは低信頼度です。",
+                f"Save annotations for {total} frames?\n\n"
+                f"Warning: {low_conf} frames have low confidence.",
                 icon="question"
             )
             if not result:
@@ -1329,7 +1508,7 @@ class SAM2AnnotationApp:
 
         messagebox.showinfo(
             "Save Complete",
-            f"保存完了\n\n{result.summary()}"
+            f"Save Complete\n\n{result.summary()}"
         )
 
         self.status_var.set(

@@ -81,6 +81,44 @@ class VRAMEstimate:
     num_batches: int
 
 
+@dataclass
+class BatchInfo:
+    """Information about a single batch for processing."""
+
+    batch_index: int  # Batch number (0-indexed)
+    start_frame: int  # Start frame index (global)
+    end_frame: int  # End frame index (global, inclusive)
+    frame_count: int  # Number of frames in this batch
+    is_first_batch: bool = False
+    is_last_batch: bool = False
+
+
+@dataclass
+class BatchTrackingProgress:
+    """Progress information for batch tracking."""
+
+    current_batch: int  # Current batch index (0-indexed)
+    total_batches: int  # Total number of batches
+    current_frame_in_batch: int  # Current frame within batch
+    total_frames_in_batch: int  # Total frames in current batch
+    overall_frames_processed: int  # Total frames processed so far
+    overall_total_frames: int  # Total frames across all batches
+
+    @property
+    def batch_progress_pct(self) -> float:
+        """Progress percentage within current batch."""
+        if self.total_frames_in_batch == 0:
+            return 0.0
+        return (self.current_frame_in_batch / self.total_frames_in_batch) * 100
+
+    @property
+    def overall_progress_pct(self) -> float:
+        """Overall progress percentage."""
+        if self.overall_total_frames == 0:
+            return 0.0
+        return (self.overall_frames_processed / self.overall_total_frames) * 100
+
+
 class VideoTrackingPredictor:
     """
     SAM2 Video Predictor wrapper for sequential image tracking.
@@ -335,6 +373,88 @@ class VideoTrackingPredictor:
 
         return num_frames, image_paths
 
+    def init_batch_sequence(
+        self,
+        image_paths: List[Path],
+        batch_info: BatchInfo,
+        progress_callback: Optional[Callable[[str], None]] = None,
+    ) -> Tuple[int, Dict[int, Path]]:
+        """
+        Initialize a batch sequence for tracking.
+
+        Creates a temporary directory with symlinks to a subset of images
+        (specified by batch_info) for SAM2 processing.
+
+        Args:
+            image_paths: Full list of image paths (in order)
+            batch_info: BatchInfo specifying which frames to include
+            progress_callback: Optional callback for progress updates
+
+        Returns:
+            Tuple of (num_frames_in_batch, global_frame_map)
+            - num_frames_in_batch: Number of frames in this batch
+            - global_frame_map: Dict mapping global frame index to original Path
+        """
+        if self.predictor is None:
+            raise RuntimeError("Model not loaded. Call load_model() first.")
+
+        # Clean up previous temp directory
+        self._cleanup_temp_dir()
+
+        if progress_callback:
+            progress_callback(
+                f"Preparing batch {batch_info.batch_index + 1} "
+                f"(frames {batch_info.start_frame}-{batch_info.end_frame})..."
+            )
+
+        # Create temp directory with sequential symlinks for this batch only
+        self.temp_dir = tempfile.mkdtemp(prefix="sam2_batch_")
+        self.frame_map = {}
+        self.batch_global_frame_map: Dict[int, Path] = {}
+
+        local_idx = 0
+        for global_idx in range(batch_info.start_frame, batch_info.end_frame + 1):
+            if global_idx >= len(image_paths):
+                break
+
+            original_path = image_paths[global_idx]
+
+            # SAM2 expects files named as integers: 0.jpg, 1.jpg, etc.
+            link_name = f"{local_idx}.jpg"
+            link_path = Path(self.temp_dir) / link_name
+
+            # Create symlink to original file
+            os.symlink(original_path.absolute(), link_path)
+
+            # Store both local and global mappings
+            self.frame_map[local_idx] = original_path
+            self.batch_global_frame_map[local_idx] = global_idx
+
+            local_idx += 1
+
+        num_frames_in_batch = local_idx
+
+        if progress_callback:
+            progress_callback(f"Initialized batch with {num_frames_in_batch} frames")
+
+        # Initialize SAM2 inference state for this batch
+        self.inference_state = self.predictor.init_state(
+            video_path=self.temp_dir,
+            offload_video_to_cpu=True,  # Save GPU memory
+        )
+
+        # Clear previous results for this batch
+        self.tracking_results = {}
+        # Note: reference_mask_area is preserved across batches for consistency
+
+        # Create global frame map for return
+        global_frame_map = {
+            self.batch_global_frame_map[local_idx]: self.frame_map[local_idx]
+            for local_idx in self.frame_map
+        }
+
+        return num_frames_in_batch, global_frame_map
+
     def set_initial_prompt(
         self,
         frame_idx: int,
@@ -390,6 +510,52 @@ class VideoTrackingPredictor:
         self.tracking_results[frame_idx].is_low_confidence = False
 
         return mask
+
+    def set_initial_mask(
+        self,
+        frame_idx: int,
+        obj_id: int,
+        mask: np.ndarray,
+    ) -> np.ndarray:
+        """
+        Set initial mask directly on a frame for tracking.
+
+        Uses SAM2's add_new_mask() to set a mask as the initial prompt.
+        This is useful for batch processing where the previous batch's
+        last mask is used as the initial mask for the next batch.
+
+        Args:
+            frame_idx: Frame index (local, within current batch)
+            obj_id: Object ID for tracking
+            mask: Boolean mask array (H, W)
+
+        Returns:
+            The mask after SAM2 processing
+        """
+        if self.inference_state is None:
+            raise RuntimeError("Sequence not initialized. Call init_sequence() first.")
+
+        # Use SAM2's add_new_mask method
+        _, out_obj_ids, out_mask_logits = self.predictor.add_new_mask(
+            inference_state=self.inference_state,
+            frame_idx=frame_idx,
+            obj_id=obj_id,
+            mask=mask,
+        )
+
+        # Convert mask logits to boolean mask
+        result_mask = (out_mask_logits[0, 0] > 0.0).cpu().numpy()
+
+        # Update reference mask area if not already set
+        if self.reference_mask_area is None:
+            self.reference_mask_area = int(np.sum(result_mask))
+
+        # Store result
+        self.tracking_results[frame_idx] = TrackingResult.from_mask(
+            result_mask, reference_area=self.reference_mask_area
+        )
+
+        return result_mask
 
     def propagate_tracking(
         self,
@@ -534,6 +700,30 @@ class VideoTrackingPredictor:
         self.tracking_results = {}
         self.reference_mask_area = None
         self._cleanup_temp_dir()
+
+    def clear_vram(self) -> None:
+        """
+        Clear VRAM by resetting state and releasing GPU memory.
+
+        This is used between batches to free up GPU memory.
+        Unlike reset(), this preserves the reference_mask_area for
+        consistent confidence calculation across batches.
+        """
+        # Reset SAM2 inference state
+        if self.inference_state is not None and self.predictor is not None:
+            self.predictor.reset_state(self.inference_state)
+
+        self.inference_state = None
+        # Note: Don't clear reference_mask_area to maintain consistency across batches
+        # Note: Don't clear tracking_results here - they're managed by the caller
+
+        # Clean up temporary directory
+        self._cleanup_temp_dir()
+
+        # Clear CUDA cache
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
 
     def _cleanup_temp_dir(self):
         """Clean up temporary directory."""
