@@ -1,8 +1,9 @@
 """
 Annotation Page
 
-Provides UI for running auto-annotation pipeline on collected images.
-Integrates with scripts/annotation/auto_annotate.py via TaskManager.
+Provides UI for SAM2 interactive annotation application.
+Allows users to launch the annotation app for semi-automatic object annotation
+using SAM2 segmentation and video tracking.
 """
 
 import streamlit as st
@@ -26,20 +27,11 @@ from components.progress_display import (
 
 def show_annotation_page():
     """Main annotation page."""
-    st.title("🏷️ Auto-Annotation")
+    st.title("🏷️ SAM2 Interactive Annotation")
 
     # Initialize services
     task_manager = TaskManager()
     path_coordinator = PathCoordinator()
-
-    # Check for active annotation task
-    active_task = render_active_task_banner("annotation", task_manager)
-
-    if active_task:
-        st.markdown("---")
-        st.subheader("Running Task")
-        render_task_progress(active_task.task_id, task_manager)
-        return
 
     # Tabs for different sections
     tab1, tab2, tab3 = st.tabs(["Run Annotation", "Sessions", "History"])
@@ -55,14 +47,13 @@ def show_annotation_page():
 
 
 def _render_run_annotation(task_manager: TaskManager, path_coordinator: PathCoordinator):
-    """Render annotation configuration and run section."""
-    st.subheader("Configure Annotation Pipeline")
+    """Render SAM2 Interactive Annotation section."""
+    st.subheader("Launch Annotation Application")
 
     # Check prerequisites
     raw_captures_dir = path_coordinator.get_path("raw_captures_dir")
-    class_config_file = path_coordinator.get_path("class_config_file")
 
-    # Count available images
+    # Count available images per class
     image_count = 0
     class_dirs = []
     if raw_captures_dir.exists():
@@ -70,7 +61,7 @@ def _render_run_annotation(task_manager: TaskManager, path_coordinator: PathCoor
             if class_dir.is_dir():
                 images = list(class_dir.glob("*.jpg")) + list(class_dir.glob("*.png"))
                 if images:
-                    class_dirs.append((class_dir.name, len(images)))
+                    class_dirs.append((class_dir.name, len(images), str(class_dir)))
                     image_count += len(images)
 
     if image_count == 0:
@@ -95,135 +86,137 @@ def _render_run_annotation(task_manager: TaskManager, path_coordinator: PathCoor
                     st.rerun()
         return
 
-    # Show available data
+    # Show available data with file paths
     st.success(f"Found **{image_count}** images across **{len(class_dirs)}** classes")
 
     with st.expander("View Class Distribution", expanded=False):
-        for class_name, count in sorted(class_dirs):
-            st.write(f"  • **{class_name}**: {count} images")
+        for class_name, count, path in sorted(class_dirs):
+            st.markdown(f"**{class_name}**: {count} images")
+            st.caption(f"`{path}`")
 
     st.markdown("---")
 
-    # Annotation method selection
-    col1, col2 = st.columns(2)
-
-    with col1:
-        method = st.radio(
-            "Annotation Method",
-            ["background", "sam2"],
-            format_func=lambda x: {
-                "background": "Background Subtraction (Fast)",
-                "sam2": "SAM2 Segmentation (Accurate, GPU)"
-            }[x],
-            help="Background subtraction is faster but requires a background image. "
-                 "SAM2 is more accurate but requires GPU."
-        )
-
-    with col2:
-        train_val_split = st.slider(
-            "Train/Val Split",
-            min_value=0.5,
-            max_value=0.95,
-            value=0.85,
-            step=0.05,
-            help="Ratio of images to use for training (rest for validation)"
-        )
-
-    # Background image selection (for background method)
-    background_path = None
-    if method == "background":
-        st.markdown("---")
-        st.subheader("Background Image")
-
-        # List available backgrounds
-        backgrounds = path_coordinator.get_background_images()
-
-        if backgrounds:
-            bg_options = ["Upload new..."] + [bg["name"] for bg in backgrounds]
-            selected_bg = st.selectbox("Select Background", bg_options)
-
-            if selected_bg != "Upload new...":
-                background_path = next(
-                    (bg["path"] for bg in backgrounds if bg["name"] == selected_bg),
-                    None
-                )
-                if background_path:
-                    st.image(background_path, caption="Selected background", width=300)
-
-        # Upload option
-        if not backgrounds or selected_bg == "Upload new...":
-            uploaded_bg = st.file_uploader(
-                "Upload Background Image",
-                type=["jpg", "jpeg", "png"],
-                help="Upload a clean background image (same setup as object captures, but without objects)"
-            )
-
-            if uploaded_bg:
-                # Save uploaded background
-                bg_save_path = path_coordinator.add_background_image(
-                    uploaded_bg,
-                    name=uploaded_bg.name
-                )
-                background_path = bg_save_path
-                st.success(f"Saved background: {bg_save_path}")
-
-        if not background_path:
-            st.warning("Please select or upload a background image")
-
-    # Advanced options
-    with st.expander("Advanced Options", expanded=False):
-        min_area = st.number_input(
-            "Minimum Contour Area",
-            min_value=100,
-            max_value=5000,
-            value=500,
-            help="Minimum pixel area for detected contours (background method only)"
-        )
-
-    # Session name
-    st.markdown("---")
-    session_name = st.text_input(
-        "Session Name (optional)",
-        placeholder="Leave empty for auto-generated name",
-        help="Name for this annotation session"
+    # Class selection
+    class_options = {name: (name, path, idx) for idx, (name, _, path) in enumerate(sorted(class_dirs))}
+    selected_class = st.selectbox(
+        "Select Class to Annotate",
+        list(class_options.keys()),
+        help="Choose which class to annotate"
     )
 
-    # Run button
+    class_name, input_dir, class_id = class_options[selected_class]
+
+    # Output directory config
+    annotated_dir = path_coordinator.get_path("annotated_dir")
+    output_dir = str(annotated_dir / class_name)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write(f"**Input:** `{input_dir}`")
+    with col2:
+        st.write(f"**Output:** `{output_dir}`")
+
+    # Device selection
+    device = st.radio(
+        "Device",
+        ["cuda", "cpu"],
+        horizontal=True,
+        help="CUDA recommended for GPU acceleration. CPU is slower but works without GPU."
+    )
+
     st.markdown("---")
 
-    can_run = True
-    if method == "background" and not background_path:
-        can_run = False
-        st.error("Please select a background image")
+    # Launch button
+    if st.button("Launch Annotation App", type="primary"):
+        if path_coordinator.open_annotation_app(
+            input_dir=input_dir,
+            output_dir=output_dir,
+            class_id=class_id,
+            device=device
+        ):
+            st.success("Annotation application launched!")
+        else:
+            st.error("Failed to launch annotation application. Check if the script exists.")
 
-    if not class_config_file.exists():
-        can_run = False
-        st.error(f"Class config not found: {class_config_file}")
+    # Color Legend
+    st.markdown("---")
+    st.subheader("Color Legend")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown("🟢 **Green**")
+        st.caption("Current mask / High confidence")
+    with col2:
+        st.markdown("🟡 **Yellow**")
+        st.caption("Low confidence (review needed)")
+    with col3:
+        st.markdown("🟠 **Orange**")
+        st.caption("Saved annotation")
 
-    if can_run:
-        # Estimated time
-        estimated_time = (image_count / 100) * 5  # ~5 minutes per 100 images
-        st.info(f"Estimated time: ~{estimated_time:.0f} minutes for {image_count} images")
+    st.markdown("---")
 
-        if st.button("Start Annotation", type="primary"):
-            # Create session
-            session_paths = path_coordinator.create_annotation_session(
-                session_name if session_name else None
-            )
+    # How to Use section
+    with st.expander("How to Use", expanded=False):
+        st.markdown("""
+### SAM2 Interactive Annotation Application
 
-            # Start task
-            task_id = task_manager.start_annotation(
-                method=method,
-                input_dir=session_paths["input_dir"],
-                output_dir=session_paths["output_dir"],
-                class_config=session_paths["class_config"],
-                background_path=background_path,
-                train_val_split=train_val_split,
-                min_area=min_area,
-            )
+A Tkinter-based GUI for semi-automatic object annotation using SAM2 segmentation and video tracking.
 
-            st.success(f"Annotation started! Task ID: {task_id}")
-            st.rerun()
+#### Basic Workflow
+
+1. **Select Image**: Use the image list on the left to select an image
+2. **Add Points**:
+   - Left-click to add foreground points (include in mask)
+   - Right-click to add background points (exclude from mask)
+3. **Refine Mask**: Add more points until the mask accurately covers the object
+4. **Save Annotation**: Press Enter to save and move to next image
+
+#### Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| Left-click | Add foreground point |
+| Right-click | Add background point |
+| Enter | Accept and save annotation |
+| Escape | Reset all points |
+| Ctrl+Z | Undo last point |
+| Arrow keys / N, P | Navigate images |
+| Space / M | Toggle mask overlay |
+| S | Skip current image |
+
+#### Tracking Mode (Sequential Frame Annotation)
+
+For sequential images (e.g., video frames), use tracking mode for efficient batch annotation:
+
+1. **Enable Tracking Mode**: Check the "Enable Tracking Mode" checkbox
+2. **Annotate First Frame**: Add points to create initial mask
+3. **Start Tracking**: Click "Start Tracking" to propagate to all frames
+4. **Review Results**:
+   - Green frames: High confidence
+   - Yellow frames: Low confidence (review recommended)
+5. **Apply All**: Click "Apply All" to save all annotations
+
+#### VRAM Management
+
+For large image sequences, the application automatically manages GPU memory:
+
+- **Automatic Estimation**: Before tracking, VRAM usage is estimated
+- **Batch Splitting**: If estimated usage exceeds 95% of available VRAM:
+  - A warning dialog shows estimated usage and available memory
+  - Frames are automatically split into smaller batches
+  - Each batch is processed sequentially to prevent out-of-memory errors
+
+**Example**: For 200 frames at 1080p on a 12GB GPU:
+- Estimated usage: ~14GB
+- System splits into 2 batches of 100 frames each
+- Processing continues automatically with progress indicator
+
+#### Tips
+
+- Start with objects that have clear boundaries
+- Use background points to exclude similar-colored regions
+- For tracking mode, choose a representative first frame
+- Monitor the confidence indicators for tracking quality
+        """)
 
 
 def _render_annotation_sessions(path_coordinator: PathCoordinator):

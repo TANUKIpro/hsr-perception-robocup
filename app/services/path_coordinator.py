@@ -440,3 +440,53 @@ class PathCoordinator:
             path = getattr(self.config, key)
             summary[key] = str(self.project_root / path)
         return summary
+
+    # ========== Application Launchers ==========
+
+    def open_annotation_app(
+        self,
+        input_dir: str,
+        output_dir: str,
+        class_id: int = 0,
+        device: str = "cuda"
+    ) -> bool:
+        """
+        Launch SAM2 Interactive Annotation Application.
+
+        Opens a Tkinter-based GUI for semi-automatic object annotation
+        using SAM2 segmentation and video tracking.
+
+        Args:
+            input_dir: Directory containing images to annotate
+            output_dir: Directory for YOLO label output
+            class_id: YOLO class ID for annotations
+            device: Device for inference ("cuda" or "cpu")
+
+        Returns:
+            True if application launched successfully, False otherwise
+        """
+        import subprocess
+        import sys
+
+        script_path = self.project_root / "scripts/annotation/sam2_interactive_app.py"
+
+        if not script_path.exists():
+            return False
+
+        # Ensure output directory exists
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+        cmd = [
+            sys.executable,
+            str(script_path),
+            "--input-dir", input_dir,
+            "--output-dir", output_dir,
+            "--class-id", str(class_id),
+            "--device", device
+        ]
+
+        try:
+            subprocess.Popen(cmd, start_new_session=True)
+            return True
+        except Exception:
+            return False
