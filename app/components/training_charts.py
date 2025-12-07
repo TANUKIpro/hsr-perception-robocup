@@ -11,14 +11,14 @@ from typing import List, Dict, Optional, Any
 
 from .training_styles import COLORS
 
-# Plotly theme configuration matching Mission Control aesthetic
+# Plotly theme configuration - transparent backgrounds for theme compatibility
 PLOTLY_THEME = {
-    "paper_bgcolor": COLORS["surface"],
-    "plot_bgcolor": COLORS["surface"],
+    "paper_bgcolor": "rgba(0,0,0,0)",
+    "plot_bgcolor": "rgba(0,0,0,0)",
     "font_family": "'JetBrains Mono', 'SF Mono', monospace",
-    "font_color": COLORS["text_secondary"],
-    "gridcolor": COLORS["surface_hover"],
-    "linecolor": COLORS["surface_hover"],
+    "font_color": "inherit",
+    "gridcolor": "rgba(128,128,128,0.2)",
+    "linecolor": "rgba(128,128,128,0.3)",
 }
 
 
@@ -70,7 +70,7 @@ def render_training_chart(
             marker=dict(
                 size=6,
                 color=COLORS["accent_primary"],
-                line=dict(width=1, color=COLORS["surface"]),
+                line=dict(width=1, color="rgba(0,0,0,0.3)"),
             ),
             fill="tozeroy",
             fillcolor="rgba(0, 212, 170, 0.1)",
@@ -124,7 +124,6 @@ def render_training_chart(
             text="Training Progress" if show_title else None,
             font=dict(
                 size=14,
-                color=COLORS["text_primary"],
                 family="JetBrains Mono",
             ),
             x=0,
@@ -137,7 +136,6 @@ def render_training_chart(
         font=dict(
             family=PLOTLY_THEME["font_family"],
             size=11,
-            color=PLOTLY_THEME["font_color"],
         ),
         legend=dict(
             orientation="h",
@@ -150,7 +148,7 @@ def render_training_chart(
         ),
         hovermode="x unified",
         hoverlabel=dict(
-            bgcolor=COLORS["surface_elevated"],
+            bgcolor="rgba(50,50,50,0.9)",
             font_size=11,
             font_family="JetBrains Mono",
         ),
@@ -160,7 +158,7 @@ def render_training_chart(
     fig.update_xaxes(
         title=dict(
             text="Epoch",
-            font=dict(size=10, color=COLORS["text_muted"]),
+            font=dict(size=10),
         ),
         tickfont=dict(size=10),
         gridcolor=PLOTLY_THEME["gridcolor"],
@@ -361,32 +359,31 @@ def render_loss_breakdown_chart(
 
 def _render_empty_chart_placeholder():
     """Render placeholder when no training data is available."""
-    st.markdown(f"""
+    st.markdown("""
     <div style="
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         padding: 60px 20px;
-        background: {COLORS["surface"]};
-        border: 1px dashed {COLORS["surface_hover"]};
+        border: 1px dashed currentColor;
         border-radius: 8px;
         text-align: center;
+        opacity: 0.6;
     ">
         <div style="
             font-size: 2rem;
-            color: {COLORS["text_muted"]};
             margin-bottom: 12px;
         ">◐</div>
         <div style="
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.85rem;
-            color: {COLORS["text_secondary"]};
+            opacity: 0.8;
         ">Waiting for training data...</div>
         <div style="
             font-family: 'Inter', sans-serif;
             font-size: 0.75rem;
-            color: {COLORS["text_muted"]};
+            opacity: 0.5;
             margin-top: 4px;
         ">Chart will update as epochs complete</div>
     </div>

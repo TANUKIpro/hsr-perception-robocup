@@ -45,141 +45,16 @@ from object_registry import ObjectRegistry, RegisteredObject, ObjectProperties
 from services.path_coordinator import PathCoordinator
 from services.task_manager import TaskManager
 from services.profile_manager import ProfileManager
-
-
-def _reinitialize_services():
-    """Reinitialize all services after profile switch."""
-    st.session_state.path_coordinator = PathCoordinator(
-        profile_manager=st.session_state.profile_manager
-    )
-    st.session_state.registry = ObjectRegistry(
-        path_coordinator=st.session_state.path_coordinator
-    )
-    st.session_state.task_manager = TaskManager(
-        path_coordinator=st.session_state.path_coordinator
-    )
-
-
-# Initialize session state with profile support
-if "profile_manager" not in st.session_state:
-    st.session_state.profile_manager = ProfileManager()
-
-if "path_coordinator" not in st.session_state:
-    st.session_state.path_coordinator = PathCoordinator(
-        profile_manager=st.session_state.profile_manager
-    )
-
-if "registry" not in st.session_state:
-    st.session_state.registry = ObjectRegistry(
-        path_coordinator=st.session_state.path_coordinator
-    )
-
-if "task_manager" not in st.session_state:
-    st.session_state.task_manager = TaskManager(
-        path_coordinator=st.session_state.path_coordinator
-    )
-
-if "current_object_id" not in st.session_state:
-    st.session_state.current_object_id = None
-
-
-def _render_profile_selector():
-    """Render profile selector in sidebar."""
-    profile_manager = st.session_state.profile_manager
-
-    profiles = profile_manager.get_all_profiles()
-    active_profile = profile_manager.get_active_profile()
-
-    # Create options
-    profile_options = {p.display_name: p.id for p in profiles}
-    profile_names = list(profile_options.keys())
-
-    # Find current index
-    current_idx = 0
-    for i, p_id in enumerate(profile_options.values()):
-        if p_id == active_profile.id:
-            current_idx = i
-            break
-
-    selected_name = st.sidebar.selectbox(
-        "Profile",
-        profile_names,
-        index=current_idx,
-        key="profile_selector"
-    )
-
-    selected_id = profile_options[selected_name]
-
-    # Handle profile switch
-    if selected_id != active_profile.id:
-        profile_manager.set_active_profile(selected_id)
-        _reinitialize_services()
-        st.rerun()
+from components.common_sidebar import render_common_sidebar
 
 
 def main():
     """Main application entry point."""
+    # Render common sidebar (includes profile selector and stats)
+    render_common_sidebar()
 
-    # Sidebar with profile selector
-    st.sidebar.title("HSR Object Manager")
-
-    # Profile selector at top
-    _render_profile_selector()
-
-    st.sidebar.markdown("---")
-
-    page = st.sidebar.radio(
-        "Navigation",
-        [
-            "📊 Dashboard",
-            "📋 Registry",
-            "📸 Collection",
-            "🏷️ Annotation",
-            "🎓 Training",
-            "📈 Evaluation",
-            "⚙️ Settings"
-        ],
-        label_visibility="collapsed",
-    )
-
-    st.sidebar.markdown("---")
-
-    # Quick stats in sidebar
-    registry = st.session_state.registry
-    stats = registry.get_collection_stats()
-
-    st.sidebar.metric("Total Objects", stats["total_objects"])
-    st.sidebar.metric(
-        "Collection Progress",
-        f"{stats['total_collected']}/{stats['total_target']}",
-        f"{stats['progress_percent']:.1f}%"
-    )
-
-    # Active task indicator
-    task_manager = st.session_state.task_manager
-    active_tasks = task_manager.get_active_tasks()
-    if active_tasks:
-        st.sidebar.markdown("---")
-        st.sidebar.warning(f"🔄 {len(active_tasks)} task(s) running")
-
-    # Route to pages
-    if page == "📊 Dashboard":
-        show_dashboard()
-    elif page == "📋 Registry":
-        show_registry()
-    elif page == "📸 Collection":
-        show_collection()
-    elif page == "🏷️ Annotation":
-        from pages import show_annotation_page
-        show_annotation_page()
-    elif page == "🎓 Training":
-        from pages import show_training_page
-        show_training_page()
-    elif page == "📈 Evaluation":
-        from pages import show_evaluation_page
-        show_evaluation_page()
-    elif page == "⚙️ Settings":
-        show_settings()
+    # Show Dashboard as default page
+    show_dashboard()
 
 
 def _render_profile_management():
@@ -283,6 +158,10 @@ def show_dashboard():
     st.markdown("---")
 
     registry = st.session_state.registry
+
+    # Update collection counts from filesystem before displaying stats
+    registry.update_all_collection_counts()
+
     stats = registry.get_collection_stats()
     objects = registry.get_all_objects()
 
@@ -799,8 +678,12 @@ def show_collection():
     st.title("📸 Data Collection")
 
     registry = st.session_state.registry
-    objects = registry.get_all_objects()
     path_coordinator = st.session_state.path_coordinator
+
+    # Update collection counts from filesystem before displaying
+    registry.update_all_collection_counts()
+
+    objects = registry.get_all_objects()
 
     if not objects:
         st.warning("No objects registered. Go to Registry first.")
@@ -1308,15 +1191,16 @@ def show_settings():
 
     A comprehensive tool for managing object recognition pipelines
     for RoboCup@Home competitions.
-
-    Features:
-    - Register objects with reference images
-    - Collect training data via ROS2, camera, or file upload
-    - Run auto-annotation pipeline
-    - Fine-tune YOLOv8 models
-    - Evaluate model performance
-    - Export to competition-ready format
     """)
+
+    # Creator info
+    st.caption("Created by")
+    col1, col2, col3 = st.columns([1, 1, 6])
+    img_dir = app_dir / "img"
+    with col1:
+        st.image(str(img_dir / "tid_logo.svg"), width=120)
+    with col2:
+        st.image(str(img_dir / "ikeryo.jpg"), width=120)
 
 
 # Import page modules

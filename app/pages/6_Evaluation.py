@@ -6,6 +6,7 @@ Integrates with scripts/evaluation/evaluate_model.py via TaskManager.
 """
 
 import streamlit as st
+import subprocess
 from pathlib import Path
 import sys
 
@@ -36,6 +37,10 @@ TARGET_INFERENCE_MS = 100.0
 
 def show_evaluation_page():
     """Main evaluation page."""
+    # Render common sidebar
+    from components.common_sidebar import render_common_sidebar
+    render_common_sidebar()
+
     st.title("Model Evaluation")
 
     # Get services from session state (profile-aware)
@@ -60,7 +65,9 @@ def show_evaluation_page():
         return
 
     # Tabs for different sections
-    tab1, tab2, tab3, tab4 = st.tabs(["Run Evaluation", "Results", "Visual Test", "Robustness Test"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "Run Evaluation", "Results", "Visual Test", "Robustness Test", "Xtion Live Test"
+    ])
 
     with tab1:
         _render_run_evaluation(task_manager, path_coordinator)
@@ -73,6 +80,9 @@ def show_evaluation_page():
 
     with tab4:
         _render_robustness_test(path_coordinator)
+
+    with tab5:
+        _render_xtion_live_test(path_coordinator)
 
 
 def _render_run_evaluation(task_manager: TaskManager, path_coordinator: PathCoordinator):
@@ -548,6 +558,74 @@ def _render_robustness_test(path_coordinator: PathCoordinator):
 
     else:  # Similar Object Test
         render_similar_object_test(model, dataset_path, conf_threshold)
+
+
+def _render_xtion_live_test(path_coordinator: PathCoordinator):
+    """Render Xtion live test section."""
+    st.subheader("Xtion Live Test")
+    st.write("Test trained models in real-time using the Xtion camera.")
+
+    # Model selection
+    st.markdown("### Model Selection")
+    models = path_coordinator.get_trained_models()
+
+    if not models:
+        st.warning("No trained models found. Please train a model first.")
+        return
+
+    model_options = {
+        f"{m['name']} ({m['created'][:10]})": m['best_path'] or m['last_path']
+        for m in models
+    }
+    selected_label = st.selectbox(
+        "Select Model",
+        list(model_options.keys()),
+        key="xtion_model_select"
+    )
+    selected_model = model_options[selected_label]
+
+    # Confidence threshold
+    conf_threshold = st.slider(
+        "Confidence Threshold",
+        min_value=0.0,
+        max_value=1.0,
+        value=0.25,
+        step=0.05,
+        key="xtion_conf_threshold"
+    )
+
+    st.markdown("---")
+
+    # Launch button
+    st.markdown("### Launch Application")
+    st.info("Click the button to launch the Xtion test app in a new window.")
+
+    if st.button("Launch Xtion Test App", type="primary", key="launch_xtion_app"):
+        # Get project root
+        project_root = path_coordinator.project_root
+
+        # Path to the xtion test app
+        app_path = project_root / "scripts" / "evaluation" / "xtion_test_app.py"
+
+        if not app_path.exists():
+            st.error(f"Application not found: {app_path}")
+            return
+
+        try:
+            # Launch the tkinter app as a subprocess
+            subprocess.Popen(
+                [
+                    sys.executable,
+                    str(app_path),
+                    "--model", selected_model,
+                    "--conf", str(conf_threshold)
+                ],
+                cwd=str(project_root)
+            )
+            st.success("Xtion Test App launched! Check for a new window.")
+
+        except Exception as e:
+            st.error(f"Failed to launch app: {e}")
 
 
 # For Streamlit native multipage

@@ -110,6 +110,7 @@ class ObjectRegistry:
         self.registry_file = self._path_coordinator.get_path("app_registry_file")
         self.reference_images_dir = self._path_coordinator.get_path("app_reference_dir")
         self.collected_images_dir = self._path_coordinator.get_path("app_collected_dir")
+        self.raw_captures_dir = self._path_coordinator.get_path("raw_captures_dir")
         self.thumbnails_dir = self._path_coordinator.get_path("app_thumbnails_dir")
 
         # Create directories
@@ -372,15 +373,17 @@ class ObjectRegistry:
         if not obj:
             return []
 
-        obj_dir = self.collected_images_dir / obj.name
-        if not obj_dir.exists():
-            return []
-
         extensions = [".jpg", ".jpeg", ".png", ".bmp"]
         images = []
-        for f in sorted(obj_dir.iterdir()):
-            if f.suffix.lower() in extensions:
-                images.append(str(f))
+
+        # Check both collected_images_dir and raw_captures_dir
+        for base_dir in [self.collected_images_dir, self.raw_captures_dir]:
+            obj_dir = base_dir / obj.name
+            if obj_dir.exists():
+                for f in sorted(obj_dir.iterdir()):
+                    if f.suffix.lower() in extensions:
+                        images.append(str(f))
+
         return images
 
     def update_collection_count(self, obj_id: int) -> int:
