@@ -596,6 +596,56 @@ class ROS2Bridge:
         except Exception:
             return False
 
+    def open_record_app(
+        self,
+        output_dir: Optional[str] = None,
+        video_dir: Optional[str] = None
+    ) -> bool:
+        """
+        Open the video recording application with full GUI.
+
+        Launches the Tkinter-based recording application with:
+        - Topic selection from available ROS2 topics
+        - Real-time preview with center reticle
+        - Video recording with countdown
+        - Automatic frame extraction
+
+        Args:
+            output_dir: Default output directory for extracted images
+            video_dir: Default output directory for video files
+
+        Returns:
+            True if successfully launched, False otherwise
+        """
+        script_path = Path(__file__).parent.parent.parent / "scripts/capture/record_app.py"
+
+        if not script_path.exists():
+            return False
+
+        # Build command with ROS2 environment sourced
+        cmd_parts = [
+            f"source {self.source_script} 2>/dev/null",
+            f"python3 {script_path}"
+        ]
+
+        if output_dir:
+            cmd_parts[1] += f" --output-dir {shlex.quote(output_dir)}"
+        if video_dir:
+            cmd_parts[1] += f" --video-dir {shlex.quote(video_dir)}"
+
+        full_cmd = " && ".join(cmd_parts)
+
+        try:
+            # Run in background (non-blocking)
+            subprocess.Popen(
+                ["bash", "-c", full_cmd],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            return True
+        except Exception:
+            return False
+
     def start_direct_burst_capture(
         self,
         topic: str,

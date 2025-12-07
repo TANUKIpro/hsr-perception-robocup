@@ -997,23 +997,44 @@ def _show_ros2_collection_tab(obj, registry, path_coordinator):
     col1, col2 = st.columns([1, 2])
 
     with col1:
-        # Get default output directory
+        # Get default output directories
         default_output = str(path_coordinator.get_path("raw_captures_dir"))
+        video_dir = str(path_coordinator.get_path("videos_dir"))
 
-        if st.button("Launch Capture App", type="primary"):
-            if ros2_bridge.open_capture_app(output_dir=default_output):
-                st.success("Capture application launched!")
-            else:
-                st.error("Failed to launch capture application")
+        # Mode selection
+        use_burst_mode = st.checkbox("Use Burst Capture (Legacy)", value=False)
+
+        if use_burst_mode:
+            if st.button("Launch Burst Capture App"):
+                if ros2_bridge.open_capture_app(output_dir=default_output):
+                    st.success("Burst capture application launched!")
+                else:
+                    st.error("Failed to launch burst capture application")
+        else:
+            if st.button("Launch Recording App", type="primary"):
+                if ros2_bridge.open_record_app(output_dir=default_output, video_dir=video_dir):
+                    st.success("Recording application launched!")
+                else:
+                    st.error("Failed to launch recording application")
 
     with col2:
-        st.markdown("""
-        **Application Features:**
-        - Topic selection (auto-detected)
-        - Real-time preview with center reticle
-        - Single capture / Burst capture
-        - Configurable parameters (count, interval, class name, output)
-        """)
+        if use_burst_mode:
+            st.markdown("""
+            **Burst Capture Features:**
+            - Topic selection (auto-detected)
+            - Real-time preview with center reticle
+            - Single capture / Burst capture
+            - Configurable parameters (count, interval)
+            """)
+        else:
+            st.markdown("""
+            **Recording App Features:**
+            - Topic selection (auto-detected)
+            - Real-time preview with center reticle
+            - Video recording with countdown
+            - Automatic frame extraction (uniform intervals)
+            - MP4 video saving
+            """)
 
     # Application usage guide
     with st.expander("How to Use", expanded=False):
@@ -1069,6 +1090,126 @@ def _show_ros2_collection_tab(obj, registry, path_coordinator):
                 st.info("No captured images yet. Launch the Capture App to start collecting.")
         else:
             st.info("Capture directory not created yet.")
+
+    # Video Frame Extractor
+    st.markdown("---")
+    st.subheader("Video Frame Extractor")
+    st.caption("Extract frames from recorded videos to create training data.")
+
+    videos_dir = path_coordinator.get_path("videos_dir")
+    video_files = list(videos_dir.glob("*.mp4")) if videos_dir.exists() else []
+
+    if not video_files:
+        st.info("No videos found. Use the Recording App to capture videos first.")
+    else:
+        # Video selection
+        video_options = {f.name: f for f in sorted(video_files, reverse=True)}
+        selected_name = st.selectbox("Select Video", list(video_options.keys()), key="video_select")
+        selected_video = video_options[selected_name]
+
+        # Extract class name from filename (classname_yyyymmdd-hh-mm.mp4)
+        # Handle cases where classname itself contains underscores
+        parts = selected_name.rsplit("_", 2)  # Split from right, max 2 splits
+        if len(parts) >= 2:
+            class_name = "_".join(parts[:-2]) if len(parts) > 2 else parts[0]
+        else:
+            class_name = selected_name.replace(".mp4", "")
+
+        st.write(f"**Class Name:** `{class_name}`")
+
+        # Parameters
+        target_frames = st.slider("Target Frames", 10, 200, 50, key="extract_frames")
+
+        # Preview directory
+        preview_dir = Path("/tmp/frame_preview")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if st.button("Extract Preview", key="extract_preview"):
+                import cv2
+
+                # Create and clear preview directory
+                preview_dir.mkdir(exist_ok=True)
+                for f in preview_dir.glob("*.jpg"):
+                    f.unlink()
+
+                # Extract frames
+                cap = cv2.VideoCapture(str(selected_video))
+                total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+                if total_frames == 0:
+                    st.error("Video has no frames")
+                    cap.release()
+                else:
+                    # Calculate uniform indices
+                    if total_frames <= target_frames:
+                        indices = list(range(total_frames))
+                    else:
+                        indices = [int(i * total_frames / target_frames) for i in range(target_frames)]
+
+                    # Extract
+                    with st.spinner(f"Extracting {len(indices)} frames..."):
+                        for i, frame_idx in enumerate(indices):
+                            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+                            ret, frame = cap.read()
+                            if ret:
+                                filename = f"{class_name}_{i+1}.jpg"
+                                cv2.imwrite(str(preview_dir / filename), frame)
+
+                    cap.release()
+                    st.success(f"Extracted {len(indices)} frames to preview")
+                    st.rerun()
+
+        with col2:
+            if st.button("Save to Dataset", type="primary", key="save_to_dataset"):
+                import re
+                import shutil
+
+                preview_files = list(preview_dir.glob("*.jpg")) if preview_dir.exists() else []
+                if not preview_files:
+                    st.warning("No preview frames. Click 'Extract Preview' first.")
+                else:
+                    # Get output directory
+                    output_dir = path_coordinator.get_path("raw_captures_dir") / class_name
+                    output_dir.mkdir(parents=True, exist_ok=True)
+
+                    # Find next file number
+                    pattern = re.compile(rf"^{re.escape(class_name)}_(\d+)\.jpg$")
+                    max_num = 0
+                    for f in output_dir.iterdir():
+                        match = pattern.match(f.name)
+                        if match:
+                            num = int(match.group(1))
+                            max_num = max(max_num, num)
+                    start_num = max_num + 1
+
+                    # Copy files with new numbering
+                    saved = 0
+                    for i, src in enumerate(sorted(preview_files)):
+                        dst = output_dir / f"{class_name}_{start_num + i}.jpg"
+                        shutil.copy2(src, dst)
+                        saved += 1
+
+                    # Clear preview
+                    for f in preview_files:
+                        f.unlink()
+
+                    st.success(f"Saved {saved} images to {output_dir} (#{start_num}-{start_num + saved - 1})")
+                    st.rerun()
+
+        # Show preview thumbnails
+        preview_files = sorted(preview_dir.glob("*.jpg")) if preview_dir.exists() else []
+        if preview_files:
+            st.write(f"**Preview:** ({len(preview_files)} images)")
+            # Show first 12 as thumbnails
+            display_files = preview_files[:12]
+            cols = st.columns(4)
+            for i, img_path in enumerate(display_files):
+                with cols[i % 4]:
+                    st.image(str(img_path), use_container_width=True, caption=img_path.name)
+            if len(preview_files) > 12:
+                st.caption(f"... and {len(preview_files) - 12} more")
 
 
 def show_settings():
