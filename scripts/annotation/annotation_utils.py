@@ -8,11 +8,19 @@ for YOLO format annotations.
 import json
 import random
 import shutil
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import yaml
+
+# Add scripts directory to path for common module imports
+_scripts_dir = Path(__file__).parent.parent
+if str(_scripts_dir) not in sys.path:
+    sys.path.insert(0, str(_scripts_dir))
+
+from common.constants import IMAGE_EXTENSIONS
 
 
 @dataclass
@@ -296,7 +304,7 @@ def split_dataset(
     # Find all images with corresponding labels
     valid_pairs = []
     for img_path in images_path.glob("*"):
-        if img_path.suffix.lower() not in [".jpg", ".jpeg", ".png", ".bmp"]:
+        if img_path.suffix.lower() not in IMAGE_EXTENSIONS:
             continue
 
         label_path = labels_path / f"{img_path.stem}.txt"

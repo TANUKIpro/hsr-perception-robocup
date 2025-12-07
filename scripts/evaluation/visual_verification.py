@@ -8,6 +8,7 @@ before competition deployment.
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -16,6 +17,13 @@ import numpy as np
 from colorama import Fore, Style, init as colorama_init
 
 colorama_init()
+
+# Add scripts directory to path for common module imports
+_scripts_dir = Path(__file__).parent.parent
+if str(_scripts_dir) not in sys.path:
+    sys.path.insert(0, str(_scripts_dir))
+
+from common.constants import IMAGE_EXTENSIONS
 
 
 class VisualVerifier:
@@ -220,7 +228,7 @@ class VisualVerifier:
         image_path = Path(image_dir)
         images = sorted([
             f for f in image_path.glob("*")
-            if f.suffix.lower() in [".jpg", ".jpeg", ".png", ".bmp"]
+            if f.suffix.lower() in IMAGE_EXTENSIONS
         ])
 
         if not images:
@@ -378,7 +386,7 @@ class VisualVerifier:
 
         test_path = Path(test_dir)
         images = list(test_path.glob("*"))
-        images = [f for f in images if f.suffix.lower() in [".jpg", ".jpeg", ".png"]]
+        images = [f for f in images if f.suffix.lower() in IMAGE_EXTENSIONS]
 
         # Collect samples per class
         class_samples: Dict[str, List[str]] = {name: [] for name in self.class_names.values()}
@@ -502,7 +510,7 @@ Examples:
         elif args.grid:
             # Create grid
             images = sorted(Path(args.batch_dir).glob("*"))
-            images = [str(f) for f in images if f.suffix.lower() in [".jpg", ".jpeg", ".png"]]
+            images = [str(f) for f in images if f.suffix.lower() in IMAGE_EXTENSIONS]
             images = images[:9]  # Limit to 9 for grid
 
             output = args.output or "comparison_grid.jpg"

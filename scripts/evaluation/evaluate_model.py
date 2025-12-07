@@ -11,6 +11,7 @@ Comprehensive evaluation of trained YOLO models including:
 
 import argparse
 import json
+import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -22,6 +23,13 @@ from colorama import Fore, Style, init as colorama_init
 from tabulate import tabulate
 
 colorama_init()
+
+# Add scripts directory to path for common module imports
+_scripts_dir = Path(__file__).parent.parent
+if str(_scripts_dir) not in sys.path:
+    sys.path.insert(0, str(_scripts_dir))
+
+from common.constants import TARGET_MAP50, TARGET_INFERENCE_MS
 
 
 @dataclass
@@ -64,22 +72,22 @@ class EvaluationReport:
     num_test_images: int
     timestamp: str = field(default_factory=lambda: __import__("datetime").datetime.now().isoformat())
 
-    # Competition targets
-    TARGET_MAP50 = 0.85
-    TARGET_INFERENCE_MS = 100.0
+    # Competition targets (imported from common.constants)
+    _TARGET_MAP50 = TARGET_MAP50
+    _TARGET_INFERENCE_MS = TARGET_INFERENCE_MS
 
     def meets_requirements(self) -> Tuple[bool, List[str]]:
         """Check if model meets competition requirements."""
         issues = []
 
-        if self.overall_map50 < self.TARGET_MAP50:
+        if self.overall_map50 < self._TARGET_MAP50:
             issues.append(
-                f"mAP50 {self.overall_map50:.2%} < {self.TARGET_MAP50:.0%} target"
+                f"mAP50 {self.overall_map50:.2%} < {self._TARGET_MAP50:.0%} target"
             )
 
-        if self.inference_time_ms > self.TARGET_INFERENCE_MS:
+        if self.inference_time_ms > self._TARGET_INFERENCE_MS:
             issues.append(
-                f"Inference {self.inference_time_ms:.1f}ms > {self.TARGET_INFERENCE_MS:.0f}ms target"
+                f"Inference {self.inference_time_ms:.1f}ms > {self._TARGET_INFERENCE_MS:.0f}ms target"
             )
 
         return (len(issues) == 0, issues)

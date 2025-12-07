@@ -3,7 +3,7 @@
   "categories": [],
   "objects": [],
   "settings": {
-    "default_target_samples": 100,
+    "default_target_samples": 200,
     "min_samples_for_training": 50,
     "train_val_split": 0.85
   }

@@ -20,6 +20,14 @@ from colorama import Fore, Style, init as colorama_init
 
 colorama_init()
 
+# Add scripts directory to path for common module imports
+_scripts_dir = Path(__file__).parent.parent
+if str(_scripts_dir) not in sys.path:
+    sys.path.insert(0, str(_scripts_dir))
+
+from common.device_utils import log_gpu_status
+from common.constants import TARGET_MAP50
+
 # Competition-optimized training configuration
 COMPETITION_CONFIG = {
     # Model settings
@@ -151,17 +159,7 @@ class CompetitionTrainer:
 
     def _check_cuda(self) -> None:
         """Check CUDA availability and log GPU info."""
-        try:
-            import torch
-
-            if torch.cuda.is_available():
-                gpu_name = torch.cuda.get_device_name(0)
-                gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1e9
-                print(f"{Fore.GREEN}GPU Available: {gpu_name} ({gpu_memory:.1f} GB){Style.RESET_ALL}")
-            else:
-                print(f"{Fore.YELLOW}Warning: CUDA not available. Training will be slow.{Style.RESET_ALL}")
-        except ImportError:
-            print(f"{Fore.RED}Warning: PyTorch not installed.{Style.RESET_ALL}")
+        log_gpu_status(verbose=True)
 
     def _generate_run_name(self) -> str:
         """Generate unique run name with timestamp."""

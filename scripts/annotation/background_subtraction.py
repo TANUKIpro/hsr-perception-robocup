@@ -7,6 +7,7 @@ due to its speed and simplicity.
 """
 
 import argparse
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional, Tuple
@@ -17,20 +18,32 @@ from tqdm import tqdm
 
 from annotation_utils import AnnotationResult, bbox_to_yolo, write_yolo_label
 
+# Add scripts directory to path for common module imports
+_scripts_dir = Path(__file__).parent.parent
+if str(_scripts_dir) not in sys.path:
+    sys.path.insert(0, str(_scripts_dir))
+
+from common.constants import (
+    IMAGE_EXTENSIONS,
+    DEFAULT_BBOX_MARGIN_RATIO,
+    DEFAULT_MIN_CONTOUR_AREA,
+    DEFAULT_MAX_CONTOUR_AREA_RATIO,
+)
+
 
 @dataclass
 class AnnotatorConfig:
     """Configuration for background subtraction annotator."""
 
-    min_contour_area: int = 500
+    min_contour_area: int = DEFAULT_MIN_CONTOUR_AREA
     blur_kernel_size: int = 5
     threshold_method: str = "otsu"  # "otsu" or "adaptive" or "fixed"
     fixed_threshold: int = 30
     morph_kernel_size: int = 5
     erosion_iterations: int = 2
     dilation_iterations: int = 3
-    margin_ratio: float = 0.02
-    max_contour_area_ratio: float = 0.9  # Max object area as ratio of image
+    bbox_margin_ratio: float = DEFAULT_BBOX_MARGIN_RATIO
+    max_contour_area_ratio: float = DEFAULT_MAX_CONTOUR_AREA_RATIO
 
 
 class BackgroundSubtractionAnnotator:
@@ -175,8 +188,8 @@ class BackgroundSubtractionAnnotator:
         x, y, w, h = cv2.boundingRect(largest)
 
         # Add margin
-        margin_x = int(w * self.config.margin_ratio)
-        margin_y = int(h * self.config.margin_ratio)
+        margin_x = int(w * self.config.bbox_margin_ratio)
+        margin_y = int(h * self.config.bbox_margin_ratio)
 
         x_min = max(0, x - margin_x)
         y_min = max(0, y - margin_y)
@@ -253,11 +266,10 @@ class BackgroundSubtractionAnnotator:
         output_path.mkdir(parents=True, exist_ok=True)
 
         # Find all images
-        image_extensions = [".jpg", ".jpeg", ".png", ".bmp"]
         images = [
             f
             for f in image_path.iterdir()
-            if f.suffix.lower() in image_extensions
+            if f.suffix.lower() in IMAGE_EXTENSIONS
         ]
 
         result = AnnotationResult(total_images=len(images))
