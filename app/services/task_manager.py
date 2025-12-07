@@ -264,11 +264,15 @@ class TaskManager:
         Returns:
             Popen object
         """
+        # ログファイルを作成（CLI出力表示用）
+        log_file = self.tasks_dir / f"{task.task_id}.log"
+        log_handle = open(log_file, "w", buffering=1)  # line-buffered
+
         # Use start_new_session to detach from parent process group
         # This allows the subprocess to survive if parent is terminated
         process = subprocess.Popen(
             cmd,
-            stdout=subprocess.PIPE,
+            stdout=log_handle,
             stderr=subprocess.STDOUT,
             text=True,
             start_new_session=True,
@@ -278,6 +282,7 @@ class TaskManager:
         task.pid = process.pid
         task.status = TaskStatus.RUNNING
         task.command = cmd
+        task.extra_data["log_file"] = str(log_file)
         self._save_status(task)
 
         return process
