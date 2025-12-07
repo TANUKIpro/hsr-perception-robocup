@@ -89,11 +89,12 @@ def _render_run_evaluation(task_manager: TaskManager, path_coordinator: PathCoor
     """Render evaluation configuration and run section."""
     st.subheader("Configure Evaluation")
 
-    # Model selection
-    st.markdown("### Model")
-
+    # Get available models and datasets
     models = path_coordinator.get_trained_models()
+    sessions = path_coordinator.get_annotation_sessions()
+    ready_sessions = [s for s in sessions if s["has_data_yaml"]]
 
+    # Check if data is available
     if not models:
         st.warning(
             "No trained models found. "
@@ -101,72 +102,71 @@ def _render_run_evaluation(task_manager: TaskManager, path_coordinator: PathCoor
         )
         return
 
-    # Check for pre-selected model
-    default_idx = 0
-    if "selected_model" in st.session_state:
-        for i, m in enumerate(models):
-            if m["best_path"] == st.session_state["selected_model"]:
-                default_idx = i
-                break
-
-    selected_model = st.selectbox(
-        "Select Model",
-        models,
-        index=default_idx,
-        format_func=lambda x: f"{x['name']} ({x['created'][:10]})"
-    )
-
-    if selected_model:
-        model_path = selected_model["best_path"] or selected_model["last_path"]
-        st.write(f"**Model Path:** `{model_path}`")
-
-    st.markdown("---")
-
-    # Dataset selection
-    st.markdown("### Dataset")
-
-    sessions = path_coordinator.get_annotation_sessions()
-    ready_sessions = [s for s in sessions if s["has_data_yaml"]]
-
     if not ready_sessions:
         st.warning("No annotated datasets found.")
         return
 
-    selected_session = st.selectbox(
-        "Select Dataset",
-        ready_sessions,
-        format_func=lambda x: f"{x['name']} ({x['created'][:10]})"
-    )
+    # Row 1: Model and Dataset selection (2 columns)
+    col_model, col_dataset = st.columns(2)
 
-    if selected_session:
-        data_yaml = Path(selected_session["path"]) / "data.yaml"
-        st.write(f"**Dataset Path:** `{data_yaml}`")
+    with col_model:
+        st.markdown("### Model")
+
+        # Check for pre-selected model
+        default_idx = 0
+        if "selected_model" in st.session_state:
+            for i, m in enumerate(models):
+                if m["best_path"] == st.session_state["selected_model"]:
+                    default_idx = i
+                    break
+
+        selected_model = st.selectbox(
+            "Select Model",
+            models,
+            index=default_idx,
+            format_func=lambda x: f"{x['name']} ({x['created'][:10]})"
+        )
+
+        if selected_model:
+            model_path = selected_model["best_path"] or selected_model["last_path"]
+            st.caption(f"`{model_path}`")
+
+    with col_dataset:
+        st.markdown("### Dataset")
+
+        selected_session = st.selectbox(
+            "Select Dataset",
+            ready_sessions,
+            format_func=lambda x: f"{x['name']} ({x['created'][:10]})"
+        )
+
+        if selected_session:
+            data_yaml = Path(selected_session["path"]) / "data.yaml"
+            st.caption(f"`{data_yaml}`")
 
     st.markdown("---")
 
-    # Evaluation options
-    st.markdown("### Options")
+    # Row 2: Options and Competition Requirements (2 columns)
+    col_options, col_requirements = st.columns(2)
 
-    conf_threshold = st.slider(
-        "Confidence Threshold",
-        min_value=0.1,
-        max_value=0.9,
-        value=0.25,
-        step=0.05,
-        help="Minimum confidence for detections"
-    )
+    with col_options:
+        st.markdown("### Options")
+        conf_threshold = st.slider(
+            "Confidence Threshold",
+            min_value=0.1,
+            max_value=0.9,
+            value=0.25,
+            step=0.05,
+            help="Minimum confidence for detections"
+        )
 
-    # Competition targets
-    st.markdown("---")
-    st.markdown("### Competition Requirements")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.metric("Target mAP@50", f"{TARGET_MAP50:.0%}")
-
-    with col2:
-        st.metric("Target Inference", f"<{TARGET_INFERENCE_MS:.0f}ms")
+    with col_requirements:
+        st.markdown("### Competition Requirements")
+        req_col1, req_col2 = st.columns(2)
+        with req_col1:
+            st.metric("Target mAP@50", f"{TARGET_MAP50:.0%}")
+        with req_col2:
+            st.metric("Target Inference", f"<{TARGET_INFERENCE_MS:.0f}ms")
 
     # Run button
     st.markdown("---")
@@ -434,57 +434,66 @@ def _render_robustness_test(path_coordinator: PathCoordinator):
     - **Hue Rotation**: Similar-looking objects (color variants)
     """)
 
-    # Model selection
+    # Get available models and datasets
     models = path_coordinator.get_trained_models()
+    sessions = path_coordinator.get_annotation_sessions()
+    ready_sessions = [s for s in sessions if s["has_data_yaml"]]
 
     if not models:
         st.warning("No trained models found. Please run training first.")
         return
 
-    selected_model = st.selectbox(
-        "Select Model",
-        models,
-        format_func=lambda x: x['name'],
-        key="robustness_model"
-    )
-
-    if not selected_model:
-        return
-
-    model_path = selected_model["best_path"] or selected_model["last_path"]
-
-    # Dataset selection
-    st.markdown("---")
-    sessions = path_coordinator.get_annotation_sessions()
-    ready_sessions = [s for s in sessions if s["has_data_yaml"]]
-
     if not ready_sessions:
         st.warning("No annotated datasets found.")
         return
 
-    selected_session = st.selectbox(
-        "Select Dataset",
-        ready_sessions,
-        format_func=lambda x: x['name'],
-        key="robustness_dataset"
-    )
+    # Row 1: Model, Dataset, and Confidence (3 columns)
+    col_model, col_dataset, col_conf = st.columns(3)
 
-    if not selected_session:
+    with col_model:
+        selected_model = st.selectbox(
+            "Model",
+            models,
+            format_func=lambda x: x['name'],
+            key="robustness_model"
+        )
+
+    with col_dataset:
+        selected_session = st.selectbox(
+            "Dataset",
+            ready_sessions,
+            format_func=lambda x: x['name'],
+            key="robustness_dataset"
+        )
+
+    with col_conf:
+        conf_threshold = st.slider(
+            "Confidence",
+            min_value=0.1,
+            max_value=0.9,
+            value=0.25,
+            step=0.05,
+            key="robustness_conf"
+        )
+
+    if not selected_model or not selected_session:
         return
 
+    model_path = selected_model["best_path"] or selected_model["last_path"]
     dataset_path = Path(selected_session["path"])
 
-    # Image selection
     st.markdown("---")
+
+    # Row 2: Image selection (full width)
+    test_image = None
+    test_image_path = None
+
     image_source = st.radio(
         "Image Source",
         ["Select from Dataset", "Upload Image"],
         horizontal=True,
         key="robustness_image_source"
     )
-
-    test_image = None
-    test_image_path = None
 
     if image_source == "Upload Image":
         uploaded = st.file_uploader(
@@ -494,7 +503,6 @@ def _render_robustness_test(path_coordinator: PathCoordinator):
         )
 
         if uploaded:
-            import tempfile
             import cv2
             import numpy as np
 
@@ -521,16 +529,6 @@ def _render_robustness_test(path_coordinator: PathCoordinator):
     if test_image is None:
         st.info("Please select or upload an image to test.")
         return
-
-    # Confidence threshold
-    conf_threshold = st.slider(
-        "Confidence Threshold",
-        min_value=0.1,
-        max_value=0.9,
-        value=0.25,
-        step=0.05,
-        key="robustness_conf"
-    )
 
     # Load model
     try:
