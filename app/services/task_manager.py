@@ -3,6 +3,7 @@ Task Manager
 
 Manages long-running ML pipeline tasks using subprocesses.
 Provides progress tracking via JSON status files that survive Streamlit reruns.
+Supports profile-based data isolation via PathCoordinator.
 """
 
 import json
@@ -14,7 +15,10 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .path_coordinator import PathCoordinator
 
 
 class TaskStatus(Enum):
@@ -127,22 +131,27 @@ class TaskManager:
         manager.cancel_task(task_id)
     """
 
-    def __init__(self, tasks_dir: Optional[Union[str, Path]] = None):
+    def __init__(self, path_coordinator: Optional["PathCoordinator"] = None):
         """
         Initialize task manager.
 
         Args:
-            tasks_dir: Directory for task status files. Defaults to app/data/tasks/
+            path_coordinator: PathCoordinator instance for profile-aware paths.
+                            If None, creates a new one (uses active profile).
         """
-        if tasks_dir is None:
-            self.tasks_dir = Path(__file__).parent.parent / "data" / "tasks"
+        # Use path coordinator for profile-aware paths
+        if path_coordinator is None:
+            from .path_coordinator import PathCoordinator
+            self._path_coordinator = PathCoordinator()
         else:
-            self.tasks_dir = Path(tasks_dir)
+            self._path_coordinator = path_coordinator
 
+        # Get tasks directory from coordinator (profile-aware)
+        self.tasks_dir = self._path_coordinator.get_path("app_tasks_dir")
         self.tasks_dir.mkdir(parents=True, exist_ok=True)
 
         # Project root for finding scripts
-        self.project_root = Path(__file__).parent.parent.parent
+        self.project_root = self._path_coordinator.project_root
 
     def _status_file(self, task_id: str) -> Path:
         """Get path to task status file."""
@@ -329,6 +338,7 @@ class TaskManager:
             sys.executable,
             str(runner_script),
             "--task-id", task_id,
+            "--tasks-dir", str(self.tasks_dir),
             "--method", method,
             "--input-dir", input_dir,
             "--output-dir", output_dir,
@@ -392,6 +402,7 @@ class TaskManager:
             sys.executable,
             str(runner_script),
             "--task-id", task_id,
+            "--tasks-dir", str(self.tasks_dir),
             "--dataset", dataset_yaml,
             "--model", base_model,
             "--output", output_dir,
@@ -446,6 +457,7 @@ class TaskManager:
             sys.executable,
             str(runner_script),
             "--task-id", task_id,
+            "--tasks-dir", str(self.tasks_dir),
             "--model", model_path,
             "--dataset", dataset_yaml,
             "--conf", str(conf_threshold),

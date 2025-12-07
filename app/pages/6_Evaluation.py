@@ -31,11 +31,15 @@ TARGET_INFERENCE_MS = 100.0
 
 def show_evaluation_page():
     """Main evaluation page."""
-    st.title("📈 Model Evaluation")
+    st.title("Model Evaluation")
 
-    # Initialize services
-    task_manager = TaskManager()
-    path_coordinator = PathCoordinator()
+    # Get services from session state (profile-aware)
+    if "task_manager" not in st.session_state or "path_coordinator" not in st.session_state:
+        st.error("Services not initialized. Please reload the page.")
+        return
+
+    task_manager = st.session_state.task_manager
+    path_coordinator = st.session_state.path_coordinator
 
     # Check for active evaluation task
     active_task = render_active_task_banner("evaluation", task_manager)

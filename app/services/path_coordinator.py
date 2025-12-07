@@ -3,6 +3,7 @@ Path Coordinator
 
 Standardizes paths between the Streamlit app and ML pipeline scripts.
 Handles path translation, symlink creation, and directory management.
+Supports profile-based data isolation.
 """
 
 import os
@@ -10,43 +11,48 @@ import shutil
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, TYPE_CHECKING
 import json
+
+if TYPE_CHECKING:
+    from .profile_manager import ProfileManager
 
 
 @dataclass
 class PathConfig:
-    """Path configuration with defaults."""
+    """Path configuration with profile-relative defaults."""
 
-    # App data paths (legacy, for backward compatibility)
-    app_data_dir: str = "app/data"
-    app_collected_dir: str = "app/data/collected_images"
-    app_reference_dir: str = "app/data/reference_images"
-    app_tasks_dir: str = "app/data/tasks"
-    app_registry_file: str = "app/data/object_registry.json"
+    # App data paths (relative to profile root)
+    app_data_dir: str = "app_data"
+    app_collected_dir: str = "app_data/collected_images"
+    app_reference_dir: str = "app_data/reference_images"
+    app_tasks_dir: str = "app_data/tasks"
+    app_registry_file: str = "app_data/object_registry.json"
+    app_thumbnails_dir: str = "app_data/thumbnails"
 
-    # Standard dataset paths (used by scripts)
+    # Dataset paths (relative to profile root)
     datasets_dir: str = "datasets"
     raw_captures_dir: str = "datasets/raw_captures"
     annotated_dir: str = "datasets/annotated"
     backgrounds_dir: str = "datasets/backgrounds"
 
-    # Model paths
-    models_dir: str = "models"
-    pretrained_dir: str = "models/pretrained"
+    # Model paths - finetuned is profile-specific
     finetuned_dir: str = "models/finetuned"
 
-    # Config paths
+    # Shared paths (relative to project root, not profile)
+    models_dir: str = "models"
+    pretrained_dir: str = "models/pretrained"
     config_dir: str = "config"
     class_config_file: str = "config/object_classes.json"
 
 
 class PathCoordinator:
     """
-    Coordinates paths between app and ML pipeline.
+    Coordinates paths between app and ML pipeline with profile support.
 
     Provides:
-    - Path resolution relative to project root
+    - Profile-aware path resolution
+    - Path resolution relative to project root for shared resources
     - Symlink management for data migration
     - Session-based output directory creation
     - Path validation utilities
@@ -54,8 +60,11 @@ class PathCoordinator:
     Usage:
         coordinator = PathCoordinator()
 
-        # Get absolute path
+        # Get absolute path (profile-aware)
         raw_dir = coordinator.get_path("raw_captures_dir")
+
+        # Get shared path (project-level)
+        pretrained = coordinator.get_path("pretrained_dir")
 
         # Prepare paths for annotation
         paths = coordinator.prepare_annotation_paths()
@@ -64,12 +73,25 @@ class PathCoordinator:
         coordinator.sync_app_to_datasets("apple")
     """
 
-    def __init__(self, project_root: Optional[Union[str, Path]] = None):
+    # Paths that are shared across all profiles (resolved from project root)
+    SHARED_PATHS = {
+        "models_dir",
+        "pretrained_dir",
+        "config_dir",
+        "class_config_file",
+    }
+
+    def __init__(
+        self,
+        project_root: Optional[Union[str, Path]] = None,
+        profile_manager: Optional["ProfileManager"] = None
+    ):
         """
         Initialize path coordinator.
 
         Args:
             project_root: Project root directory. If None, auto-detected from file location.
+            profile_manager: ProfileManager instance. If None, creates a new one.
         """
         if project_root is None:
             # Auto-detect: app/services/path_coordinator.py -> project root
@@ -79,36 +101,65 @@ class PathCoordinator:
 
         self.config = PathConfig()
 
+        # Initialize profile manager
+        if profile_manager is None:
+            from .profile_manager import ProfileManager
+            self._profile_manager = ProfileManager(self.project_root)
+        else:
+            self._profile_manager = profile_manager
+
         # Ensure critical directories exist
         self._ensure_directories()
 
-    def _ensure_directories(self) -> None:
+    def _get_profile_root(self, profile_id: Optional[str] = None) -> Path:
+        """Get the root directory for a profile."""
+        if profile_id is None:
+            profile_id = self._profile_manager.get_active_profile_id()
+        return self._profile_manager.get_profile_path(profile_id)
+
+    def _ensure_directories(self, profile_id: Optional[str] = None) -> None:
         """Create required directories if they don't exist."""
-        directories = [
+        profile_root = self._get_profile_root(profile_id)
+
+        # Profile-specific directories
+        profile_directories = [
             self.config.app_data_dir,
             self.config.app_collected_dir,
             self.config.app_reference_dir,
             self.config.app_tasks_dir,
+            self.config.app_thumbnails_dir,
             self.config.datasets_dir,
             self.config.raw_captures_dir,
             self.config.annotated_dir,
             self.config.backgrounds_dir,
+            self.config.finetuned_dir,
+        ]
+
+        for dir_path in profile_directories:
+            full_path = profile_root / dir_path
+            full_path.mkdir(parents=True, exist_ok=True)
+
+        # Shared directories (project-level)
+        shared_directories = [
             self.config.models_dir,
             self.config.pretrained_dir,
-            self.config.finetuned_dir,
             self.config.config_dir,
         ]
 
-        for dir_path in directories:
+        for dir_path in shared_directories:
             full_path = self.project_root / dir_path
             full_path.mkdir(parents=True, exist_ok=True)
 
-    def get_path(self, key: str) -> Path:
+    def get_path(self, key: str, profile_id: Optional[str] = None) -> Path:
         """
         Get absolute path for a configured path key.
 
+        For shared paths (pretrained, config), resolves relative to project root.
+        For profile-specific paths, resolves relative to the active profile directory.
+
         Args:
             key: Path configuration key (e.g., "raw_captures_dir", "class_config_file")
+            profile_id: Optional profile ID. If None, uses active profile.
 
         Returns:
             Absolute Path object
@@ -120,7 +171,14 @@ class PathCoordinator:
             raise KeyError(f"Unknown path key: {key}. Available: {list(vars(self.config).keys())}")
 
         rel_path = getattr(self.config, key)
-        return self.project_root / rel_path
+
+        if key in self.SHARED_PATHS:
+            # Shared paths are relative to project root
+            return self.project_root / rel_path
+        else:
+            # Profile-specific paths are relative to profile root
+            profile_root = self._get_profile_root(profile_id)
+            return profile_root / rel_path
 
     def get_relative_path(self, key: str) -> str:
         """
@@ -136,12 +194,13 @@ class PathCoordinator:
             raise KeyError(f"Unknown path key: {key}")
         return getattr(self.config, key)
 
-    def resolve_path(self, path: Union[str, Path]) -> Path:
+    def resolve_path(self, path: Union[str, Path], profile_id: Optional[str] = None) -> Path:
         """
-        Resolve a path relative to project root.
+        Resolve a path relative to project root or profile root.
 
         Args:
             path: Relative or absolute path
+            profile_id: Optional profile ID for profile-relative paths
 
         Returns:
             Absolute Path object
@@ -149,7 +208,13 @@ class PathCoordinator:
         path = Path(path)
         if path.is_absolute():
             return path
-        return self.project_root / path
+        # Default to profile root for relative paths
+        profile_root = self._get_profile_root(profile_id)
+        return profile_root / path
+
+    def get_profile_manager(self) -> "ProfileManager":
+        """Get the profile manager instance."""
+        return self._profile_manager
 
     # ========== Data Synchronization ==========
 
@@ -158,7 +223,7 @@ class PathCoordinator:
         Sync collected images from app directory to datasets directory.
 
         Creates a symlink from datasets/raw_captures/{object_name} to
-        app/data/collected_images/{object_name}.
+        app_data/collected_images/{object_name}.
 
         Args:
             object_name: Name of the object (used as directory name)
@@ -272,6 +337,9 @@ class PathCoordinator:
         annotated_dir = self.get_path("annotated_dir")
         sessions = []
 
+        if not annotated_dir.exists():
+            return sessions
+
         for session_dir in sorted(annotated_dir.iterdir(), reverse=True):
             if session_dir.is_dir():
                 data_yaml = session_dir / "data.yaml"
@@ -329,6 +397,9 @@ class PathCoordinator:
         finetuned_dir = self.get_path("finetuned_dir")
         models = []
 
+        if not finetuned_dir.exists():
+            return models
+
         for model_dir in sorted(finetuned_dir.iterdir(), reverse=True):
             if model_dir.is_dir():
                 weights_dir = model_dir / "weights"
@@ -355,8 +426,9 @@ class PathCoordinator:
         pretrained_dir = self.get_path("pretrained_dir")
         models = []
 
-        for model_file in pretrained_dir.glob("*.pt"):
-            models.append(str(model_file))
+        if pretrained_dir.exists():
+            for model_file in pretrained_dir.glob("*.pt"):
+                models.append(str(model_file))
 
         # Also include standard YOLO model names that will be auto-downloaded
         standard_models = ["yolov8n.pt", "yolov8s.pt", "yolov8m.pt", "yolov8l.pt", "yolov8x.pt"]
@@ -379,6 +451,9 @@ class PathCoordinator:
         """
         backgrounds_dir = self.get_path("backgrounds_dir")
         images = []
+
+        if not backgrounds_dir.exists():
+            return images
 
         extensions = [".jpg", ".jpeg", ".png", ".bmp"]
         for img_file in backgrounds_dir.iterdir():
@@ -437,8 +512,8 @@ class PathCoordinator:
         """
         summary = {}
         for key in vars(self.config):
-            path = getattr(self.config, key)
-            summary[key] = str(self.project_root / path)
+            path = self.get_path(key)
+            summary[key] = str(path)
         return summary
 
     # ========== Application Launchers ==========

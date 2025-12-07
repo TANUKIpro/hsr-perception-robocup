@@ -22,18 +22,21 @@ from app.services.task_manager import update_task_status
 def main():
     parser = argparse.ArgumentParser(description="Run model evaluation")
     parser.add_argument("--task-id", required=True, help="Task ID for status updates")
+    parser.add_argument("--tasks-dir", help="Tasks directory for status files")
     parser.add_argument("--model", required=True, help="Path to trained model")
     parser.add_argument("--dataset", required=True, help="Path to dataset YAML")
     parser.add_argument("--conf", type=float, default=0.25, help="Confidence threshold")
     args = parser.parse_args()
 
     task_id = args.task_id
+    tasks_dir = args.tasks_dir
 
     try:
         update_task_status(
             task_id,
             progress=0.05,
-            current_step="Loading evaluation modules..."
+            current_step="Loading evaluation modules...",
+            tasks_dir=tasks_dir
         )
 
         # Import evaluation modules
@@ -42,7 +45,8 @@ def main():
         update_task_status(
             task_id,
             progress=0.1,
-            current_step="Loading model..."
+            current_step="Loading model...",
+            tasks_dir=tasks_dir
         )
 
         # Create evaluator
@@ -51,7 +55,8 @@ def main():
         update_task_status(
             task_id,
             progress=0.2,
-            current_step="Running evaluation on validation set..."
+            current_step="Running evaluation on validation set...",
+            tasks_dir=tasks_dir
         )
 
         # Run evaluation
@@ -63,7 +68,8 @@ def main():
         update_task_status(
             task_id,
             progress=0.7,
-            current_step="Measuring inference time..."
+            current_step="Measuring inference time...",
+            tasks_dir=tasks_dir
         )
 
         # Inference time is already measured in evaluate()
@@ -72,7 +78,8 @@ def main():
         update_task_status(
             task_id,
             progress=0.9,
-            current_step="Generating report..."
+            current_step="Generating report...",
+            tasks_dir=tasks_dir
         )
 
         # Check if requirements are met
@@ -109,7 +116,8 @@ def main():
                     }
                     for name, m in report.per_class_metrics.items()
                 }
-            }
+            },
+            tasks_dir=tasks_dir
         )
 
         # Print summary
@@ -133,7 +141,8 @@ def main():
             current_step="Failed",
             status="failed",
             error_message=error_msg,
-            extra_data={"traceback": traceback_str}
+            extra_data={"traceback": traceback_str},
+            tasks_dir=tasks_dir
         )
 
         print(f"Error: {error_msg}", file=sys.stderr)

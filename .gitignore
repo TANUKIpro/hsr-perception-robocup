@@ -17,8 +17,10 @@ build/
 datasets/
 models/pretrained/
 models/finetuned/
-app/data/collected_images/
-app/data/reference_images/
+app/data/
+
+# Profile data (user-specific)
+profiles/
 
 # IDE
 .vscode/

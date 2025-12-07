@@ -21,9 +21,10 @@ from app.services.task_manager import update_task_status
 class TrainingProgressCallback:
     """Callback for updating task progress during training."""
 
-    def __init__(self, task_id: str, total_epochs: int):
+    def __init__(self, task_id: str, total_epochs: int, tasks_dir: str = None):
         self.task_id = task_id
         self.total_epochs = total_epochs
+        self.tasks_dir = tasks_dir
         self.current_epoch = 0
 
     def on_train_epoch_end(self, trainer):
@@ -46,7 +47,8 @@ class TrainingProgressCallback:
             self.task_id,
             progress=progress,
             current_step=f"Training epoch {self.current_epoch}/{self.total_epochs}",
-            extra_data={"epoch": self.current_epoch, "metrics": metrics}
+            extra_data={"epoch": self.current_epoch, "metrics": metrics},
+            tasks_dir=self.tasks_dir
         )
 
     def on_train_start(self, trainer):
@@ -54,7 +56,8 @@ class TrainingProgressCallback:
         update_task_status(
             self.task_id,
             progress=0.1,
-            current_step="Training started..."
+            current_step="Training started...",
+            tasks_dir=self.tasks_dir
         )
 
     def on_train_end(self, trainer):
@@ -62,13 +65,15 @@ class TrainingProgressCallback:
         update_task_status(
             self.task_id,
             progress=0.9,
-            current_step="Saving model..."
+            current_step="Saving model...",
+            tasks_dir=self.tasks_dir
         )
 
 
 def main():
     parser = argparse.ArgumentParser(description="Run YOLOv8 training")
     parser.add_argument("--task-id", required=True, help="Task ID for status updates")
+    parser.add_argument("--tasks-dir", help="Tasks directory for status files")
     parser.add_argument("--dataset", required=True, help="Path to dataset YAML")
     parser.add_argument("--model", default="yolov8m.pt", help="Base model path or name")
     parser.add_argument("--output", default="models/finetuned", help="Output directory")
@@ -78,12 +83,14 @@ def main():
     args = parser.parse_args()
 
     task_id = args.task_id
+    tasks_dir = args.tasks_dir
 
     try:
         update_task_status(
             task_id,
             progress=0.02,
-            current_step="Checking GPU availability..."
+            current_step="Checking GPU availability...",
+            tasks_dir=tasks_dir
         )
 
         # Check GPU
@@ -102,7 +109,8 @@ def main():
             task_id,
             progress=0.05,
             current_step="Loading training modules...",
-            extra_data={"gpu_available": gpu_available, "gpu_info": gpu_info}
+            extra_data={"gpu_available": gpu_available, "gpu_info": gpu_info},
+            tasks_dir=tasks_dir
         )
 
         # Import training modules
@@ -116,7 +124,8 @@ def main():
         update_task_status(
             task_id,
             progress=0.08,
-            current_step="Initializing trainer..."
+            current_step="Initializing trainer...",
+            tasks_dir=tasks_dir
         )
 
         # Create trainer
@@ -129,7 +138,8 @@ def main():
         update_task_status(
             task_id,
             progress=0.1,
-            current_step="Loading model and starting training..."
+            current_step="Loading model and starting training...",
+            tasks_dir=tasks_dir
         )
 
         # Load YOLO model and add callbacks
@@ -137,7 +147,7 @@ def main():
         model = YOLO(args.model)
 
         # Create and register progress callback
-        progress_callback = TrainingProgressCallback(task_id, args.epochs)
+        progress_callback = TrainingProgressCallback(task_id, args.epochs, tasks_dir)
         model.add_callback("on_train_start", progress_callback.on_train_start)
         model.add_callback("on_train_epoch_end", progress_callback.on_train_epoch_end)
         model.add_callback("on_train_end", progress_callback.on_train_end)
@@ -191,7 +201,8 @@ def main():
                 "best_model": str(best_path) if best_path.exists() else None,
                 "last_model": str(last_path) if last_path.exists() else None,
                 "run_dir": str(run_dir),
-            }
+            },
+            tasks_dir=tasks_dir
         )
 
         print(f"\nTraining completed!")
@@ -206,7 +217,8 @@ def main():
             progress=0.0,
             current_step="Cancelled",
             status="cancelled",
-            error_message="Training cancelled by user"
+            error_message="Training cancelled by user",
+            tasks_dir=tasks_dir
         )
         print("Training cancelled by user")
         sys.exit(1)
@@ -222,7 +234,8 @@ def main():
             current_step="Failed",
             status="failed",
             error_message=error_msg,
-            extra_data={"traceback": traceback_str}
+            extra_data={"traceback": traceback_str},
+            tasks_dir=tasks_dir
         )
 
         print(f"Error: {error_msg}", file=sys.stderr)

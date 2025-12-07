@@ -27,11 +27,15 @@ from components.progress_display import (
 
 def show_annotation_page():
     """Main annotation page."""
-    st.title("🏷️ SAM2 Interactive Annotation")
+    st.title("SAM2 Interactive Annotation")
 
-    # Initialize services
-    task_manager = TaskManager()
-    path_coordinator = PathCoordinator()
+    # Get services from session state (profile-aware)
+    if "task_manager" not in st.session_state or "path_coordinator" not in st.session_state:
+        st.error("Services not initialized. Please reload the page.")
+        return
+
+    task_manager = st.session_state.task_manager
+    path_coordinator = st.session_state.path_coordinator
 
     # Tabs for different sections
     tab1, tab2, tab3 = st.tabs(["Run Annotation", "Sessions", "History"])

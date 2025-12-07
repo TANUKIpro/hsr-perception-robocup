@@ -21,6 +21,7 @@ from app.services.task_manager import update_task_status
 def main():
     parser = argparse.ArgumentParser(description="Run annotation pipeline")
     parser.add_argument("--task-id", required=True, help="Task ID for status updates")
+    parser.add_argument("--tasks-dir", help="Tasks directory for status files")
     parser.add_argument("--method", default="background", choices=["background", "sam2"])
     parser.add_argument("--input-dir", required=True, help="Input directory with raw captures")
     parser.add_argument("--output-dir", required=True, help="Output directory for dataset")
@@ -31,12 +32,14 @@ def main():
     args = parser.parse_args()
 
     task_id = args.task_id
+    tasks_dir = args.tasks_dir
 
     try:
         update_task_status(
             task_id,
             progress=0.05,
-            current_step="Loading annotation modules..."
+            current_step="Loading annotation modules...",
+            tasks_dir=tasks_dir
         )
 
         # Import annotation modules
@@ -46,7 +49,8 @@ def main():
         update_task_status(
             task_id,
             progress=0.1,
-            current_step="Initializing annotator..."
+            current_step="Initializing annotator...",
+            tasks_dir=tasks_dir
         )
 
         # Create annotator config
@@ -62,7 +66,8 @@ def main():
         update_task_status(
             task_id,
             progress=0.15,
-            current_step="Running annotation pipeline..."
+            current_step="Running annotation pipeline...",
+            tasks_dir=tasks_dir
         )
 
         # Run annotation
@@ -94,7 +99,8 @@ def main():
                 "success_rate": report.success_rate,
                 "train_count": report.train_count,
                 "val_count": report.val_count,
-            }
+            },
+            tasks_dir=tasks_dir
         )
 
         print(report.summary())
@@ -113,7 +119,8 @@ def main():
             current_step="Failed",
             status="failed",
             error_message=error_msg,
-            extra_data={"traceback": traceback_str}
+            extra_data={"traceback": traceback_str},
+            tasks_dir=tasks_dir
         )
 
         print(f"Error: {error_msg}", file=sys.stderr)
