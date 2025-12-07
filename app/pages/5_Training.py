@@ -246,10 +246,32 @@ def _render_active_training_view(active_task, task_manager: TaskManager, path_co
         else:
             render_tensorboard_status(is_running=False)
 
+    # CLI出力表示
+    if task.extra_data:
+        log_file = task.extra_data.get("log_file")
+        if log_file:
+            log_path = Path(log_file)
+            if log_path.exists():
+                with st.expander(f"{ICONS.get('terminal', '>')} Training Logs", expanded=False):
+                    try:
+                        with open(log_path, "r") as f:
+                            lines = f.readlines()
+                            # 最新100行を表示
+                            recent_lines = lines[-100:] if len(lines) > 100 else lines
+                            st.code("".join(recent_lines), language="text")
+                    except Exception:
+                        st.info("ログの読み込みに失敗しました")
+
     # Check for completion
     if task.status == TaskStatus.COMPLETED:
         st.balloons()
         render_training_completed_banner(task)
+
+    # 学習中は2秒ごとに自動更新
+    if task.status == TaskStatus.RUNNING:
+        import time
+        time.sleep(2)
+        st.rerun()
 
 
 def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoordinator):

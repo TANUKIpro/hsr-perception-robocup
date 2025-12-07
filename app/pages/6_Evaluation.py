@@ -22,6 +22,11 @@ from components.progress_display import (
     render_task_list,
     render_task_metrics,
 )
+from components.robustness_test import (
+    render_realtime_preview,
+    render_batch_test,
+    render_similar_object_test,
+)
 
 
 # Competition targets
@@ -55,7 +60,7 @@ def show_evaluation_page():
         return
 
     # Tabs for different sections
-    tab1, tab2, tab3 = st.tabs(["Run Evaluation", "Results", "Visual Test"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Run Evaluation", "Results", "Visual Test", "Robustness Test"])
 
     with tab1:
         _render_run_evaluation(task_manager, path_coordinator)
@@ -65,6 +70,9 @@ def show_evaluation_page():
 
     with tab3:
         _render_visual_test(path_coordinator)
+
+    with tab4:
+        _render_robustness_test(path_coordinator)
 
 
 def _render_run_evaluation(task_manager: TaskManager, path_coordinator: PathCoordinator):
@@ -403,6 +411,143 @@ def _render_visual_test(path_coordinator: PathCoordinator):
 
                 except Exception as e:
                     st.error(f"Prediction failed: {e}")
+
+
+def _render_robustness_test(path_coordinator: PathCoordinator):
+    """Render robustness test interface."""
+    st.subheader("Robustness Test")
+    st.markdown("""
+    Test model robustness against real-world conditions:
+    - **Brightness**: Lighting variation (dark/bright environments)
+    - **Shadow**: Shadows cast on objects
+    - **Occlusion**: Partially hidden objects
+    - **Hue Rotation**: Similar-looking objects (color variants)
+    """)
+
+    # Model selection
+    models = path_coordinator.get_trained_models()
+
+    if not models:
+        st.warning("No trained models found. Please run training first.")
+        return
+
+    selected_model = st.selectbox(
+        "Select Model",
+        models,
+        format_func=lambda x: x['name'],
+        key="robustness_model"
+    )
+
+    if not selected_model:
+        return
+
+    model_path = selected_model["best_path"] or selected_model["last_path"]
+
+    # Dataset selection
+    st.markdown("---")
+    sessions = path_coordinator.get_annotation_sessions()
+    ready_sessions = [s for s in sessions if s["has_data_yaml"]]
+
+    if not ready_sessions:
+        st.warning("No annotated datasets found.")
+        return
+
+    selected_session = st.selectbox(
+        "Select Dataset",
+        ready_sessions,
+        format_func=lambda x: x['name'],
+        key="robustness_dataset"
+    )
+
+    if not selected_session:
+        return
+
+    dataset_path = Path(selected_session["path"])
+
+    # Image selection
+    st.markdown("---")
+    image_source = st.radio(
+        "Image Source",
+        ["Select from Dataset", "Upload Image"],
+        horizontal=True,
+        key="robustness_image_source"
+    )
+
+    test_image = None
+    test_image_path = None
+
+    if image_source == "Upload Image":
+        uploaded = st.file_uploader(
+            "Upload test image",
+            type=["jpg", "jpeg", "png"],
+            key="robustness_upload"
+        )
+
+        if uploaded:
+            import tempfile
+            import cv2
+            import numpy as np
+
+            # Read uploaded image
+            file_bytes = np.asarray(bytearray(uploaded.read()), dtype=np.uint8)
+            test_image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+
+    else:  # Select from Dataset
+        val_dir = dataset_path / "images" / "val"
+        if val_dir.exists():
+            images = list(val_dir.glob("*.jpg")) + list(val_dir.glob("*.png"))
+            if images:
+                selected_image = st.selectbox(
+                    "Select Image",
+                    images[:50],
+                    format_func=lambda x: x.name,
+                    key="robustness_image"
+                )
+                if selected_image:
+                    import cv2
+                    test_image = cv2.imread(str(selected_image))
+                    test_image_path = selected_image
+
+    if test_image is None:
+        st.info("Please select or upload an image to test.")
+        return
+
+    # Confidence threshold
+    conf_threshold = st.slider(
+        "Confidence Threshold",
+        min_value=0.1,
+        max_value=0.9,
+        value=0.25,
+        step=0.05,
+        key="robustness_conf"
+    )
+
+    # Load model
+    try:
+        from ultralytics import YOLO
+        model = YOLO(model_path)
+    except Exception as e:
+        st.error(f"Failed to load model: {e}")
+        return
+
+    st.markdown("---")
+
+    # Test mode selection
+    test_mode = st.radio(
+        "Test Mode",
+        ["Real-time Preview", "Batch Test", "Similar Object Test"],
+        horizontal=True,
+        key="robustness_mode"
+    )
+
+    if test_mode == "Real-time Preview":
+        render_realtime_preview(model, test_image, conf_threshold)
+
+    elif test_mode == "Batch Test":
+        render_batch_test(model, test_image, conf_threshold)
+
+    else:  # Similar Object Test
+        render_similar_object_test(model, dataset_path, conf_threshold)
 
 
 # For Streamlit native multipage
