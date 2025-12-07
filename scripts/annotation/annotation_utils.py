@@ -409,6 +409,134 @@ def update_collected_samples(
         json.dump(config, f, indent=2, ensure_ascii=False)
 
 
+def mask_to_bbox(mask) -> Optional[Tuple[int, int, int, int]]:
+    """
+    Convert boolean mask to bounding box.
+
+    Args:
+        mask: Boolean mask array (H, W)
+
+    Returns:
+        Bounding box as (x_min, y_min, x_max, y_max) or None if empty mask
+    """
+    import numpy as np
+
+    if not np.any(mask):
+        return None
+
+    rows = np.any(mask, axis=1)
+    cols = np.any(mask, axis=0)
+
+    y_min, y_max = np.where(rows)[0][[0, -1]]
+    x_min, x_max = np.where(cols)[0][[0, -1]]
+
+    return (int(x_min), int(y_min), int(x_max), int(y_max))
+
+
+def batch_save_yolo_labels(
+    tracking_results: Dict,
+    frame_map: Dict[int, Path],
+    output_dir: str,
+    class_id: int,
+    copy_images: bool = True,
+) -> AnnotationResult:
+    """
+    Save tracking results as YOLO format labels in batch.
+
+    Args:
+        tracking_results: Dictionary mapping frame_idx to TrackingResult objects
+        frame_map: Dictionary mapping frame_idx to original image Path
+        output_dir: Output directory for labels and optionally images
+        class_id: Class ID for all annotations
+        copy_images: If True, copy images to output_dir/images/
+
+    Returns:
+        AnnotationResult with statistics
+    """
+    import cv2
+    import numpy as np
+
+    output_path = Path(output_dir)
+    labels_dir = output_path / "labels"
+    images_dir = output_path / "images"
+
+    labels_dir.mkdir(parents=True, exist_ok=True)
+    if copy_images:
+        images_dir.mkdir(parents=True, exist_ok=True)
+
+    result = AnnotationResult(total_images=len(tracking_results))
+
+    for frame_idx, tracking_result in tracking_results.items():
+        original_path = frame_map.get(frame_idx)
+        if original_path is None:
+            result.failed += 1
+            result.failed_paths.append(f"Frame {frame_idx}: No path mapping")
+            continue
+
+        try:
+            # Get mask from tracking result
+            mask = tracking_result.mask
+
+            # Convert mask to bbox
+            bbox_abs = mask_to_bbox(mask)
+            if bbox_abs is None:
+                result.failed += 1
+                result.failed_paths.append(f"{original_path.name}: Empty mask")
+                continue
+
+            # Get image dimensions
+            img = cv2.imread(str(original_path))
+            if img is None:
+                result.failed += 1
+                result.failed_paths.append(f"{original_path.name}: Cannot read image")
+                continue
+
+            img_height, img_width = img.shape[:2]
+            x_min, y_min, x_max, y_max = bbox_abs
+
+            # Convert to YOLO format
+            yolo_bbox = bbox_to_yolo(x_min, y_min, x_max, y_max, img_width, img_height)
+
+            # Write label file
+            label_filename = f"{original_path.stem}.txt"
+            label_path = labels_dir / label_filename
+            write_yolo_label(str(label_path), class_id, yolo_bbox)
+
+            # Optionally copy image
+            if copy_images:
+                dst_image_path = images_dir / original_path.name
+                if not dst_image_path.exists():
+                    shutil.copy2(original_path, dst_image_path)
+
+            result.successful += 1
+
+        except Exception as e:
+            result.failed += 1
+            result.failed_paths.append(f"{original_path.name}: {str(e)}")
+
+    return result
+
+
+def get_image_dimensions(image_path: str) -> Tuple[int, int]:
+    """
+    Get image dimensions without loading entire image.
+
+    Args:
+        image_path: Path to image file
+
+    Returns:
+        Tuple of (width, height)
+    """
+    import cv2
+
+    img = cv2.imread(str(image_path))
+    if img is None:
+        raise ValueError(f"Cannot read image: {image_path}")
+
+    height, width = img.shape[:2]
+    return (width, height)
+
+
 if __name__ == "__main__":
     # Test functions
     print("Testing bbox_to_yolo...")
