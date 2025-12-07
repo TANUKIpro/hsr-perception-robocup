@@ -74,40 +74,33 @@ def render_class_status_grid(classes: List, columns: int = 2):
         classes: List of ClassInfo objects
         columns: Number of columns in grid
     """
-    # Extract colors
-    surface = COLORS["surface"]
-    surface_hover = COLORS["surface_hover"]
-    surface_elevated = COLORS["surface_elevated"]
-    text_primary = COLORS["text_primary"]
-    text_secondary = COLORS["text_secondary"]
-    text_muted = COLORS["text_muted"]
+    # Extract accent colors only (these are intentional)
     info_color = COLORS["info"]
     accent_primary = COLORS["accent_primary"]
     success = COLORS["success"]
 
     if not classes:
-        html = f"""
+        html = """
         <div style="
-            background: {surface};
-            border: 1px dashed {surface_hover};
+            border: 1px dashed currentColor;
             border-radius: 12px;
             padding: 40px;
             text-align: center;
+            opacity: 0.6;
         ">
             <div style="
                 font-size: 2rem;
-                color: {text_muted};
                 margin-bottom: 12px;
             ">📁</div>
             <div style="
                 font-family: 'Inter', sans-serif;
                 font-size: 0.9rem;
-                color: {text_secondary};
+                opacity: 0.8;
             ">No classes found</div>
             <div style="
                 font-family: 'Inter', sans-serif;
                 font-size: 0.8rem;
-                color: {text_muted};
+                opacity: 0.5;
                 margin-top: 4px;
             ">Capture some images first using the app</div>
         </div>
@@ -127,7 +120,6 @@ def render_class_status_grid(classes: List, columns: int = 2):
         gap: 16px;
         margin-bottom: 16px;
         padding: 12px 16px;
-        background: {surface_elevated};
         border-radius: 8px;
     ">
         <div style="text-align: center; flex: 1;">
@@ -135,9 +127,8 @@ def render_class_status_grid(classes: List, columns: int = 2):
                 font-family: 'JetBrains Mono', monospace;
                 font-size: 1.25rem;
                 font-weight: 600;
-                color: {text_primary};
             ">{num_classes}</div>
-            <div style="font-size: 0.7rem; color: {text_muted};">Classes</div>
+            <div style="font-size: 0.7rem; opacity: 0.5;">Classes</div>
         </div>
         <div style="text-align: center; flex: 1;">
             <div style="
@@ -146,7 +137,7 @@ def render_class_status_grid(classes: List, columns: int = 2):
                 font-weight: 600;
                 color: {info_color};
             ">{total_images}</div>
-            <div style="font-size: 0.7rem; color: {text_muted};">Images</div>
+            <div style="font-size: 0.7rem; opacity: 0.5;">Images</div>
         </div>
         <div style="text-align: center; flex: 1;">
             <div style="
@@ -155,7 +146,7 @@ def render_class_status_grid(classes: List, columns: int = 2):
                 font-weight: 600;
                 color: {accent_primary};
             ">{total_matched}</div>
-            <div style="font-size: 0.7rem; color: {text_muted};">Matched</div>
+            <div style="font-size: 0.7rem; opacity: 0.5;">Matched</div>
         </div>
         <div style="text-align: center; flex: 1;">
             <div style="
@@ -164,7 +155,7 @@ def render_class_status_grid(classes: List, columns: int = 2):
                 font-weight: 600;
                 color: {success};
             ">{ready_count}/{num_classes}</div>
-            <div style="font-size: 0.7rem; color: {text_muted};">Ready</div>
+            <div style="font-size: 0.7rem; opacity: 0.5;">Ready</div>
         </div>
     </div>
     """
@@ -194,20 +185,14 @@ def render_dataset_preparation_panel(
         st.warning("No classes are ready for training. Annotate at least 10 samples per class.")
         return None
 
-    # Extract colors
-    text_primary = COLORS["text_primary"]
-    text_secondary = COLORS["text_secondary"]
-    text_muted = COLORS["text_muted"]
-    surface = COLORS["surface"]
-    surface_hover = COLORS["surface_hover"]
+    # Extract accent colors only
     info_color = COLORS["info"]
     accent_primary = COLORS["accent_primary"]
 
-    html = f"""
+    html = """
     <div style="
         font-family: 'JetBrains Mono', monospace;
         font-size: 0.9rem;
-        color: {text_primary};
         margin-bottom: 12px;
         display: flex;
         align-items: center;
@@ -220,10 +205,10 @@ def render_dataset_preparation_panel(
     st.markdown(html, unsafe_allow_html=True)
 
     # Class selection
-    html2 = f"""
+    html2 = """
     <div style="
         font-size: 0.8rem;
-        color: {text_secondary};
+        opacity: 0.7;
         margin-bottom: 8px;
     ">Select classes to include:</div>
     """
@@ -276,8 +261,6 @@ def render_dataset_preparation_panel(
 
         html3 = f"""
         <div style="
-            background: {surface};
-            border: 1px solid {surface_hover};
             border-radius: 8px;
             padding: 12px 16px;
             margin-bottom: 16px;
@@ -285,38 +268,36 @@ def render_dataset_preparation_panel(
             <div style="
                 font-family: 'JetBrains Mono', monospace;
                 font-size: 0.75rem;
-                color: {text_muted};
+                opacity: 0.5;
                 text-transform: uppercase;
                 letter-spacing: 0.1em;
                 margin-bottom: 8px;
             ">Preview</div>
             <div style="display: flex; gap: 24px;">
                 <div>
-                    <div style="font-size: 0.7rem; color: {text_muted};">Classes</div>
+                    <div style="font-size: 0.7rem; opacity: 0.5;">Classes</div>
                     <div style="
                         font-family: 'JetBrains Mono', monospace;
-                        color: {text_primary};
                     ">{num_selected}</div>
                 </div>
                 <div>
-                    <div style="font-size: 0.7rem; color: {text_muted};">Train</div>
+                    <div style="font-size: 0.7rem; opacity: 0.5;">Train</div>
                     <div style="
                         font-family: 'JetBrains Mono', monospace;
                         color: {info_color};
                     ">{train_count}</div>
                 </div>
                 <div>
-                    <div style="font-size: 0.7rem; color: {text_muted};">Val</div>
+                    <div style="font-size: 0.7rem; opacity: 0.5;">Val</div>
                     <div style="
                         font-family: 'JetBrains Mono', monospace;
                         color: {accent_primary};
                     ">{val_count}</div>
                 </div>
                 <div>
-                    <div style="font-size: 0.7rem; color: {text_muted};">Total</div>
+                    <div style="font-size: 0.7rem; opacity: 0.5;">Total</div>
                     <div style="
                         font-family: 'JetBrains Mono', monospace;
-                        color: {text_primary};
                     ">{total_samples}</div>
                 </div>
             </div>
@@ -348,12 +329,9 @@ def render_dataset_result(result, dataset_name: str):
         result: DatasetResult from DatasetPreparer
         dataset_name: Name of the generated dataset
     """
-    # Extract colors
+    # Extract accent colors only
     success_color = COLORS["success"]
     success_bg = COLORS["success_bg"]
-    text_primary = COLORS["text_primary"]
-    text_secondary = COLORS["text_secondary"]
-    text_muted = COLORS["text_muted"]
     info_color = COLORS["info"]
     accent_primary = COLORS["accent_primary"]
 
@@ -401,9 +379,8 @@ def render_dataset_result(result, dataset_name: str):
                         font-family: 'JetBrains Mono', monospace;
                         font-size: 1.25rem;
                         font-weight: 600;
-                        color: {text_primary};
                     ">{num_classes}</div>
-                    <div style="font-size: 0.7rem; color: {text_muted};">Classes</div>
+                    <div style="font-size: 0.7rem; opacity: 0.5;">Classes</div>
                 </div>
                 <div style="text-align: center;">
                     <div style="
@@ -412,7 +389,7 @@ def render_dataset_result(result, dataset_name: str):
                         font-weight: 600;
                         color: {info_color};
                     ">{train_count}</div>
-                    <div style="font-size: 0.7rem; color: {text_muted};">Train</div>
+                    <div style="font-size: 0.7rem; opacity: 0.5;">Train</div>
                 </div>
                 <div style="text-align: center;">
                     <div style="
@@ -421,16 +398,15 @@ def render_dataset_result(result, dataset_name: str):
                         font-weight: 600;
                         color: {accent_primary};
                     ">{val_count}</div>
-                    <div style="font-size: 0.7rem; color: {text_muted};">Val</div>
+                    <div style="font-size: 0.7rem; opacity: 0.5;">Val</div>
                 </div>
                 <div style="text-align: center;">
                     <div style="
                         font-family: 'JetBrains Mono', monospace;
                         font-size: 1.25rem;
                         font-weight: 600;
-                        color: {text_primary};
                     ">{total_count}</div>
-                    <div style="font-size: 0.7rem; color: {text_muted};">Total</div>
+                    <div style="font-size: 0.7rem; opacity: 0.5;">Total</div>
                 </div>
             </div>
 
@@ -441,13 +417,12 @@ def render_dataset_result(result, dataset_name: str):
             ">
                 <div style="
                     font-size: 0.8rem;
-                    color: {text_secondary};
+                    opacity: 0.7;
                     margin-bottom: 4px;
                 ">Classes:</div>
                 <div style="
                     font-family: 'JetBrains Mono', monospace;
                     font-size: 0.85rem;
-                    color: {text_primary};
                 ">{class_names_str}</div>
             </div>
         </div>

@@ -97,7 +97,7 @@ FONTS = {
 # =============================================================================
 
 def inject_training_styles():
-    """Inject custom CSS for training page with Mission Control aesthetic."""
+    """Inject custom CSS for training page - theme-aware version."""
 
     css = f"""
     <style>
@@ -105,37 +105,12 @@ def inject_training_styles():
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
     /* =========================================
-       Base Page Overrides
-       ========================================= */
-
-    .stApp {{
-        background: {COLORS["background"]};
-    }}
-
-    /* Subtle grid background pattern */
-    .stApp::before {{
-        content: '';
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-image:
-            linear-gradient(rgba(0, 212, 170, 0.02) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(0, 212, 170, 0.02) 1px, transparent 1px);
-        background-size: 50px 50px;
-        pointer-events: none;
-        z-index: 0;
-    }}
-
-    /* =========================================
-       Custom Component Styles
+       Custom Component Styles (Theme-aware)
        ========================================= */
 
     /* Mission Control Header */
     .mc-header {{
         font-family: {FONTS["display"]};
-        color: {COLORS["text_primary"]};
         font-size: 1.75rem;
         font-weight: 600;
         letter-spacing: -0.02em;
@@ -171,7 +146,6 @@ def inject_training_styles():
     .mc-status-badge.running {{
         background: {COLORS["info_bg"]};
         color: {COLORS["info"]};
-        border: 1px solid rgba(88, 166, 255, 0.3);
     }}
 
     .mc-status-badge.running::before {{
@@ -186,13 +160,11 @@ def inject_training_styles():
     .mc-status-badge.completed {{
         background: {COLORS["success_bg"]};
         color: {COLORS["success"]};
-        border: 1px solid rgba(63, 185, 80, 0.3);
     }}
 
     .mc-status-badge.failed {{
         background: {COLORS["error_bg"]};
         color: {COLORS["error"]};
-        border: 1px solid rgba(248, 81, 73, 0.3);
     }}
 
     @keyframes pulse-dot {{
@@ -205,17 +177,10 @@ def inject_training_styles():
        ========================================= */
 
     .mc-metric-card {{
-        background: {COLORS["surface"]};
-        border: 1px solid {COLORS["surface_hover"]};
         border-radius: 8px;
         padding: 20px;
         position: relative;
         overflow: hidden;
-        transition: border-color 0.2s ease;
-    }}
-
-    .mc-metric-card:hover {{
-        border-color: rgba(0, 212, 170, 0.3);
     }}
 
     .mc-metric-card::before {{
@@ -238,17 +203,16 @@ def inject_training_styles():
         font-family: {FONTS["mono"]};
         font-size: 0.7rem;
         font-weight: 500;
-        color: {COLORS["text_muted"]};
         text-transform: uppercase;
         letter-spacing: 0.1em;
         margin-bottom: 8px;
+        opacity: 0.7;
     }}
 
     .mc-metric-value {{
         font-family: {FONTS["display"]};
         font-size: 1.75rem;
         font-weight: 600;
-        color: {COLORS["text_primary"]};
         line-height: 1.1;
     }}
 
@@ -274,8 +238,8 @@ def inject_training_styles():
     .mc-metric-subtitle {{
         font-family: {FONTS["body"]};
         font-size: 0.75rem;
-        color: {COLORS["text_secondary"]};
         margin-top: 4px;
+        opacity: 0.7;
     }}
 
     /* =========================================
@@ -298,7 +262,6 @@ def inject_training_styles():
         font-family: {FONTS["display"]};
         font-size: 1.5rem;
         font-weight: 700;
-        color: {COLORS["text_primary"]};
     }}
 
     .mc-circular-progress .progress-label {{
@@ -306,9 +269,9 @@ def inject_training_styles():
         bottom: -24px;
         font-family: {FONTS["mono"]};
         font-size: 0.65rem;
-        color: {COLORS["text_muted"]};
         text-transform: uppercase;
         letter-spacing: 0.1em;
+        opacity: 0.7;
     }}
 
     /* =========================================
@@ -316,8 +279,6 @@ def inject_training_styles():
        ========================================= */
 
     .mc-gpu-card {{
-        background: {COLORS["surface"]};
-        border: 1px solid {COLORS["surface_hover"]};
         border-radius: 12px;
         padding: 24px;
         position: relative;
@@ -332,14 +293,13 @@ def inject_training_styles():
         font-family: {FONTS["display"]};
         font-size: 1.1rem;
         font-weight: 600;
-        color: {COLORS["text_primary"]};
         margin-bottom: 4px;
     }}
 
     .mc-gpu-memory {{
         font-family: {FONTS["mono"]};
         font-size: 0.85rem;
-        color: {COLORS["text_secondary"]};
+        opacity: 0.7;
     }}
 
     .mc-gpu-tier-badge {{
@@ -423,14 +383,13 @@ def inject_training_styles():
     .mc-config-item-label {{
         font-family: {FONTS["body"]};
         font-size: 0.75rem;
-        color: {COLORS["text_muted"]};
+        opacity: 0.7;
     }}
 
     .mc-config-item-value {{
         font-family: {FONTS["display"]};
         font-size: 1rem;
         font-weight: 600;
-        color: {COLORS["text_primary"]};
     }}
 
     .mc-config-divider {{
@@ -463,8 +422,6 @@ def inject_training_styles():
        ========================================= */
 
     .mc-tensorboard-panel {{
-        background: {COLORS["surface"]};
-        border: 1px solid {COLORS["surface_hover"]};
         border-radius: 12px;
         overflow: hidden;
     }}
@@ -474,8 +431,6 @@ def inject_training_styles():
         align-items: center;
         justify-content: space-between;
         padding: 16px 20px;
-        border-bottom: 1px solid {COLORS["surface_hover"]};
-        background: {COLORS["surface_elevated"]};
     }}
 
     .mc-tensorboard-title {{
@@ -485,7 +440,6 @@ def inject_training_styles():
         font-family: {FONTS["display"]};
         font-size: 0.9rem;
         font-weight: 600;
-        color: {COLORS["text_primary"]};
     }}
 
     .mc-tensorboard-title .icon {{
@@ -514,29 +468,12 @@ def inject_training_styles():
 
     .mc-btn-primary {{
         background: {COLORS["accent_gradient"]};
-        color: {COLORS["background"]};
+        color: white;
     }}
 
     .mc-btn-primary:hover {{
         filter: brightness(1.1);
         transform: translateY(-1px);
-    }}
-
-    .mc-btn-secondary {{
-        background: {COLORS["surface_hover"]};
-        color: {COLORS["text_primary"]};
-        border: 1px solid {COLORS["surface_hover"]};
-    }}
-
-    .mc-btn-secondary:hover {{
-        background: {COLORS["surface_elevated"]};
-        border-color: {COLORS["accent_primary"]};
-    }}
-
-    .mc-tensorboard-iframe {{
-        width: 100%;
-        border: none;
-        background: #1e1e1e;
     }}
 
     .mc-tensorboard-placeholder {{
@@ -546,13 +483,12 @@ def inject_training_styles():
         justify-content: center;
         padding: 60px 20px;
         text-align: center;
-        color: {COLORS["text_muted"]};
+        opacity: 0.7;
     }}
 
     .mc-tensorboard-placeholder .icon {{
         font-size: 2rem;
         margin-bottom: 12px;
-        color: {COLORS["text_secondary"]};
     }}
 
     /* Quick links */
@@ -596,11 +532,11 @@ def inject_training_styles():
        ========================================= */
 
     .mc-progress-container {{
-        background: {COLORS["progress_track"]};
         border-radius: 4px;
         height: 8px;
         overflow: hidden;
         position: relative;
+        opacity: 0.3;
     }}
 
     .mc-progress-bar {{
@@ -635,10 +571,10 @@ def inject_training_styles():
     .mc-progress-text {{
         font-family: {FONTS["mono"]};
         font-size: 0.75rem;
-        color: {COLORS["text_secondary"]};
         margin-top: 6px;
         display: flex;
         justify-content: space-between;
+        opacity: 0.7;
     }}
 
     /* =========================================
@@ -646,8 +582,6 @@ def inject_training_styles():
        ========================================= */
 
     .mc-task-item {{
-        background: {COLORS["surface"]};
-        border: 1px solid {COLORS["surface_hover"]};
         border-radius: 8px;
         padding: 16px;
         margin-bottom: 8px;
@@ -655,7 +589,6 @@ def inject_training_styles():
     }}
 
     .mc-task-item:hover {{
-        border-color: rgba(0, 212, 170, 0.3);
         transform: translateX(4px);
     }}
 
@@ -669,13 +602,13 @@ def inject_training_styles():
     .mc-task-id {{
         font-family: {FONTS["mono"]};
         font-size: 0.8rem;
-        color: {COLORS["text_secondary"]};
+        opacity: 0.7;
     }}
 
     .mc-task-time {{
         font-family: {FONTS["mono"]};
         font-size: 0.75rem;
-        color: {COLORS["text_muted"]};
+        opacity: 0.5;
     }}
 
     /* =========================================
@@ -695,13 +628,11 @@ def inject_training_styles():
 
     .mc-validation.warning {{
         background: {COLORS["warning_bg"]};
-        border: 1px solid rgba(210, 153, 34, 0.3);
         color: {COLORS["warning"]};
     }}
 
     .mc-validation.error {{
         background: {COLORS["error_bg"]};
-        border: 1px solid rgba(248, 81, 73, 0.3);
         color: {COLORS["error"]};
     }}
 
@@ -748,7 +679,7 @@ def render_header(title: str, subtitle: Optional[str] = None):
     """Render Mission Control style header."""
     html = f'<div class="mc-header">{title}</div>'
     if subtitle:
-        html += f'<p style="color: {COLORS["text_secondary"]}; font-size: 0.9rem; margin-top: -8px;">{subtitle}</p>'
+        html += f'<p style="font-size: 0.9rem; margin-top: -8px; opacity: 0.7;">{subtitle}</p>'
     st.markdown(html, unsafe_allow_html=True)
 
 

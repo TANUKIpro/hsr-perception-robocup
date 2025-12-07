@@ -60,6 +60,10 @@ from components.progress_display import (
 
 def show_training_page():
     """Main training page with Mission Control aesthetic."""
+    # Render common sidebar
+    from components.common_sidebar import render_common_sidebar
+    render_common_sidebar()
+
     # Inject custom CSS
     inject_training_styles()
 
@@ -73,14 +77,13 @@ def show_training_page():
                 font-family: 'JetBrains Mono', monospace;
                 font-size: 1.75rem;
                 font-weight: 600;
-                color: {COLORS["text_primary"]};
             ">Model Training</h1>
         </div>
         <div style="
             font-family: 'Inter', sans-serif;
             font-size: 0.85rem;
-            color: {COLORS["text_muted"]};
             margin-top: 4px;
+            opacity: 0.7;
         ">Competition-optimized YOLOv8 fine-tuning with GPU auto-scaling</div>
     </div>
     """, unsafe_allow_html=True)
@@ -149,15 +152,13 @@ def _render_active_training_view(active_task, task_manager: TaskManager, path_co
         # Training progress chart
         st.markdown(f"""
         <div style="
-            background: {COLORS["surface"]};
-            border: 1px solid {COLORS["surface_hover"]};
             border-radius: 12px;
             padding: 16px;
         ">
             <div style="
                 font-family: 'JetBrains Mono', monospace;
                 font-size: 0.85rem;
-                color: {COLORS["text_secondary"]};
+                opacity: 0.7;
                 margin-bottom: 12px;
             ">{ICONS["accuracy"]} Training Progress</div>
         """, unsafe_allow_html=True)
@@ -196,8 +197,6 @@ def _render_active_training_view(active_task, task_manager: TaskManager, path_co
             if config:
                 st.markdown(f"""
                 <div style="
-                    background: {COLORS["surface"]};
-                    border: 1px solid {COLORS["surface_hover"]};
                     border-radius: 12px;
                     padding: 16px;
                     margin-top: 16px;
@@ -205,27 +204,27 @@ def _render_active_training_view(active_task, task_manager: TaskManager, path_co
                     <div style="
                         font-family: 'JetBrains Mono', monospace;
                         font-size: 0.75rem;
-                        color: {COLORS["text_muted"]};
+                        opacity: 0.5;
                         text-transform: uppercase;
                         letter-spacing: 0.1em;
                         margin-bottom: 12px;
                     ">Configuration</div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                         <div>
-                            <div style="font-size: 0.7rem; color: {COLORS["text_muted"]};">Model</div>
-                            <div style="font-family: 'JetBrains Mono', monospace; color: {COLORS["text_primary"]};">{config.get("model", "N/A")}</div>
+                            <div style="font-size: 0.7rem; opacity: 0.5;">Model</div>
+                            <div style="font-family: 'JetBrains Mono', monospace;">{config.get("model", "N/A")}</div>
                         </div>
                         <div>
-                            <div style="font-size: 0.7rem; color: {COLORS["text_muted"]};">Batch</div>
-                            <div style="font-family: 'JetBrains Mono', monospace; color: {COLORS["text_primary"]};">{config.get("batch", "N/A")}</div>
+                            <div style="font-size: 0.7rem; opacity: 0.5;">Batch</div>
+                            <div style="font-family: 'JetBrains Mono', monospace;">{config.get("batch", "N/A")}</div>
                         </div>
                         <div>
-                            <div style="font-size: 0.7rem; color: {COLORS["text_muted"]};">Image Size</div>
-                            <div style="font-family: 'JetBrains Mono', monospace; color: {COLORS["text_primary"]};">{config.get("imgsz", 640)}</div>
+                            <div style="font-size: 0.7rem; opacity: 0.5;">Image Size</div>
+                            <div style="font-family: 'JetBrains Mono', monospace;">{config.get("imgsz", 640)}</div>
                         </div>
                         <div>
-                            <div style="font-size: 0.7rem; color: {COLORS["text_muted"]};">Epochs</div>
-                            <div style="font-family: 'JetBrains Mono', monospace; color: {COLORS["text_primary"]};">{config.get("epochs", "N/A")}</div>
+                            <div style="font-size: 0.7rem; opacity: 0.5;">Epochs</div>
+                            <div style="font-family: 'JetBrains Mono', monospace;">{config.get("epochs", "N/A")}</div>
                         </div>
                     </div>
                 </div>
@@ -282,7 +281,6 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
     <div style="
         font-family: 'JetBrains Mono', monospace;
         font-size: 0.9rem;
-        color: {COLORS["text_primary"]};
         margin-bottom: 12px;
         display: flex;
         align-items: center;
@@ -351,8 +349,6 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
             # Dataset info card
             st.markdown(f"""
             <div style="
-                background: {COLORS["surface"]};
-                border: 1px solid {COLORS["surface_hover"]};
                 border-radius: 12px;
                 padding: 16px;
                 margin: 12px 0;
@@ -367,7 +363,7 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
                         ">{len(class_names)}</div>
                         <div style="
                             font-size: 0.75rem;
-                            color: {COLORS["text_muted"]};
+                            opacity: 0.5;
                         ">Classes</div>
                     </div>
                     <div style="text-align: center;">
@@ -379,7 +375,7 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
                         ">{train_count}</div>
                         <div style="
                             font-size: 0.75rem;
-                            color: {COLORS["text_muted"]};
+                            opacity: 0.5;
                         ">Train Images</div>
                     </div>
                     <div style="text-align: center;">
@@ -391,7 +387,7 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
                         ">{val_count}</div>
                         <div style="
                             font-size: 0.75rem;
-                            color: {COLORS["text_muted"]};
+                            opacity: 0.5;
                         ">Val Images</div>
                     </div>
                 </div>
@@ -405,15 +401,14 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
                     with cols[i % 3]:
                         st.markdown(f"""
                         <div style="
-                            background: {COLORS["surface_hover"]};
                             border-radius: 4px;
                             padding: 4px 8px;
                             margin: 2px 0;
                             font-family: 'JetBrains Mono', monospace;
                             font-size: 0.8rem;
-                            color: {COLORS["text_secondary"]};
+                            opacity: 0.85;
                         ">
-                            <span style="color: {COLORS["text_muted"]};">{i}:</span> {name}
+                            <span style="opacity: 0.5;">{i}:</span> {name}
                         </div>
                         """, unsafe_allow_html=True)
 
@@ -428,7 +423,6 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
     <div style="
         font-family: 'JetBrains Mono', monospace;
         font-size: 0.9rem;
-        color: {COLORS["text_primary"]};
         margin-bottom: 12px;
         display: flex;
         align-items: center;
@@ -508,7 +502,6 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
     <div style="
         font-family: 'JetBrains Mono', monospace;
         font-size: 0.9rem;
-        color: {COLORS["text_primary"]};
         margin-bottom: 12px;
         display: flex;
         align-items: center;
@@ -574,7 +567,6 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
     <div style="
         font-family: 'JetBrains Mono', monospace;
         font-size: 0.9rem;
-        color: {COLORS["text_primary"]};
         margin-bottom: 12px;
         display: flex;
         align-items: center;
@@ -700,7 +692,6 @@ def _render_trained_models(path_coordinator: PathCoordinator):
     <div style="
         font-family: 'JetBrains Mono', monospace;
         font-size: 0.9rem;
-        color: {COLORS["text_primary"]};
         margin-bottom: 16px;
         display: flex;
         align-items: center;
@@ -716,26 +707,25 @@ def _render_trained_models(path_coordinator: PathCoordinator):
     if not models:
         st.markdown(f"""
         <div style="
-            background: {COLORS["surface"]};
-            border: 1px dashed {COLORS["surface_hover"]};
+            border: 1px dashed currentColor;
             border-radius: 12px;
             padding: 40px;
             text-align: center;
+            opacity: 0.6;
         ">
             <div style="
                 font-size: 2rem;
-                color: {COLORS["text_muted"]};
                 margin-bottom: 12px;
             ">{ICONS["model"]}</div>
             <div style="
                 font-family: 'Inter', sans-serif;
                 font-size: 0.9rem;
-                color: {COLORS["text_secondary"]};
+                opacity: 0.8;
             ">No trained models found</div>
             <div style="
                 font-family: 'Inter', sans-serif;
                 font-size: 0.8rem;
-                color: {COLORS["text_muted"]};
+                opacity: 0.5;
                 margin-top: 4px;
             ">Run training to create one</div>
         </div>
@@ -755,7 +745,7 @@ def _render_trained_models(path_coordinator: PathCoordinator):
                 <div style="
                     font-family: 'Inter', sans-serif;
                     font-size: 0.8rem;
-                    color: {COLORS["text_muted"]};
+                    opacity: 0.5;
                 ">Created: {model['created'][:19]}</div>
             </div>
             """, unsafe_allow_html=True)
@@ -783,7 +773,6 @@ def _render_trained_models(path_coordinator: PathCoordinator):
 
                         st.markdown(f"""
                         <div style="
-                            background: {COLORS["surface"]};
                             border-radius: 8px;
                             padding: 16px;
                             margin-bottom: 12px;
@@ -813,7 +802,7 @@ def _render_trained_models(path_coordinator: PathCoordinator):
                                         font-weight: 600;
                                         color: {COLORS["accent_primary"]};
                                     ">{mAP50:.1%}</div>
-                                    <div style="font-size: 0.7rem; color: {COLORS["text_muted"]};">mAP@50</div>
+                                    <div style="font-size: 0.7rem; opacity: 0.5;">mAP@50</div>
                                 </div>
                                 <div style="text-align: center;">
                                     <div style="
@@ -822,25 +811,25 @@ def _render_trained_models(path_coordinator: PathCoordinator):
                                         font-weight: 600;
                                         color: {COLORS["info"]};
                                     ">{mAP50_95:.1%}</div>
-                                    <div style="font-size: 0.7rem; color: {COLORS["text_muted"]};">mAP@50-95</div>
+                                    <div style="font-size: 0.7rem; opacity: 0.5;">mAP@50-95</div>
                                 </div>
                                 <div style="text-align: center;">
                                     <div style="
                                         font-family: 'JetBrains Mono', monospace;
                                         font-size: 1.25rem;
                                         font-weight: 600;
-                                        color: {COLORS["text_secondary"]};
+                                        opacity: 0.7;
                                     ">{training_time:.0f}m</div>
-                                    <div style="font-size: 0.7rem; color: {COLORS["text_muted"]};">Time</div>
+                                    <div style="font-size: 0.7rem; opacity: 0.5;">Time</div>
                                 </div>
                                 <div style="text-align: center;">
                                     <div style="
                                         font-family: 'JetBrains Mono', monospace;
                                         font-size: 1.25rem;
                                         font-weight: 600;
-                                        color: {COLORS["text_secondary"]};
+                                        opacity: 0.7;
                                     ">{epochs_done}</div>
-                                    <div style="font-size: 0.7rem; color: {COLORS["text_muted"]};">Epochs</div>
+                                    <div style="font-size: 0.7rem; opacity: 0.5;">Epochs</div>
                                 </div>
                             </div>
                         </div>
@@ -853,7 +842,6 @@ def _render_trained_models(path_coordinator: PathCoordinator):
             if model["best_path"]:
                 st.markdown(f"""
                 <div style="
-                    background: {COLORS["surface_hover"]};
                     border-radius: 6px;
                     padding: 8px 12px;
                     margin-bottom: 8px;
@@ -861,23 +849,22 @@ def _render_trained_models(path_coordinator: PathCoordinator):
                     font-size: 0.75rem;
                 ">
                     <span style="color: {COLORS["success"]};">●</span>
-                    <span style="color: {COLORS["text_muted"]};">Best:</span>
-                    <span style="color: {COLORS["text_secondary"]};">{model['best_path']}</span>
+                    <span style="opacity: 0.5;">Best:</span>
+                    <span style="opacity: 0.7;">{model['best_path']}</span>
                 </div>
                 """, unsafe_allow_html=True)
 
             if model["last_path"]:
                 st.markdown(f"""
                 <div style="
-                    background: {COLORS["surface_hover"]};
                     border-radius: 6px;
                     padding: 8px 12px;
                     font-family: 'JetBrains Mono', monospace;
                     font-size: 0.75rem;
                 ">
-                    <span style="color: {COLORS["text_muted"]};">○</span>
-                    <span style="color: {COLORS["text_muted"]};">Last:</span>
-                    <span style="color: {COLORS["text_secondary"]};">{model['last_path']}</span>
+                    <span style="opacity: 0.5;">○</span>
+                    <span style="opacity: 0.5;">Last:</span>
+                    <span style="opacity: 0.7;">{model['last_path']}</span>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -894,7 +881,6 @@ def _render_training_history(task_manager: TaskManager):
     <div style="
         font-family: 'JetBrains Mono', monospace;
         font-size: 0.9rem;
-        color: {COLORS["text_primary"]};
         margin-bottom: 16px;
         display: flex;
         align-items: center;

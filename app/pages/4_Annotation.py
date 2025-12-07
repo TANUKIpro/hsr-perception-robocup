@@ -37,6 +37,10 @@ from components.training_styles import inject_training_styles, COLORS, ICONS
 
 def show_annotation_page():
     """Main annotation page."""
+    # Render common sidebar
+    from components.common_sidebar import render_common_sidebar
+    render_common_sidebar()
+
     # Inject Mission Control styles
     inject_training_styles()
 
