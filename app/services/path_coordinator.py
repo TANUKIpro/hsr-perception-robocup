@@ -35,6 +35,7 @@ class PathConfig:
     raw_captures_dir: str = "datasets/raw_captures"
     annotated_dir: str = "datasets/annotated"
     backgrounds_dir: str = "datasets/backgrounds"
+    videos_dir: str = "datasets/videos"
 
     # Model paths - finetuned is profile-specific
     finetuned_dir: str = "models/finetuned"
@@ -132,6 +133,7 @@ class PathCoordinator:
             self.config.raw_captures_dir,
             self.config.annotated_dir,
             self.config.backgrounds_dir,
+            self.config.videos_dir,
             self.config.finetuned_dir,
         ]
 
