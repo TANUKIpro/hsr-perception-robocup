@@ -181,6 +181,43 @@ cd ~/ros2_ws
 colcon build --packages-select openni2_camera --cmake-clean-first
 ```
 
+### Streamlit起動後にトピックが見えない
+
+**症状**: `streamlit run app/main.py` を先に起動してから Xtion を起動すると、トピックが発行されない・見えない。
+
+**原因**: FastDDS の Shared Memory (SHM) トランスポートが起動順序によってディスカバリに失敗する。
+
+**解決策**: `run_app.sh` を使用してStreamlitを起動することで、FastDDSプロファイルが自動的に適用されます。
+
+```bash
+# 推奨: run_app.sh経由で起動（DDS設定済み）
+./run_app.sh
+
+# 別ターミナルでXtion起動
+ros2 launch openni2_camera camera_only.launch.py
+```
+
+**手動設定が必要な場合**:
+
+```bash
+# FastDDSのShared Memoryを無効化
+export FASTRTPS_DEFAULT_PROFILES_FILE=/path/to/config/fastdds_profile.xml
+export ROS_DOMAIN_ID=0
+
+streamlit run app/main.py
+```
+
+**確認方法**:
+
+```bash
+# 環境変数が設定されているか確認
+echo $FASTRTPS_DEFAULT_PROFILES_FILE
+echo $ROS_DOMAIN_ID
+
+# トピック一覧
+ros2 topic list
+```
+
 ## 参考リンク
 
 - [openni2_camera (GitHub)](https://github.com/ros-drivers/openni2_camera)
