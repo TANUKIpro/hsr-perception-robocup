@@ -44,11 +44,28 @@ Docker環境を使用すると、依存関係のインストールなしです�
 # 1. イメージをビルド（初回のみ、約10-15分）
 docker compose build
 
-# 2. Streamlit UIを起動
+# 2. X11アクセスを許可（GUIアプリを使用する場合）
+xhost +local:docker
+
+# 3. Streamlit UIを起動
 docker compose up
 
 # ブラウザで http://localhost:8501 を開く
 ```
+
+### GUIアプリケーション（tkinter）を使用する場合
+
+Docker内からGUIアプリ（Xtion Test App等）を起動する場合は、以下の設定が必要です：
+
+```bash
+# ホスト側でX11アクセスを許可（Docker起動前に毎回実行）
+xhost +local:docker
+
+# その後、通常通りDocker Composeを起動
+docker compose up
+```
+
+**注意**: `xhost +local:docker`はセキュリティを緩和するコマンドです。使用後に`xhost -local:docker`で元に戻せます。
 
 ### Docker Composeコマンド
 

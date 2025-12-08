@@ -54,6 +54,7 @@ services:
       # Display settings (for GUI applications)
       - DISPLAY=${DISPLAY:-:0}
       - QT_X11_NO_MITSHM=1
+      - XAUTHORITY=${XAUTHORITY:-/tmp/.docker.xauth}
 
       # Python settings
       - PYTHONUNBUFFERED=1
@@ -76,6 +77,7 @@ services:
 
       # X11 socket for GUI applications
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${XAUTHORITY:-/dev/null}:${XAUTHORITY:-/tmp/.docker.xauth}:ro
 
       # Shared memory for large tensor operations
       - /dev/shm:/dev/shm

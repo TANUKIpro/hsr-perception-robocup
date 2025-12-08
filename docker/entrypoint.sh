@@ -54,6 +54,21 @@ check_gpu() {
     fi
 }
 
+# Check if X11 display is available
+check_display() {
+    echo "Checking X11 display..."
+    if [ -z "$DISPLAY" ]; then
+        echo "  [WARN] DISPLAY not set - GUI apps will not work"
+        return 1
+    fi
+    if ! xdpyinfo &>/dev/null 2>&1; then
+        echo "  [WARN] Cannot connect to X server - run 'xhost +local:docker' on host"
+        return 1
+    fi
+    echo "  [OK] X11 display available (${DISPLAY})"
+    return 0
+}
+
 # Print environment info
 print_info() {
     echo "=============================================="
@@ -63,6 +78,7 @@ print_info() {
     echo "FastDDS Profile: ${FASTRTPS_DEFAULT_PROFILES_FILE}"
     echo "Python: $(python3 --version)"
     check_gpu
+    check_display || true
     echo "=============================================="
 }
 
