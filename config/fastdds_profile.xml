@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+FastDDS Profile for HSR Perception
+
+This profile disables Shared Memory (SHM) transport to prevent race conditions
+when Streamlit starts before ROS2 camera nodes. Without this, FastDDS SHM can
+cause discovery failures depending on process startup order.
+
+Usage:
+  export FASTRTPS_DEFAULT_PROFILES_FILE=/path/to/fastdds_profile.xml
+  ros2 run/launch ...
+
+See: https://fast-dds.docs.eprosima.com/en/latest/fastdds/transport/shared_memory/shared_memory.html
+-->
+<dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+    <profiles>
+        <participant profile_name="participant_profile" is_default_profile="true">
+            <rtps>
+                <!-- Use built-in transports but disable Shared Memory -->
+                <useBuiltinTransports>true</useBuiltinTransports>
+
+                <!-- Force UDP-only transport (no SHM) -->
+                <builtin_transports transport_descriptor="no_shared_memory"/>
+            </rtps>
+        </participant>
+    </profiles>
+</dds>

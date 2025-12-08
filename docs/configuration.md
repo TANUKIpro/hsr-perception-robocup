@@ -210,6 +210,23 @@ Generic Topics:
 - `/usb_cam/image_raw`
 - `/image_raw`
 
+### FastDDS Configuration / FastDDS設定
+
+When running Streamlit and ROS2 camera nodes (e.g., Xtion), process startup order can cause DDS discovery failures due to FastDDS Shared Memory (SHM) transport.
+
+Streamlit と ROS2 カメラノードを同時に使用する場合、起動順序によって FastDDS の Shared Memory トランスポートがディスカバリに失敗することがあります。
+
+**Solution / 解決策**: Use `run_app.sh` which configures FastDDS to use UDP-only transport.
+
+| Variable | Value | Description |
+|----------|-------|-------------|
+| `FASTRTPS_DEFAULT_PROFILES_FILE` | `config/fastdds_profile.xml` | Disable SHM transport / SHMを無効化 |
+| `ROS_DOMAIN_ID` | `0` (default) | Explicit domain ID / 明示的なドメインID |
+
+**Tip**: Always start the app with `./run_app.sh` for reliable ROS2 topic discovery.
+
+**ヒント**: ROS2 トピックを確実に検出するには、常に `./run_app.sh` でアプリを起動してください。
+
 ---
 
 ## YOLO Dataset Format / YOLOデータセット形式
