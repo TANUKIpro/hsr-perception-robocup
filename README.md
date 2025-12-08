@@ -40,6 +40,31 @@ Docker環境を使用すると、依存関係のインストールなしです�
 
 ### クイックスタート
 
+**推奨: start.shを使用**
+
+```bash
+# 起動スクリプトを実行（初回はイメージビルド、udevルール設定を自動実行）
+./start.sh
+
+# ブラウザで http://localhost:8501 を開く
+```
+
+`start.sh`は以下を自動で行います：
+- 初回起動時: Dockerイメージのビルド、Xtion用udevルールのインストール
+- X11アクセスの設定（GUIアプリ用）
+- Xtionカメラの検出と自動起動
+- **Ctrl+Cで終了時に`docker compose down`を自動実行**
+
+**オプション:**
+```bash
+./start.sh --build        # イメージを強制再ビルド
+./start.sh --tensorboard  # TensorBoard付きで起動（ポート6006）
+./start.sh -d             # バックグラウンド起動
+./start.sh --help         # ヘルプを表示
+```
+
+**手動で起動する場合:**
+
 ```bash
 # 1. イメージをビルド（初回のみ、約10-15分）
 docker compose build
@@ -51,6 +76,9 @@ xhost +local:docker
 docker compose up
 
 # ブラウザで http://localhost:8501 を開く
+
+# 4. 停止時
+docker compose down
 ```
 
 ### GUIアプリケーション（tkinter）を使用する場合

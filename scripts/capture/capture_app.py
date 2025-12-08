@@ -402,8 +402,8 @@ class CaptureApp:
                 self.status_var.set("No objects in registry. Please add objects first.")
                 messagebox.showwarning(
                     "No Objects",
-                    "Registryにオブジェクトが登録されていません。\n"
-                    "先にRegistryでオブジェクトを追加してください。"
+                    "No objects are registered in the Registry.\n"
+                    "Please add objects in the Registry first."
                 )
             else:
                 # Populate dropdown with "name (display_name)" format

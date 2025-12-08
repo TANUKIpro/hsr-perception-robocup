@@ -164,7 +164,7 @@ def _render_run_annotation(task_manager: TaskManager, path_coordinator: PathCoor
     selected_model = st.selectbox(
         "SAM2 Model",
         available_models,
-        help="使用するSAM2モデルを選択。models/ディレクトリ内のsam2*.ptファイルが表示されます。"
+        help="Select the SAM2 model to use. Shows sam2*.pt files in the models/ directory."
     )
 
     st.markdown("---")

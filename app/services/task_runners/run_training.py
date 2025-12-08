@@ -71,10 +71,10 @@ class TrainingProgressCallback:
         }
         self.training_history.append(history_entry)
 
-        # 履歴サイズを制限（JSONファイル肥大化防止）
+        # Limit history size (to prevent JSON file bloat)
         MAX_HISTORY_SIZE = 50
         if len(self.training_history) > MAX_HISTORY_SIZE:
-            # 最初のエントリ + 直近のエントリを保持（チャート表示用）
+            # Keep the first entry + recent entries (for chart display)
             self.training_history = [self.training_history[0]] + self.training_history[-(MAX_HISTORY_SIZE-1):]
 
         update_task_status(
