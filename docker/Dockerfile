@@ -81,7 +81,8 @@ RUN pip3 install --upgrade pip setuptools wheel
 # =============================================================================
 # Layer 5: PyTorch with CUDA 12.1
 # =============================================================================
-RUN pip3 install --no-cache-dir \
+# Note: --ignore-installed is needed to handle pre-installed sympy in CUDA base image
+RUN pip3 install --no-cache-dir --ignore-installed \
     torch>=2.1.0 \
     torchvision>=0.16.0 \
     --index-url https://download.pytorch.org/whl/cu121
@@ -111,8 +112,9 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy and install Python requirements
+# Note: --ignore-installed handles distutils-installed packages in base image
 COPY requirements.txt /tmp/requirements.txt
-RUN pip3 install --no-cache-dir -r /tmp/requirements.txt && \
+RUN pip3 install --no-cache-dir --ignore-installed -r /tmp/requirements.txt && \
     rm /tmp/requirements.txt
 
 # =============================================================================
@@ -135,9 +137,10 @@ RUN mkdir -p /workspace/datasets \
 COPY src/hsr_perception /workspace/src/hsr_perception
 
 # Build ROS2 package
+# Note: Not using --symlink-install to avoid CMake target name conflicts
 RUN /bin/bash -c "source /opt/ros/humble/setup.bash && \
     cd /workspace && \
-    colcon build --packages-select hsr_perception --symlink-install"
+    colcon build --packages-select hsr_perception"
 
 # =============================================================================
 # Layer 10: Application Code
@@ -151,6 +154,14 @@ COPY run_app.sh /workspace/run_app.sh
 # Copy entrypoint script
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+
+# =============================================================================
+# Layer 11: Pre-download ML Models
+# =============================================================================
+# YOLOv8 models - download to cache for offline use
+# yolov8m.pt: Default model for competition (medium size, good accuracy/speed balance)
+# yolov8n.pt: Nano model for quick testing
+RUN python3 -c "from ultralytics import YOLO; YOLO('yolov8m.pt'); YOLO('yolov8n.pt')"
 
 # =============================================================================
 # Environment Variables
