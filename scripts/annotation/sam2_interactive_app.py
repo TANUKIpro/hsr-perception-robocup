@@ -809,10 +809,10 @@ class SAM2AnnotationApp:
                     # Orange color for saved annotations
                     cv2.rectangle(display, (x1, y1), (x2, y2), (255, 165, 0), 2)
 
-        # Calculate scale to fit canvas
+        # Calculate scale to fit canvas (allow scaling up and down)
         scale_w = canvas_w / img_w
         scale_h = canvas_h / img_h
-        self.scale_factor = min(scale_w, scale_h, 1.0)
+        self.scale_factor = min(scale_w, scale_h)
 
         new_w = int(img_w * self.scale_factor)
         new_h = int(img_h * self.scale_factor)

@@ -153,8 +153,9 @@ class CaptureApp:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title("ROS2 Image Capture")
-        self.root.geometry("800x700")
+        self.root.geometry("800x750")
         self.root.resizable(True, True)
+        self.root.minsize(600, 700)
 
         # ROS2 setup
         self.ros_node: Optional[ROS2ImageSubscriber] = None
@@ -240,16 +241,14 @@ class CaptureApp:
         refresh_btn = ttk.Button(topic_frame, text="Refresh", command=self._refresh_topics)
         refresh_btn.pack(side=tk.LEFT)
 
-        # === Preview Area ===
+        # === Preview Area (pack later to ensure bottom elements have space) ===
         preview_frame = ttk.LabelFrame(main_frame, text="Camera Preview", padding="5")
-        preview_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
 
         self.preview_label = ttk.Label(preview_frame, text="No image - Select a topic", anchor="center")
         self.preview_label.pack(fill=tk.BOTH, expand=True)
 
         # === Capture Settings ===
         settings_frame = ttk.LabelFrame(main_frame, text="Capture Settings", padding="5")
-        settings_frame.pack(fill=tk.X, pady=(0, 10))
 
         # Class name (dropdown from registry)
         row1 = ttk.Frame(settings_frame)
@@ -285,7 +284,6 @@ class CaptureApp:
 
         # === Burst Parameters ===
         burst_frame = ttk.LabelFrame(main_frame, text="Burst Capture Parameters", padding="5")
-        burst_frame.pack(fill=tk.X, pady=(0, 10))
 
         params_row = ttk.Frame(burst_frame)
         params_row.pack(fill=tk.X)
@@ -334,7 +332,6 @@ class CaptureApp:
 
         # === Capture Buttons ===
         button_frame = ttk.Frame(main_frame)
-        button_frame.pack(fill=tk.X, pady=(0, 10))
 
         # Custom style for large buttons
         style = ttk.Style()
@@ -362,7 +359,6 @@ class CaptureApp:
 
         # === Status Bar ===
         status_frame = ttk.Frame(main_frame)
-        status_frame.pack(fill=tk.X)
 
         self.status_var = tk.StringVar(value="Ready")
         self.status_label = ttk.Label(
@@ -381,6 +377,14 @@ class CaptureApp:
             maximum=100
         )
         self.progress_bar.pack(fill=tk.X, pady=(5, 0))
+
+        # === Pack frames in correct order (bottom elements first) ===
+        # This ensures bottom elements always have space, even when preview expands
+        status_frame.pack(side=tk.BOTTOM, fill=tk.X)
+        button_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=(0, 10))
+        burst_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=(0, 10))
+        settings_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=(0, 10))
+        preview_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
 
         # Initial topic refresh
         self._refresh_topics()
@@ -505,7 +509,7 @@ class CaptureApp:
                     display = self._draw_capture_status(display)
 
                 # Resize for display
-                display = self._resize_for_display(display, max_width=760, max_height=400)
+                display = self._resize_for_display(display)
 
                 # Convert to PhotoImage
                 image = cv2.cvtColor(display, cv2.COLOR_BGR2RGB)
@@ -607,23 +611,26 @@ class CaptureApp:
             self.countdown_active = False
             self._begin_actual_capture()
 
-    def _resize_for_display(
-        self,
-        frame: np.ndarray,
-        max_width: int,
-        max_height: int
-    ) -> np.ndarray:
-        """Resize frame to fit display area."""
+    def _resize_for_display(self, frame: np.ndarray) -> np.ndarray:
+        """Resize frame to fit display area dynamically."""
+        # Get preview area size directly (same as SAM2 annotation app)
+        preview_width = self.preview_label.winfo_width()
+        preview_height = self.preview_label.winfo_height()
+
+        # Early return if size is too small
+        if preview_width <= 1 or preview_height <= 1:
+            return frame
+
         h, w = frame.shape[:2]
+        scale_w = preview_width / w
+        scale_h = preview_height / h
+        scale = min(scale_w, scale_h)
 
-        scale_w = max_width / w
-        scale_h = max_height / h
-        scale = min(scale_w, scale_h, 1.0)
+        new_w = int(w * scale)
+        new_h = int(h * scale)
 
-        if scale < 1.0:
-            new_w = int(w * scale)
-            new_h = int(h * scale)
-            frame = cv2.resize(frame, (new_w, new_h))
+        if new_w != w or new_h != h:
+            frame = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
 
         return frame
 
