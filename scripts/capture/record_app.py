@@ -504,7 +504,7 @@ class RecordApp:
                     display = self._draw_recording_status(display)
 
                 # Resize for display
-                display = self._resize_for_display(display, max_width=760, max_height=400)
+                display = self._resize_for_display(display)
 
                 # Convert to PhotoImage
                 image = cv2.cvtColor(display, cv2.COLOR_BGR2RGB)
@@ -613,23 +613,26 @@ class RecordApp:
             self.countdown_active = False
             self._begin_actual_recording()
 
-    def _resize_for_display(
-        self,
-        frame: np.ndarray,
-        max_width: int,
-        max_height: int
-    ) -> np.ndarray:
-        """Resize frame to fit display area."""
+    def _resize_for_display(self, frame: np.ndarray) -> np.ndarray:
+        """Resize frame to fit display area dynamically."""
+        # Get preview area size directly (same as SAM2 annotation app)
+        preview_width = self.preview_label.winfo_width()
+        preview_height = self.preview_label.winfo_height()
+
+        # Early return if size is too small
+        if preview_width <= 1 or preview_height <= 1:
+            return frame
+
         h, w = frame.shape[:2]
+        scale_w = preview_width / w
+        scale_h = preview_height / h
+        scale = min(scale_w, scale_h)
 
-        scale_w = max_width / w
-        scale_h = max_height / h
-        scale = min(scale_w, scale_h, 1.0)
+        new_w = int(w * scale)
+        new_h = int(h * scale)
 
-        if scale < 1.0:
-            new_w = int(w * scale)
-            new_h = int(h * scale)
-            frame = cv2.resize(frame, (new_w, new_h))
+        if new_w != w or new_h != h:
+            frame = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
 
         return frame
 

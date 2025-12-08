@@ -248,9 +248,6 @@ class XtionTestApp:
         refresh_btn = ttk.Button(topic_frame, text="Refresh", command=self._refresh_topics)
         refresh_btn.pack(side=tk.LEFT)
 
-        # Initial topic refresh
-        self._refresh_topics()
-
         # === Preview Area ===
         preview_frame = ttk.LabelFrame(main_frame, text="Camera Preview + Detection", padding="5")
         preview_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
@@ -292,6 +289,9 @@ class XtionTestApp:
 
         self.status_label = ttk.Label(status_frame, text="Status: Waiting for topic")
         self.status_label.pack(side=tk.RIGHT)
+
+        # Initial topic refresh (must be after status_label is created)
+        self._refresh_topics()
 
     def _refresh_topics(self):
         """Refresh the list of available topics."""
@@ -387,16 +387,27 @@ class XtionTestApp:
         self.root.after(33, self._update_preview)
 
     def _resize_for_display(self, frame: np.ndarray) -> np.ndarray:
-        """Resize frame to fit display area."""
-        max_width = 800
-        max_height = 480
+        """Resize frame to fit display area dynamically."""
+        # Get window size
+        window_width = self.root.winfo_width()
+        window_height = self.root.winfo_height()
+
+        # Reserved space for other UI components (padding included)
+        # model_frame + topic_frame + confidence + results + margins
+        reserved_height = 300
+        reserved_width = 40
+
+        # Calculate available size
+        max_width = max(window_width - reserved_width, 400)
+        max_height = max(window_height - reserved_height, 200)
 
         h, w = frame.shape[:2]
         scale = min(max_width / w, max_height / h)
 
-        if scale < 1.0:
-            new_w = int(w * scale)
-            new_h = int(h * scale)
+        new_w = int(w * scale)
+        new_h = int(h * scale)
+
+        if new_w != w or new_h != h:
             frame = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
 
         return frame
