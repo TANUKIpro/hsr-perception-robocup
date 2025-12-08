@@ -264,7 +264,7 @@ class TaskManager:
         Returns:
             Popen object
         """
-        # ログファイルを作成（CLI出力表示用）
+        # Create log file (for CLI output display)
         log_file = self.tasks_dir / f"{task.task_id}.log"
         log_handle = open(log_file, "w", buffering=1)  # line-buffered
 

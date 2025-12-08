@@ -22,10 +22,13 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   DEPENDENCIES std_msgs
 )
 
-# Install Python package
-ament_python_install_package(${PROJECT_NAME})
+# Install Python modules (avoiding ament_python_install_package conflict with rosidl)
+install(DIRECTORY ${PROJECT_NAME}/
+  DESTINATION lib/python3/dist-packages/${PROJECT_NAME}
+  FILES_MATCHING PATTERN "*.py"
+)
 
-# Install Python nodes
+# Install Python nodes as executable scripts
 install(PROGRAMS
   hsr_perception/continuous_capture_node.py
   DESTINATION lib/${PROJECT_NAME}
@@ -34,11 +37,6 @@ install(PROGRAMS
 # Install launch files
 install(DIRECTORY launch/
   DESTINATION share/${PROJECT_NAME}/launch
-)
-
-# Install config files
-install(DIRECTORY config/
-  DESTINATION share/${PROJECT_NAME}/config
 )
 
 if(BUILD_TESTING)

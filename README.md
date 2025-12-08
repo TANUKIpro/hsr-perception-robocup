@@ -25,7 +25,118 @@ flowchart LR
 
 ---
 
-## セットアップ
+## Dockerでの実行（推奨）
+
+Docker環境を使用すると、依存関係のインストールなしですぐに利用できます。
+
+### 前提条件
+
+| 項目 | 要件 |
+|------|------|
+| Docker | 24.0以上 |
+| Docker Compose | v2.0以上 |
+| NVIDIA Driver | 525以上 |
+| NVIDIA Container Toolkit | インストール済み |
+
+### クイックスタート
+
+**推奨: start.shを使用**
+
+```bash
+# 起動スクリプトを実行（初回はイメージビルド、udevルール設定を自動実行）
+./start.sh
+
+# ブラウザで http://localhost:8501 を開く
+```
+
+`start.sh`は以下を自動で行います：
+- 初回起動時: Dockerイメージのビルド、Xtion用udevルールのインストール
+- X11アクセスの設定（GUIアプリ用）
+- Xtionカメラの検出と自動起動
+- **Ctrl+Cで終了時に`docker compose down`を自動実行**
+
+**オプション:**
+```bash
+./start.sh --build        # イメージを強制再ビルド
+./start.sh --tensorboard  # TensorBoard付きで起動（ポート6006）
+./start.sh -d             # バックグラウンド起動
+./start.sh --help         # ヘルプを表示
+```
+
+**手動で起動する場合:**
+
+```bash
+# 1. イメージをビルド（初回のみ、約10-15分）
+docker compose build
+
+# 2. X11アクセスを許可（GUIアプリを使用する場合）
+xhost +local:docker
+
+# 3. Streamlit UIを起動
+docker compose up
+
+# ブラウザで http://localhost:8501 を開く
+
+# 4. 停止時
+docker compose down
+```
+
+### GUIアプリケーション（tkinter）を使用する場合
+
+Docker内からGUIアプリ（Xtion Test App等）を起動する場合は、以下の設定が必要です：
+
+```bash
+# ホスト側でX11アクセスを許可（Docker起動前に毎回実行）
+xhost +local:docker
+
+# その後、通常通りDocker Composeを起動
+docker compose up
+```
+
+**注意**: `xhost +local:docker`はセキュリティを緩和するコマンドです。使用後に`xhost -local:docker`で元に戻せます。
+
+### Docker Composeコマンド
+
+| コマンド | 説明 |
+|---------|------|
+| `docker compose up` | Streamlit UI起動 |
+| `docker compose up -d` | バックグラウンド起動 |
+| `docker compose down` | 停止 |
+| `docker compose run --rm hsr-perception bash` | シェルアクセス |
+| `docker compose run --rm hsr-perception train --dataset /workspace/datasets/data.yaml` | 学習実行 |
+| `docker compose run --rm hsr-perception annotate --help` | アノテーション |
+| `docker compose run --rm hsr-perception evaluate --help` | モデル評価 |
+
+### Xtionカメラ使用時
+
+1. udevルールをインストール（初回のみ）:
+```bash
+sudo cp docker/99-xtion.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
+
+2. カメラノード起動:
+```bash
+docker compose run --rm hsr-perception ros2-camera
+```
+
+### 含まれるコンポーネント
+
+| コンポーネント | バージョン | 備考 |
+|---------------|-----------|------|
+| Python | 3.10 | |
+| PyTorch | 2.x | CUDA 12.1対応 |
+| Ultralytics | >=8.3.0 | YOLOv8 |
+| SAM2 | latest | Segment Anything 2 |
+| ROS2 | Humble | OpenNI2対応 |
+| Streamlit | >=1.28.0 | Web UI |
+
+**事前ダウンロード済みモデル**: yolov8m.pt, yolov8n.pt
+
+---
+
+## ローカルセットアップ
 
 ### 必要環境
 

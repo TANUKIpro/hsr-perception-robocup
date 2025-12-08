@@ -1,0 +1,163 @@
+# =============================================================================
+# HSR Perception Pipeline - Docker Compose Configuration
+# =============================================================================
+#
+# Usage:
+#   docker compose up                          # Start Streamlit UI
+#   docker compose up -d                       # Start in background
+#   docker compose --profile training up       # Include TensorBoard
+#   docker compose exec hsr-perception bash    # Open shell
+#   docker compose down                        # Stop all services
+#
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # Main HSR Perception Service
+  # ===========================================================================
+  hsr-perception:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: hsr-perception:latest
+    container_name: hsr-perception
+
+    # -------------------------------------------------------------------------
+    # GPU Configuration (NVIDIA Container Toolkit required)
+    # -------------------------------------------------------------------------
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+    # -------------------------------------------------------------------------
+    # Network Configuration
+    # Using host network for ROS2 DDS communication
+    # -------------------------------------------------------------------------
+    network_mode: host
+
+    # -------------------------------------------------------------------------
+    # Environment Variables
+    # -------------------------------------------------------------------------
+    environment:
+      # NVIDIA settings
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
+
+      # ROS2 settings
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTRTPS_DEFAULT_PROFILES_FILE=/workspace/config/fastdds_profile.xml
+
+      # Display settings (for GUI applications)
+      - DISPLAY=${DISPLAY:-:0}
+      - QT_X11_NO_MITSHM=1
+      - XAUTHORITY=${XAUTHORITY:-/tmp/.docker.xauth}
+
+      # Python settings
+      - PYTHONUNBUFFERED=1
+
+    # -------------------------------------------------------------------------
+    # Volume Mounts
+    # -------------------------------------------------------------------------
+    volumes:
+      # Persistent data directories
+      - ${DATASETS_DIR:-./datasets}:/workspace/datasets
+      - ${MODELS_DIR:-./models}:/workspace/models
+      - ${PROFILES_DIR:-./profiles}:/workspace/profiles
+      - ${RUNS_DIR:-./runs}:/workspace/runs
+
+      # Configuration (read-only bind mount for easy editing)
+      - ./config:/workspace/config:ro
+
+      # USB devices for Xtion camera
+      - /dev/bus/usb:/dev/bus/usb
+
+      # X11 socket for GUI applications
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${XAUTHORITY:-/dev/null}:${XAUTHORITY:-/tmp/.docker.xauth}:ro
+
+      # Shared memory for large tensor operations
+      - /dev/shm:/dev/shm
+
+    # -------------------------------------------------------------------------
+    # Device Access
+    # -------------------------------------------------------------------------
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+
+    # -------------------------------------------------------------------------
+    # Privileges
+    # Required for USB device access (Xtion camera)
+    # -------------------------------------------------------------------------
+    privileged: true
+
+    # -------------------------------------------------------------------------
+    # Interactive Mode
+    # -------------------------------------------------------------------------
+    stdin_open: true
+    tty: true
+
+    # -------------------------------------------------------------------------
+    # Shared Memory Size
+    # Increase for large batch training
+    # -------------------------------------------------------------------------
+    shm_size: '8gb'
+
+    # -------------------------------------------------------------------------
+    # Health Check
+    # -------------------------------------------------------------------------
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    # -------------------------------------------------------------------------
+    # Default Command
+    # -------------------------------------------------------------------------
+    command: streamlit
+
+  # ===========================================================================
+  # TensorBoard Service (Optional)
+  # Enabled with: docker compose --profile training up
+  # ===========================================================================
+  tensorboard:
+    image: hsr-perception:latest
+    container_name: hsr-tensorboard
+    network_mode: host
+    volumes:
+      - ${RUNS_DIR:-./runs}:/workspace/runs:ro
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    command: tensorboard
+    profiles:
+      - training
+    depends_on:
+      - hsr-perception
+
+  # ===========================================================================
+  # ROS2 Camera Service (Optional)
+  # Enabled with: docker compose --profile ros2 up
+  # ===========================================================================
+  ros2-camera:
+    image: hsr-perception:latest
+    container_name: hsr-ros2-camera
+    network_mode: host
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTRTPS_DEFAULT_PROFILES_FILE=/workspace/config/fastdds_profile.xml
+    volumes:
+      - /dev/bus/usb:/dev/bus/usb
+      - ./config:/workspace/config:ro
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+    privileged: true
+    command: ros2-camera
+    profiles:
+      - ros2
+    depends_on:
+      - hsr-perception

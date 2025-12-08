@@ -1,0 +1,34 @@
+# =============================================================================
+# udev rules for ASUS Xtion PRO LIVE
+# Copy this file to /etc/udev/rules.d/ on the host system
+#
+# Installation:
+#   sudo cp 99-xtion.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules
+#   sudo udevadm trigger
+#
+# After installation, add user to video group:
+#   sudo usermod -aG video $USER
+#   (logout and login required)
+# =============================================================================
+
+# PrimeSense Sensor
+SUBSYSTEM=="usb", ATTR{idVendor}=="1d27", MODE="0666", GROUP="video"
+
+# ASUS Xtion PRO LIVE - RGB Camera
+SUBSYSTEM=="usb", ATTR{idVendor}=="1d27", ATTR{idProduct}=="0600", MODE="0666", GROUP="video"
+
+# ASUS Xtion PRO LIVE - Depth Camera
+SUBSYSTEM=="usb", ATTR{idVendor}=="1d27", ATTR{idProduct}=="0601", MODE="0666", GROUP="video"
+
+# ASUS Xtion PRO
+SUBSYSTEM=="usb", ATTR{idVendor}=="1d27", ATTR{idProduct}=="0500", MODE="0666", GROUP="video"
+SUBSYSTEM=="usb", ATTR{idVendor}=="1d27", ATTR{idProduct}=="0501", MODE="0666", GROUP="video"
+
+# PrimeSense 1.08/1.09 (alternate IDs)
+SUBSYSTEM=="usb", ATTR{idVendor}=="1d27", ATTR{idProduct}=="0609", MODE="0666", GROUP="video"
+
+# Kinect (for compatibility)
+SUBSYSTEM=="usb", ATTR{idVendor}=="045e", ATTR{idProduct}=="02b0", MODE="0666", GROUP="video"
+SUBSYSTEM=="usb", ATTR{idVendor}=="045e", ATTR{idProduct}=="02ad", MODE="0666", GROUP="video"
+SUBSYSTEM=="usb", ATTR{idVendor}=="045e", ATTR{idProduct}=="02ae", MODE="0666", GROUP="video"
