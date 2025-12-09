@@ -105,7 +105,7 @@ def render_class_status_grid(classes: List, columns: int = 2):
             ">Capture some images first using the app</div>
         </div>
         """
-        st.markdown(html, unsafe_allow_html=True)
+        st.html(html)
         return
 
     # Summary stats
@@ -159,7 +159,7 @@ def render_class_status_grid(classes: List, columns: int = 2):
         </div>
     </div>
     """
-    st.markdown(html, unsafe_allow_html=True)
+    st.html(html)
 
     # Render cards in columns
     cols = st.columns(columns)
@@ -202,7 +202,7 @@ def render_dataset_preparation_panel(
         <span>Generate Training Dataset</span>
     </div>
     """
-    st.markdown(html, unsafe_allow_html=True)
+    st.html(html)
 
     # Class selection
     html2 = """
@@ -212,7 +212,7 @@ def render_dataset_preparation_panel(
         margin-bottom: 8px;
     ">Select classes to include:</div>
     """
-    st.markdown(html2, unsafe_allow_html=True)
+    st.html(html2)
 
     selected_classes = []
     cols = st.columns(min(len(ready_classes), 4))
@@ -303,7 +303,7 @@ def render_dataset_preparation_panel(
             </div>
         </div>
         """
-        st.markdown(html3, unsafe_allow_html=True)
+        st.html(html3)
 
     # Generate button
     if st.button(
@@ -427,7 +427,7 @@ def render_dataset_result(result, dataset_name: str):
             </div>
         </div>
         """
-        st.markdown(html, unsafe_allow_html=True)
+        st.html(html)
 
         # Show data.yaml preview
         if result.output_dir:
