@@ -560,6 +560,7 @@ class VideoTrackingPredictor:
     def propagate_tracking(
         self,
         progress_callback: Optional[Callable[[int, int, int, np.ndarray], None]] = None,
+        stop_check: Optional[Callable[[], bool]] = None,
     ) -> Dict[int, TrackingResult]:
         """
         Propagate tracking to all frames.
@@ -570,9 +571,12 @@ class VideoTrackingPredictor:
                 - total_frames: Total number of frames
                 - frame_idx: Current frame index being processed
                 - mask: Boolean mask array for the current frame
+            stop_check: Optional callback that returns True if processing should stop.
+                When stop is requested, the method will return partial results.
 
         Returns:
             Dictionary mapping frame index to TrackingResult
+            (may contain partial results if stopped mid-processing)
         """
         if self.inference_state is None:
             raise RuntimeError("Sequence not initialized. Call init_sequence() first.")
@@ -583,6 +587,10 @@ class VideoTrackingPredictor:
         for frame_idx, obj_ids, video_res_masks in self.predictor.propagate_in_video(
             self.inference_state
         ):
+            # Check for stop request before processing
+            if stop_check is not None and stop_check():
+                break
+
             # Convert mask to boolean numpy array
             mask = (video_res_masks[0, 0] > 0.0).cpu().numpy()
 
