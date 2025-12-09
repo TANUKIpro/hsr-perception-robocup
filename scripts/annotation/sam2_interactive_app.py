@@ -288,7 +288,8 @@ class TrackingState:
     """
     Manages video tracking state for sequential annotation.
 
-    Tracks tracking mode status, results, and low confidence frames.
+    Tracks tracking mode status, results, low confidence frames,
+    and excluded frames for training data filtering.
     """
 
     is_tracking_mode: bool = False
@@ -296,6 +297,7 @@ class TrackingState:
     tracking_results: Dict[int, TrackingResult] = field(default_factory=dict)
     low_confidence_frames: List[int] = field(default_factory=list)
     confirmed_frames: Set[int] = field(default_factory=set)
+    excluded_frames: Set[int] = field(default_factory=set)
     current_obj_id: int = 1
 
     def enable_tracking(self) -> None:
@@ -309,6 +311,7 @@ class TrackingState:
         self.tracking_results.clear()
         self.low_confidence_frames.clear()
         self.confirmed_frames.clear()
+        self.excluded_frames.clear()
 
     def set_tracking_results(
         self, results: Dict[int, TrackingResult]
@@ -320,21 +323,97 @@ class TrackingState:
             idx for idx, result in results.items()
             if result.is_low_confidence
         ]
+        # Clear excluded frames when new results are set
+        self.excluded_frames.clear()
 
     def get_frame_status(self, frame_idx: int) -> str:
         """
         Get status indicator for a frame.
 
         Returns:
-            Status string: 'confirmed', 'tracked', 'low_confidence', or 'pending'
+            Status string: 'confirmed', 'excluded', 'tracked', 'low_confidence', or 'pending'
         """
         if frame_idx in self.confirmed_frames:
             return "confirmed"
+        if frame_idx in self.excluded_frames:
+            return "excluded"
         if frame_idx in self.low_confidence_frames:
             return "low_confidence"
         if frame_idx in self.tracking_results:
             return "tracked"
         return "pending"
+
+    def toggle_frame_exclusion(self, frame_idx: int) -> bool:
+        """
+        Toggle exclusion state of a frame.
+
+        Args:
+            frame_idx: Frame index to toggle
+
+        Returns:
+            True if frame is now excluded, False if now included
+        """
+        if frame_idx in self.excluded_frames:
+            self.excluded_frames.discard(frame_idx)
+            return False
+        else:
+            self.excluded_frames.add(frame_idx)
+            return True
+
+    def is_frame_excluded(self, frame_idx: int) -> bool:
+        """Check if frame is excluded."""
+        return frame_idx in self.excluded_frames
+
+    def exclude_all_low_confidence(self) -> int:
+        """
+        Exclude all low confidence frames.
+
+        Returns:
+            Number of frames excluded
+        """
+        count = 0
+        for frame_idx in self.low_confidence_frames:
+            if frame_idx not in self.excluded_frames:
+                self.excluded_frames.add(frame_idx)
+                count += 1
+        return count
+
+    def include_all(self) -> int:
+        """
+        Include all frames (clear exclusions).
+
+        Returns:
+            Number of frames that were excluded
+        """
+        count = len(self.excluded_frames)
+        self.excluded_frames.clear()
+        return count
+
+    def get_included_frames(self) -> List[int]:
+        """Get list of frame indices that are not excluded."""
+        return [
+            idx for idx in self.tracking_results.keys()
+            if idx not in self.excluded_frames
+        ]
+
+    def get_exclusion_stats(self) -> Tuple[int, int, int]:
+        """
+        Get exclusion statistics.
+
+        Returns:
+            Tuple of (included_count, excluded_count, low_confidence_included_count)
+        """
+        total = len(self.tracking_results)
+        excluded = len(self.excluded_frames)
+        included = total - excluded
+
+        # Count low confidence frames that are still included
+        low_conf_included = sum(
+            1 for idx in self.low_confidence_frames
+            if idx not in self.excluded_frames
+        )
+
+        return (included, excluded, low_conf_included)
 
 
 # =============================================================================
@@ -453,6 +532,7 @@ class SAM2AnnotationApp:
         scrollbar.config(command=self.image_listbox.yview)
 
         self.image_listbox.bind("<<ListboxSelect>>", self._on_image_select)
+        self.image_listbox.bind("<Double-Button-1>", self._on_listbox_double_click)
 
         # === Main Panel: Canvas ===
         main_frame = ttk.Frame(self.root)
@@ -524,10 +604,14 @@ class SAM2AnnotationApp:
         tracking_frame = ttk.LabelFrame(self.root, text="Tracking Mode", padding=5)
         tracking_frame.grid(row=3, column=0, columnspan=2, sticky="ew", padx=5, pady=(0, 5))
 
+        # Top row: main tracking controls
+        tracking_row1 = ttk.Frame(tracking_frame)
+        tracking_row1.pack(fill=tk.X, pady=(0, 3))
+
         # Tracking mode toggle
         self.tracking_mode_var = tk.BooleanVar(value=False)
         self.tracking_toggle = ttk.Checkbutton(
-            tracking_frame,
+            tracking_row1,
             text="Enable Tracking Mode",
             variable=self.tracking_mode_var,
             command=self._on_toggle_tracking_mode,
@@ -536,7 +620,7 @@ class SAM2AnnotationApp:
 
         # Start tracking button
         self.start_tracking_btn = ttk.Button(
-            tracking_frame,
+            tracking_row1,
             text="Start Tracking",
             command=self._on_start_tracking,
             state=tk.DISABLED,
@@ -545,7 +629,7 @@ class SAM2AnnotationApp:
 
         # Apply all button
         self.apply_all_btn = ttk.Button(
-            tracking_frame,
+            tracking_row1,
             text="Apply All",
             command=self._on_apply_tracking_results,
             state=tk.DISABLED,
@@ -554,7 +638,7 @@ class SAM2AnnotationApp:
 
         # Cancel tracking button
         self.cancel_tracking_btn = ttk.Button(
-            tracking_frame,
+            tracking_row1,
             text="Cancel Tracking",
             command=self._on_cancel_tracking,
             state=tk.DISABLED,
@@ -564,19 +648,59 @@ class SAM2AnnotationApp:
         # Tracking status label
         self.tracking_status_var = tk.StringVar(value="Tracking: OFF")
         ttk.Label(
-            tracking_frame,
+            tracking_row1,
             textvariable=self.tracking_status_var,
             font=("TkDefaultFont", 9),
         ).pack(side=tk.RIGHT, padx=10)
 
         # Low confidence warning
         self.low_conf_label = ttk.Label(
-            tracking_frame,
+            tracking_row1,
             text="",
             foreground="orange",
             font=("TkDefaultFont", 9, "bold"),
         )
         self.low_conf_label.pack(side=tk.RIGHT, padx=5)
+
+        # Bottom row: exclusion controls (initially hidden)
+        self.exclusion_frame = ttk.Frame(tracking_frame)
+        # Will be shown after tracking completes
+
+        # Exclusion stats label
+        self.exclusion_stats_var = tk.StringVar(value="")
+        self.exclusion_stats_label = ttk.Label(
+            self.exclusion_frame,
+            textvariable=self.exclusion_stats_var,
+            font=("TkDefaultFont", 9),
+        )
+        self.exclusion_stats_label.pack(side=tk.LEFT, padx=5)
+
+        # Toggle Selected button
+        self.toggle_selected_btn = ttk.Button(
+            self.exclusion_frame,
+            text="Toggle Selected",
+            command=self._on_toggle_frame_exclusion,
+            state=tk.DISABLED,
+        )
+        self.toggle_selected_btn.pack(side=tk.LEFT, padx=5)
+
+        # Exclude All Low-Confidence button
+        self.exclude_low_conf_btn = ttk.Button(
+            self.exclusion_frame,
+            text="Exclude All Low-Confidence",
+            command=self._on_exclude_all_low_confidence,
+            state=tk.DISABLED,
+        )
+        self.exclude_low_conf_btn.pack(side=tk.LEFT, padx=5)
+
+        # Include All button
+        self.include_all_btn = ttk.Button(
+            self.exclusion_frame,
+            text="Include All",
+            command=self._on_include_all,
+            state=tk.DISABLED,
+        )
+        self.include_all_btn.pack(side=tk.LEFT, padx=5)
 
         # === Status Bar ===
         status_frame = ttk.Frame(self.root)
@@ -1075,6 +1199,18 @@ class SAM2AnnotationApp:
         else:
             self.low_conf_label.config(text="")
 
+        # Show/hide exclusion controls based on tracking results
+        if has_results:
+            self.exclusion_frame.pack(fill=tk.X, pady=(3, 0))
+            self.toggle_selected_btn.config(state=tk.NORMAL)
+            self.exclude_low_conf_btn.config(state=tk.NORMAL)
+            self.include_all_btn.config(state=tk.NORMAL)
+        else:
+            self.exclusion_frame.pack_forget()
+            self.toggle_selected_btn.config(state=tk.DISABLED)
+            self.exclude_low_conf_btn.config(state=tk.DISABLED)
+            self.include_all_btn.config(state=tk.DISABLED)
+
     def _on_start_tracking(self):
         """Start tracking from current mask."""
         if not self.tracking_state.is_tracking_mode:
@@ -1454,39 +1590,56 @@ class SAM2AnnotationApp:
         thread.start()
 
     def _on_apply_tracking_results(self):
-        """Apply tracking results and save all annotations."""
+        """Apply tracking results and save all annotations (excluding excluded frames)."""
         if not self.tracking_state.is_tracking_initialized:
             return
 
-        # Confirm with user
-        total = len(self.tracking_state.tracking_results)
-        low_conf = len(self.tracking_state.low_confidence_frames)
+        # Get exclusion stats
+        included_count, excluded_count, low_conf_included = self.tracking_state.get_exclusion_stats()
 
-        if low_conf > 0:
-            result = messagebox.askyesno(
-                "Confirm Save",
-                f"Save annotations for {total} frames?\n\n"
-                f"Warning: {low_conf} frames have low confidence.",
-                icon="question"
-            )
-            if not result:
-                return
+        # Filter out excluded frames
+        included_results = {
+            idx: result
+            for idx, result in self.tracking_state.tracking_results.items()
+            if not self.tracking_state.is_frame_excluded(idx)
+        }
 
-        # Save all results
+        included_frame_map = {
+            idx: path
+            for idx, path in self.tracking_frame_map.items()
+            if not self.tracking_state.is_frame_excluded(idx)
+        }
+
+        # Build confirmation message
+        confirm_msg = f"Save annotations for {included_count} frames?"
+        if excluded_count > 0:
+            confirm_msg += f"\n\n({excluded_count} frames excluded)"
+        if low_conf_included > 0:
+            confirm_msg += f"\nWarning: {low_conf_included} low confidence frames included"
+
+        result = messagebox.askyesno(
+            "Confirm Save",
+            confirm_msg,
+            icon="question"
+        )
+        if not result:
+            return
+
+        # Save all results (excluding excluded frames)
         self.status_var.set("Saving annotations...")
         self.progress_bar.pack(fill=tk.X, pady=(5, 0))
 
         def save_task():
             try:
                 result = batch_save_yolo_labels(
-                    tracking_results=self.tracking_state.tracking_results,
-                    frame_map=self.tracking_frame_map,
+                    tracking_results=included_results,
+                    frame_map=included_frame_map,
                     output_dir=str(self.output_dir),
                     class_id=self.class_id,
                     copy_images=False,  # Don't copy images, just save labels
                 )
 
-                self.root.after(0, lambda: self._on_save_complete(result))
+                self.root.after(0, lambda: self._on_save_complete(result, excluded_count))
 
             except Exception as e:
                 self.root.after(0, lambda: self._on_save_error(str(e)))
@@ -1494,31 +1647,145 @@ class SAM2AnnotationApp:
         thread = threading.Thread(target=save_task, daemon=True)
         thread.start()
 
-    def _on_save_complete(self, result):
+    def _on_save_complete(self, result, excluded_count: int = 0):
         """Called when save is complete."""
         self.progress_bar.pack_forget()
 
-        # Update annotated images set
+        # Update annotated images set (only for included frames)
         for frame_idx in self.tracking_state.tracking_results.keys():
             if frame_idx in self.tracking_frame_map:
-                self.annotated_images.add(self.tracking_frame_map[frame_idx])
+                # Only add to annotated if not excluded
+                if not self.tracking_state.is_frame_excluded(frame_idx):
+                    self.annotated_images.add(self.tracking_frame_map[frame_idx])
 
         self._update_image_listbox()
         self._on_cancel_tracking()
 
-        messagebox.showinfo(
-            "Save Complete",
-            f"Save Complete\n\n{result.summary()}"
-        )
+        # Build summary message
+        summary_msg = f"Save Complete\n\n{result.summary()}"
+        if excluded_count > 0:
+            summary_msg += f"\n\n{excluded_count} frames were excluded and not saved."
 
-        self.status_var.set(
-            f"Saved {result.successful}/{result.total_images} annotations"
-        )
+        messagebox.showinfo("Save Complete", summary_msg)
+
+        status_msg = f"Saved {result.successful}/{result.total_images} annotations"
+        if excluded_count > 0:
+            status_msg += f" ({excluded_count} excluded)"
+        self.status_var.set(status_msg)
 
     def _on_save_error(self, error_msg: str):
         """Called when save fails."""
         self.progress_bar.pack_forget()
         messagebox.showerror("Save Error", f"Save failed:\n{error_msg}")
+
+    # =========================================================================
+    # Frame Exclusion Methods
+    # =========================================================================
+
+    def _on_toggle_frame_exclusion(self):
+        """Toggle exclusion state of the currently selected frame."""
+        if not self.tracking_state.is_tracking_initialized:
+            return
+
+        selection = self.image_listbox.curselection()
+        if not selection:
+            self.status_var.set("Select a frame to toggle exclusion")
+            return
+
+        frame_idx = selection[0]
+
+        # Check if this frame has tracking results
+        if frame_idx not in self.tracking_state.tracking_results:
+            self.status_var.set("Selected frame has no tracking results")
+            return
+
+        is_now_excluded = self.tracking_state.toggle_frame_exclusion(frame_idx)
+
+        # Update display
+        self._update_image_listbox()
+        self._update_display()
+
+        if is_now_excluded:
+            self.status_var.set(f"Frame {frame_idx} excluded from training")
+        else:
+            self.status_var.set(f"Frame {frame_idx} included in training")
+
+    def _on_exclude_all_low_confidence(self):
+        """Exclude all low confidence frames."""
+        if not self.tracking_state.is_tracking_initialized:
+            return
+
+        count = self.tracking_state.exclude_all_low_confidence()
+
+        # Update display
+        self._update_image_listbox()
+        self._update_display()
+
+        if count > 0:
+            self.status_var.set(f"Excluded {count} low confidence frames")
+        else:
+            self.status_var.set("No additional frames to exclude")
+
+    def _on_include_all(self):
+        """Include all frames (clear exclusions)."""
+        if not self.tracking_state.is_tracking_initialized:
+            return
+
+        count = self.tracking_state.include_all()
+
+        # Update display
+        self._update_image_listbox()
+        self._update_display()
+
+        if count > 0:
+            self.status_var.set(f"Included {count} previously excluded frames")
+        else:
+            self.status_var.set("All frames already included")
+
+    def _update_exclusion_stats(self):
+        """Update the exclusion statistics label."""
+        if not self.tracking_state.is_tracking_initialized:
+            self.exclusion_stats_var.set("")
+            return
+
+        included, excluded, low_conf_included = self.tracking_state.get_exclusion_stats()
+        total = included + excluded
+
+        if excluded > 0:
+            stats_text = f"Included: {included}/{total} ({excluded} excluded)"
+        else:
+            stats_text = f"Included: {included}/{total}"
+
+        if low_conf_included > 0:
+            stats_text += f" | {low_conf_included} low-conf included"
+
+        self.exclusion_stats_var.set(stats_text)
+
+    def _on_listbox_double_click(self, event):
+        """Handle double-click on listbox to toggle frame exclusion."""
+        if not self.tracking_state.is_tracking_initialized:
+            return
+
+        # Get the item that was double-clicked
+        index = self.image_listbox.nearest(event.y)
+        if index < 0:
+            return
+
+        # Check if this frame has tracking results
+        if index not in self.tracking_state.tracking_results:
+            return
+
+        # Toggle exclusion
+        is_now_excluded = self.tracking_state.toggle_frame_exclusion(index)
+
+        # Update display
+        self._update_image_listbox()
+        self._update_display()
+
+        if is_now_excluded:
+            self.status_var.set(f"Frame {index} excluded from training")
+        else:
+            self.status_var.set(f"Frame {index} included in training")
 
     def _on_cancel_tracking(self):
         """Cancel tracking and reset state."""
@@ -1540,40 +1807,49 @@ class SAM2AnnotationApp:
         self._update_display()
 
     def _update_image_listbox(self):
-        """Update image list display with tracking status."""
+        """Update image list display with tracking status and exclusion checkboxes."""
         self.image_listbox.delete(0, tk.END)
 
         for i, path in enumerate(self.image_list):
-            # Determine status prefix
+            # Determine status prefix and color
             if path in self.annotated_images:
                 prefix = "[✓]"
+                color = "black"
             elif self.tracking_state.is_tracking_initialized:
-                status = self.tracking_state.get_frame_status(i)
-                if status == "low_confidence":
-                    prefix = "[!]"
-                elif status == "tracked":
-                    prefix = "[T]"
+                is_excluded = self.tracking_state.is_frame_excluded(i)
+                is_low_conf = i in self.tracking_state.low_confidence_frames
+
+                if is_excluded:
+                    # Excluded frames: unchecked box
+                    if is_low_conf:
+                        prefix = "[☐!]"  # Excluded low confidence
+                    else:
+                        prefix = "[☐]"   # Excluded normal
+                    color = "gray"
                 else:
-                    prefix = "[ ]"
+                    # Included frames: checked box
+                    if is_low_conf:
+                        prefix = "[☑!]"  # Included low confidence
+                        color = "orange"
+                    else:
+                        prefix = "[☑]"   # Included normal
+                        color = "green"
             else:
                 prefix = "[ ]"
+                color = "black"
 
             display_name = f"{prefix} {path.name}"
             self.image_listbox.insert(tk.END, display_name)
-
-            # Color code for tracking status
-            if self.tracking_state.is_tracking_initialized:
-                status = self.tracking_state.get_frame_status(i)
-                if status == "low_confidence":
-                    self.image_listbox.itemconfig(i, foreground="orange")
-                elif status == "tracked":
-                    self.image_listbox.itemconfig(i, foreground="green")
+            self.image_listbox.itemconfig(i, foreground=color)
 
         # Select current image
         if self.image_list:
             self.image_listbox.selection_clear(0, tk.END)
             self.image_listbox.selection_set(self.current_index)
             self.image_listbox.see(self.current_index)
+
+        # Update exclusion stats
+        self._update_exclusion_stats()
 
     def _on_close(self):
         """Handle window close."""
