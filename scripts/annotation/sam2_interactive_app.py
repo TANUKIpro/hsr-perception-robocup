@@ -668,7 +668,7 @@ class SAM2AnnotationApp:
         # Apply all button
         self.apply_all_btn = ttk.Button(
             tracking_row1,
-            text="Apply All",
+            text="Apply",
             command=self._on_apply_tracking_results,
             state=tk.DISABLED,
         )
@@ -1488,6 +1488,7 @@ class SAM2AnnotationApp:
 
     def _on_tracking_complete(self, results: Dict[int, TrackingResult]):
         """Called when tracking is complete."""
+        self.tracking_state.set_processing(False)
         self.tracking_state.set_tracking_results(results)
         self.progress_bar.pack_forget()
         self.progress_var.set(0)
@@ -1509,7 +1510,7 @@ class SAM2AnnotationApp:
         self._update_display()
 
         self.status_var.set(
-            f"Tracking complete. Review results and click 'Apply All' to save."
+            f"Tracking complete. Review results and click 'Apply' to save."
         )
 
     def _on_tracking_error(self, error_msg: str):
@@ -2087,7 +2088,7 @@ class SAM2AnnotationApp:
 
         self.status_var.set(
             f"Tracking stopped. {total_frames} frames processed. "
-            f"Click 'Apply All' to save results."
+            f"Click 'Apply' to save results."
         )
 
     def _update_image_listbox(self):
