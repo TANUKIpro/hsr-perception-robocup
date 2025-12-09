@@ -35,6 +35,77 @@ from components.dataset_status import (
 from components.training_styles import inject_training_styles, COLORS, ICONS
 
 
+def _get_annotation_progress(raw_captures_dir: Path, annotated_dir: Path) -> dict:
+    """
+    Calculate annotation progress for each class.
+
+    Args:
+        raw_captures_dir: Directory containing raw captured images per class
+        annotated_dir: Directory containing annotation outputs per class
+
+    Returns:
+        Dictionary mapping class_name to progress info:
+        {
+            "class_name": {
+                "total_images": int,
+                "annotated_count": int,
+                "progress_percent": float,
+                "status": "complete" | "in_progress" | "not_started"
+            }
+        }
+    """
+    progress = {}
+
+    if not raw_captures_dir.exists():
+        return progress
+
+    for class_dir in raw_captures_dir.iterdir():
+        if not class_dir.is_dir():
+            continue
+
+        class_name = class_dir.name
+
+        # Count raw images
+        images = list(class_dir.glob("*.jpg")) + list(class_dir.glob("*.png"))
+        total_images = len(images)
+
+        if total_images == 0:
+            continue
+
+        # Count annotated labels (check both labels subdirectory and direct output)
+        annotated_count = 0
+        class_annotated_dir = annotated_dir / class_name
+
+        if class_annotated_dir.exists():
+            # Check labels subdirectory (batch save location)
+            labels_dir = class_annotated_dir / "labels"
+            if labels_dir.exists():
+                annotated_count = len(list(labels_dir.glob("*.txt")))
+            else:
+                # Fallback to direct output
+                annotated_count = len(list(class_annotated_dir.glob("*.txt")))
+
+        # Calculate progress
+        progress_percent = (annotated_count / total_images) * 100 if total_images > 0 else 0
+
+        # Determine status
+        if annotated_count == 0:
+            status = "not_started"
+        elif annotated_count >= total_images:
+            status = "complete"
+        else:
+            status = "in_progress"
+
+        progress[class_name] = {
+            "total_images": total_images,
+            "annotated_count": annotated_count,
+            "progress_percent": progress_percent,
+            "status": status,
+        }
+
+    return progress
+
+
 def show_annotation_page():
     """Main annotation page."""
     # Render common sidebar
@@ -118,6 +189,10 @@ def _render_run_annotation(task_manager: TaskManager, path_coordinator: PathCoor
     # Show available data with file paths
     st.success(f"Found **{image_count}** images across **{len(class_dirs)}** classes")
 
+    # Get annotation progress for all classes
+    annotated_dir = path_coordinator.get_path("annotated_dir")
+    annotation_progress = _get_annotation_progress(raw_captures_dir, annotated_dir)
+
     with st.expander("View Class Distribution", expanded=False):
         for class_name, count, path in sorted(class_dirs):
             st.markdown(f"**{class_name}**: {count} images")
@@ -125,18 +200,80 @@ def _render_run_annotation(task_manager: TaskManager, path_coordinator: PathCoor
 
     st.markdown("---")
 
-    # Class selection
-    class_options = {name: (name, path, idx) for idx, (name, _, path) in enumerate(sorted(class_dirs))}
-    selected_class = st.selectbox(
-        "Select Class to Annotate",
-        list(class_options.keys()),
-        help="Choose which class to annotate"
+    # Class selection with progress indicators
+    st.markdown("##### Select Class to Annotate")
+
+    # Build class options with progress info for display
+    class_options = {}
+    display_options = []
+
+    for idx, (name, img_count, path) in enumerate(sorted(class_dirs)):
+        class_options[name] = (name, path, idx)
+
+        # Get progress info
+        if name in annotation_progress:
+            prog = annotation_progress[name]
+            annotated = prog["annotated_count"]
+            total = prog["total_images"]
+            pct = prog["progress_percent"]
+            status = prog["status"]
+
+            # Create display label with status indicator
+            if status == "complete":
+                status_icon = "✅"  # Green checkmark
+            elif status == "in_progress":
+                status_icon = "🟡"  # Yellow circle
+            else:
+                status_icon = "⚪"  # White circle
+
+            display_label = f"{status_icon} {name} ({annotated}/{total})"
+        else:
+            display_label = f"⚪ {name} (0/{img_count})"
+
+        display_options.append((display_label, name))
+
+    # Create selectbox with formatted options
+    selected_display = st.selectbox(
+        "Class",
+        [label for label, _ in display_options],
+        help="Choose which class to annotate. Status: ✅ Complete | 🟡 In Progress | ⚪ Not Started",
+        label_visibility="collapsed"
     )
+
+    # Map back to actual class name
+    selected_class = None
+    for label, name in display_options:
+        if label == selected_display:
+            selected_class = name
+            break
+
+    # Show detailed progress for selected class
+    if selected_class and selected_class in annotation_progress:
+        prog = annotation_progress[selected_class]
+        annotated = prog["annotated_count"]
+        total = prog["total_images"]
+        pct = prog["progress_percent"]
+        status = prog["status"]
+
+        # Progress bar with color based on status
+        if status == "complete":
+            st.progress(1.0, text=f"Annotation complete: {annotated}/{total} images")
+        elif status == "in_progress":
+            st.progress(pct / 100, text=f"In progress: {annotated}/{total} images ({pct:.0f}%)")
+        else:
+            st.progress(0.0, text=f"Not started: 0/{total} images")
+    elif selected_class:
+        # No annotation data yet
+        img_count = next((c for n, c, p in class_dirs if n == selected_class), (None, 0, None))[1] if class_dirs else 0
+        for n, c, p in class_dirs:
+            if n == selected_class:
+                img_count = c
+                break
+        st.progress(0.0, text=f"Not started: 0/{img_count} images")
 
     class_name, input_dir, class_id = class_options[selected_class]
 
-    # Output directory config
-    annotated_dir = path_coordinator.get_path("annotated_dir")
+    # Output directory config (annotated_dir already retrieved above)
     output_dir = str(annotated_dir / class_name)
 
     col1, col2 = st.columns(2)

@@ -508,6 +508,7 @@ class SAM2AnnotationApp:
         self.current_image_path: Optional[Path] = None
         self.image_list: List[Path] = []
         self.current_index: int = 0
+        self.points_frame_index: Optional[int] = None  # Frame where points were added
         self.annotated_images: set = set()
 
         # Tracking mode state
@@ -668,7 +669,7 @@ class SAM2AnnotationApp:
         # Apply all button
         self.apply_all_btn = ttk.Button(
             tracking_row1,
-            text="Apply All",
+            text="Apply",
             command=self._on_apply_tracking_results,
             state=tk.DISABLED,
         )
@@ -913,6 +914,7 @@ class SAM2AnnotationApp:
 
         # Reset annotation state
         self.state.reset()
+        self.points_frame_index = None
         self.predictor.reset_mask_state()
 
         # Set image in predictor
@@ -985,18 +987,20 @@ class SAM2AnnotationApp:
                 box_color = tuple(mask_color)
                 cv2.rectangle(display, (x1, y1), (x2, y2), box_color, 2)
 
-        # Draw foreground points (green with plus)
-        for x, y in self.state.foreground_points:
-            cv2.circle(display, (x, y), 8, (0, 255, 0), -1)
-            cv2.circle(display, (x, y), 8, (255, 255, 255), 2)
-            cv2.line(display, (x - 5, y), (x + 5, y), (255, 255, 255), 2)
-            cv2.line(display, (x, y - 5), (x, y + 5), (255, 255, 255), 2)
+        # Draw points only on the frame where they were added
+        if self.points_frame_index is None or self.current_index == self.points_frame_index:
+            # Draw foreground points (green with plus)
+            for x, y in self.state.foreground_points:
+                cv2.circle(display, (x, y), 5, (0, 255, 0), -1)
+                cv2.circle(display, (x, y), 5, (255, 255, 255), 2)
+                cv2.line(display, (x - 3, y), (x + 3, y), (255, 255, 255), 2)
+                cv2.line(display, (x, y - 3), (x, y + 3), (255, 255, 255), 2)
 
-        # Draw background points (red with minus)
-        for x, y in self.state.background_points:
-            cv2.circle(display, (x, y), 8, (255, 0, 0), -1)
-            cv2.circle(display, (x, y), 8, (255, 255, 255), 2)
-            cv2.line(display, (x - 5, y), (x + 5, y), (255, 255, 255), 2)
+            # Draw background points (red with minus)
+            for x, y in self.state.background_points:
+                cv2.circle(display, (x, y), 5, (255, 0, 0), -1)
+                cv2.circle(display, (x, y), 5, (255, 255, 255), 2)
+                cv2.line(display, (x - 3, y), (x + 3, y), (255, 255, 255), 2)
 
         # Draw saved annotation bounding box (orange) if no active annotation
         if (
@@ -1067,6 +1071,10 @@ class SAM2AnnotationApp:
         if coords is None:
             return
 
+        # Record frame where points were first added
+        if self.points_frame_index is None:
+            self.points_frame_index = self.current_index
+
         self.state.add_foreground_point(*coords)
         self._run_segmentation()
 
@@ -1075,6 +1083,10 @@ class SAM2AnnotationApp:
         coords = self._canvas_to_image_coords(event.x, event.y)
         if coords is None:
             return
+
+        # Record frame where points were first added
+        if self.points_frame_index is None:
+            self.points_frame_index = self.current_index
 
         self.state.add_background_point(*coords)
         self._run_segmentation()
@@ -1178,6 +1190,7 @@ class SAM2AnnotationApp:
     def _on_reset(self):
         """Handle reset action."""
         self.state.reset()
+        self.points_frame_index = None
         if self.predictor:
             self.predictor.reset_mask_state()
         self._update_display()
@@ -1488,6 +1501,7 @@ class SAM2AnnotationApp:
 
     def _on_tracking_complete(self, results: Dict[int, TrackingResult]):
         """Called when tracking is complete."""
+        self.tracking_state.set_processing(False)
         self.tracking_state.set_tracking_results(results)
         self.progress_bar.pack_forget()
         self.progress_var.set(0)
@@ -1509,7 +1523,7 @@ class SAM2AnnotationApp:
         self._update_display()
 
         self.status_var.set(
-            f"Tracking complete. Review results and click 'Apply All' to save."
+            f"Tracking complete. Review results and click 'Apply' to save."
         )
 
     def _on_tracking_error(self, error_msg: str):
@@ -1987,18 +2001,26 @@ class SAM2AnnotationApp:
         if not self.tracking_state.is_processing:
             return
 
+        # Pause processing BEFORE showing dialog
+        self.tracking_state.request_stop()
+        self.status_var.set("Paused - waiting for confirmation...")
+
         result = messagebox.askyesno(
             "Stop Tracking",
-            "Processing will stop after the current frame.\n"
+            "Processing is paused.\n"
             "Results obtained so far will be preserved.\n\n"
             "Do you want to stop?",
             icon="warning"
         )
 
         if result:
-            self.tracking_state.request_stop()
-            self.status_var.set("Stopping... (waiting for current frame)")
+            # User confirmed stop
+            self.status_var.set("Stopping...")
             self.stop_tracking_btn.config(state=tk.DISABLED)
+        else:
+            # User cancelled - resume processing
+            self.tracking_state.clear_stop_request()
+            self.status_var.set("Resumed tracking...")
 
     def _show_batch_pause_dialog(
         self, batch_idx: int, num_batches: int, batch_results: Dict
@@ -2087,7 +2109,7 @@ class SAM2AnnotationApp:
 
         self.status_var.set(
             f"Tracking stopped. {total_frames} frames processed. "
-            f"Click 'Apply All' to save results."
+            f"Click 'Apply' to save results."
         )
 
     def _update_image_listbox(self):
