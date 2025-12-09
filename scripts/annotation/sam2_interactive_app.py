@@ -300,6 +300,13 @@ class TrackingState:
     excluded_frames: Set[int] = field(default_factory=set)
     current_obj_id: int = 1
 
+    # Stop/pause control fields
+    is_processing: bool = False
+    stop_requested: bool = False
+    is_paused_between_batches: bool = False
+    current_batch_index: int = 0
+    total_batches: int = 0
+
     def enable_tracking(self) -> None:
         """Enable tracking mode."""
         self.is_tracking_mode = True
@@ -415,6 +422,36 @@ class TrackingState:
 
         return (included, excluded, low_conf_included)
 
+    # Stop/pause control methods
+    def request_stop(self) -> None:
+        """Request processing to stop."""
+        self.stop_requested = True
+
+    def clear_stop_request(self) -> None:
+        """Clear stop request flag."""
+        self.stop_requested = False
+
+    def is_stop_requested(self) -> bool:
+        """Check if stop has been requested."""
+        return self.stop_requested
+
+    def set_processing(self, processing: bool) -> None:
+        """Set processing state."""
+        self.is_processing = processing
+        if not processing:
+            self.stop_requested = False
+            self.is_paused_between_batches = False
+
+    def pause_for_batch_review(self, batch_idx: int, total_batches: int) -> None:
+        """Set state for batch review pause."""
+        self.is_paused_between_batches = True
+        self.current_batch_index = batch_idx
+        self.total_batches = total_batches
+
+    def resume_from_pause(self) -> None:
+        """Resume from batch review pause."""
+        self.is_paused_between_batches = False
+
 
 # =============================================================================
 # Main Application
@@ -477,6 +514,7 @@ class SAM2AnnotationApp:
         self.tracking_state = TrackingState()
         self.video_predictor: Optional[VideoTrackingPredictor] = None
         self.tracking_frame_map: Dict[int, Path] = {}
+        self._batch_continue_event = threading.Event()
 
         # Display state
         self.display_image: Optional[np.ndarray] = None
@@ -645,6 +683,15 @@ class SAM2AnnotationApp:
         )
         self.cancel_tracking_btn.pack(side=tk.LEFT, padx=5)
 
+        # Stop tracking button (visible only during processing)
+        self.stop_tracking_btn = ttk.Button(
+            tracking_row1,
+            text="Stop",
+            command=self._on_stop_tracking,
+            state=tk.DISABLED,
+        )
+        self.stop_tracking_btn.pack(side=tk.LEFT, padx=5)
+
         # Tracking status label
         self.tracking_status_var = tk.StringVar(value="Tracking: OFF")
         ttk.Label(
@@ -701,6 +748,42 @@ class SAM2AnnotationApp:
             state=tk.DISABLED,
         )
         self.include_all_btn.pack(side=tk.LEFT, padx=5)
+
+        # Batch pause frame (shown between batches)
+        self.batch_pause_frame = ttk.Frame(tracking_frame)
+        # Will be shown/hidden dynamically during batch processing
+
+        # Batch info label
+        self.batch_info_var = tk.StringVar(value="")
+        ttk.Label(
+            self.batch_pause_frame,
+            textvariable=self.batch_info_var,
+            font=("TkDefaultFont", 10, "bold"),
+        ).pack(side=tk.LEFT, padx=5)
+
+        # Batch summary label
+        self.batch_summary_var = tk.StringVar(value="")
+        ttk.Label(
+            self.batch_pause_frame,
+            textvariable=self.batch_summary_var,
+            font=("TkDefaultFont", 9),
+        ).pack(side=tk.LEFT, padx=5)
+
+        # Continue to Next Batch button
+        self.continue_batch_btn = ttk.Button(
+            self.batch_pause_frame,
+            text="Continue to Next Batch",
+            command=self._on_continue_batch,
+        )
+        self.continue_batch_btn.pack(side=tk.LEFT, padx=10)
+
+        # Stop Here button
+        self.stop_at_batch_btn = ttk.Button(
+            self.batch_pause_frame,
+            text="Stop Here",
+            command=self._on_stop_at_batch,
+        )
+        self.stop_at_batch_btn.pack(side=tk.LEFT, padx=5)
 
         # === Status Bar ===
         status_frame = ttk.Frame(self.root)
@@ -1172,15 +1255,23 @@ class SAM2AnnotationApp:
         is_enabled = self.tracking_state.is_tracking_mode
         has_mask = self.state.current_mask is not None
         has_results = self.tracking_state.is_tracking_initialized
+        is_processing = self.tracking_state.is_processing
+        is_paused = self.tracking_state.is_paused_between_batches
 
-        # Start tracking: enabled when tracking mode is on and we have a mask
-        if is_enabled and has_mask and not has_results:
+        # Start tracking: enabled when tracking mode is on, have mask, no results, not processing
+        if is_enabled and has_mask and not has_results and not is_processing:
             self.start_tracking_btn.config(state=tk.NORMAL)
         else:
             self.start_tracking_btn.config(state=tk.DISABLED)
 
-        # Apply all: enabled when we have tracking results
-        if has_results:
+        # Stop button: enabled only during processing (not paused)
+        if is_processing and not is_paused:
+            self.stop_tracking_btn.config(state=tk.NORMAL)
+        else:
+            self.stop_tracking_btn.config(state=tk.DISABLED)
+
+        # Apply all and Cancel: enabled when we have results and not processing
+        if has_results and not is_processing:
             self.apply_all_btn.config(state=tk.NORMAL)
             self.cancel_tracking_btn.config(state=tk.NORMAL)
         else:
@@ -1199,8 +1290,14 @@ class SAM2AnnotationApp:
         else:
             self.low_conf_label.config(text="")
 
-        # Show/hide exclusion controls based on tracking results
-        if has_results:
+        # Show/hide exclusion controls based on tracking results and not processing
+        if has_results and not is_processing:
+            self.exclusion_frame.pack(fill=tk.X, pady=(3, 0))
+            self.toggle_selected_btn.config(state=tk.NORMAL)
+            self.exclude_low_conf_btn.config(state=tk.NORMAL)
+            self.include_all_btn.config(state=tk.NORMAL)
+        elif is_paused:
+            # During batch pause, show exclusion controls for review
             self.exclusion_frame.pack(fill=tk.X, pady=(3, 0))
             self.toggle_selected_btn.config(state=tk.NORMAL)
             self.exclude_low_conf_btn.config(state=tk.NORMAL)
@@ -1223,11 +1320,16 @@ class SAM2AnnotationApp:
             )
             return
 
-        # Disable UI during tracking
+        # Disable UI during tracking and set processing state
         self.start_tracking_btn.config(state=tk.DISABLED)
         self.tracking_status_var.set("Tracking: Initializing...")
         self.progress_bar.pack(fill=tk.X, pady=(5, 0))
         self.progress_var.set(0)
+
+        # Set processing state
+        self.tracking_state.set_processing(True)
+        self.tracking_state.clear_stop_request()
+        self._update_tracking_ui_state()
 
         def tracking_task():
             try:
@@ -1251,10 +1353,14 @@ class SAM2AnnotationApp:
                     "Tracking: Checking VRAM..."
                 ))
 
+                # Calculate frame range: from current frame to end
+                start_frame = self.current_index
+                end_frame = len(self.image_list) - 1
+                num_frames = end_frame - start_frame + 1
+
                 # Get first image to estimate size
                 if self.current_image is not None:
                     img_size = self.current_image.shape[:2]
-                    num_frames = len(self.image_list)
 
                     vram_estimate = self.video_predictor.estimate_vram_usage(
                         num_frames, img_size
@@ -1263,30 +1369,42 @@ class SAM2AnnotationApp:
                     if vram_estimate.needs_split:
                         # Show warning dialog on main thread
                         self.root.after(0, lambda: self._show_vram_warning_dialog(
-                            vram_estimate, num_frames
+                            vram_estimate, num_frames, start_frame
                         ))
                         return
 
-                # Initialize sequence
+                # Initialize sequence from current frame to end
                 self.root.after(0, lambda: self.tracking_status_var.set(
-                    "Tracking: Preparing frames..."
+                    f"Tracking: Preparing frames {start_frame}-{end_frame}..."
                 ))
-                num_frames, _ = self.video_predictor.init_sequence(
-                    str(self.input_dir),
+
+                # Create BatchInfo for partial sequence
+                batch_info = BatchInfo(
+                    batch_index=0,
+                    start_frame=start_frame,
+                    end_frame=end_frame,
+                    frame_count=num_frames,
+                    is_first_batch=True,
+                    is_last_batch=True,
+                )
+
+                num_frames_in_batch, global_frame_map = self.video_predictor.init_batch_sequence(
+                    image_paths=self.image_list,
+                    batch_info=batch_info,
                     progress_callback=lambda msg: self.root.after(
                         0, lambda: self.status_var.set(msg)
                     )
                 )
 
-                # Store frame map
-                self.tracking_frame_map = self.video_predictor.frame_map.copy()
+                # Store frame map (global indices)
+                self.tracking_frame_map.update(global_frame_map)
 
-                # Set initial prompt on current frame
+                # Set initial prompt on first frame of the batch (local index 0)
                 self.root.after(0, lambda: self.tracking_status_var.set(
                     "Tracking: Setting initial prompt..."
                 ))
                 self.video_predictor.set_initial_prompt(
-                    frame_idx=self.current_index,
+                    frame_idx=0,  # Local index within batch
                     obj_id=self.tracking_state.current_obj_id,
                     foreground_points=self.state.foreground_points,
                     background_points=self.state.background_points,
@@ -1297,7 +1415,10 @@ class SAM2AnnotationApp:
                     "Tracking: Propagating..."
                 ))
 
-                def progress_callback(current, total, frame_idx, mask):
+                def progress_callback(current, total, local_frame_idx, mask):
+                    # Convert local index to global index
+                    global_frame_idx = start_frame + local_frame_idx
+
                     def update_ui():
                         # Update progress
                         progress = (current / total) * 100
@@ -1307,9 +1428,9 @@ class SAM2AnnotationApp:
                         )
 
                         # Switch to current frame and display tracking result
-                        if frame_idx < len(self.image_list):
-                            self.current_index = frame_idx
-                            self.current_image_path = self.image_list[frame_idx]
+                        if global_frame_idx < len(self.image_list):
+                            self.current_index = global_frame_idx
+                            self.current_image_path = self.image_list[global_frame_idx]
 
                             # Load image for display
                             img = cv2.imread(str(self.current_image_path))
@@ -1320,7 +1441,7 @@ class SAM2AnnotationApp:
                                 temp_result = TrackingResult.from_mask(
                                     mask, reference_area=self.video_predictor.reference_mask_area
                                 )
-                                self.tracking_state.tracking_results[frame_idx] = temp_result
+                                self.tracking_state.tracking_results[global_frame_idx] = temp_result
                                 self.tracking_state.is_tracking_initialized = True
 
                                 # Update display and listbox
@@ -1329,20 +1450,38 @@ class SAM2AnnotationApp:
 
                                 # Update listbox selection
                                 self.image_listbox.selection_clear(0, tk.END)
-                                self.image_listbox.selection_set(frame_idx)
-                                self.image_listbox.see(frame_idx)
+                                self.image_listbox.selection_set(global_frame_idx)
+                                self.image_listbox.see(global_frame_idx)
 
                     self.root.after(0, update_ui)
 
-                results = self.video_predictor.propagate_tracking(
-                    progress_callback=progress_callback
+                # Define stop check callback
+                def stop_check():
+                    return self.tracking_state.is_stop_requested()
+
+                local_results = self.video_predictor.propagate_tracking(
+                    progress_callback=progress_callback,
+                    stop_check=stop_check,
                 )
 
+                # Convert local results to global frame indices
+                global_results = {
+                    start_frame + local_idx: result
+                    for local_idx, result in local_results.items()
+                }
+
+                # Check if stopped
+                if self.tracking_state.is_stop_requested():
+                    self.root.after(0, lambda r=global_results: self._on_tracking_stopped(r))
+                    return
+
                 # Update state on main thread
-                self.root.after(0, lambda: self._on_tracking_complete(results))
+                self.root.after(0, lambda: self._on_tracking_complete(global_results))
 
             except Exception as e:
                 self.root.after(0, lambda: self._on_tracking_error(str(e)))
+            finally:
+                self.root.after(0, lambda: self.tracking_state.set_processing(False))
 
         thread = threading.Thread(target=tracking_task, daemon=True)
         thread.start()
@@ -1382,11 +1521,12 @@ class SAM2AnnotationApp:
 
         messagebox.showerror("Tracking Error", f"Tracking failed:\n{error_msg}")
 
-    def _show_vram_warning_dialog(self, vram_estimate, num_frames: int):
+    def _show_vram_warning_dialog(self, vram_estimate, num_frames: int, start_frame: int = 0):
         """Show VRAM warning dialog for batch splitting."""
+        end_frame = start_frame + num_frames - 1
         message = (
             f"VRAM Capacity Warning\n\n"
-            f"Target: {num_frames} frames\n"
+            f"Target: frames {start_frame}-{end_frame} ({num_frames} frames)\n"
             f"Estimated VRAM usage: {vram_estimate.estimated_usage_gb:.1f}GB\n"
             f"Available VRAM: {vram_estimate.available_gb:.1f}GB\n\n"
             f"Processing with batch splitting:\n"
@@ -1394,10 +1534,10 @@ class SAM2AnnotationApp:
 
         batch_size = vram_estimate.recommended_batch_size
         for i in range(vram_estimate.num_batches):
-            start = i * batch_size
-            end = min((i + 1) * batch_size - 1, num_frames - 1)
-            count = end - start + 1
-            message += f"- Batch {i + 1}: frames {start}-{end} ({count} images)\n"
+            batch_start = start_frame + i * batch_size
+            batch_end = min(start_frame + (i + 1) * batch_size - 1, end_frame)
+            count = batch_end - batch_start + 1
+            message += f"- Batch {i + 1}: frames {batch_start}-{batch_end} ({count} images)\n"
 
         result = messagebox.askyesno(
             "VRAM Capacity Warning",
@@ -1407,22 +1547,29 @@ class SAM2AnnotationApp:
 
         if result:
             # Start batch processing
-            self._run_batch_tracking(vram_estimate, num_frames)
+            self._run_batch_tracking(vram_estimate, num_frames, start_frame)
         else:
             self.tracking_status_var.set("Tracking: Cancelled")
             self.progress_bar.pack_forget()
             self._update_tracking_ui_state()
 
-    def _run_batch_tracking(self, vram_estimate, num_frames: int):
+    def _run_batch_tracking(self, vram_estimate, num_frames: int, global_start_frame: int = 0):
         """
         Run tracking in batches to handle large sequences with limited VRAM.
 
         Args:
             vram_estimate: VRAMEstimate with batch configuration
             num_frames: Total number of frames to process
+            global_start_frame: Global frame index to start tracking from
         """
         self.tracking_status_var.set("Tracking: Starting batch processing...")
         self.progress_var.set(0)
+
+        # Set processing state and clear stop request
+        self.tracking_state.set_processing(True)
+        self.tracking_state.clear_stop_request()
+        self._batch_continue_event.clear()
+        self._update_tracking_ui_state()
 
         def batch_tracking_task():
             try:
@@ -1433,15 +1580,21 @@ class SAM2AnnotationApp:
                 low_conf_batches = []
 
                 for batch_idx in range(num_batches):
-                    # Calculate batch frame range
-                    start_frame = batch_idx * batch_size
-                    end_frame = min((batch_idx + 1) * batch_size - 1, num_frames - 1)
-                    frame_count = end_frame - start_frame + 1
+                    # Check for stop request at start of each batch
+                    if self.tracking_state.is_stop_requested():
+                        self.root.after(0, lambda r=dict(all_results): self._on_tracking_stopped(r))
+                        return
+
+                    # Calculate batch frame range (global indices)
+                    batch_start = global_start_frame + batch_idx * batch_size
+                    batch_end = min(global_start_frame + (batch_idx + 1) * batch_size - 1,
+                                   global_start_frame + num_frames - 1)
+                    frame_count = batch_end - batch_start + 1
 
                     batch_info = BatchInfo(
                         batch_index=batch_idx,
-                        start_frame=start_frame,
-                        end_frame=end_frame,
+                        start_frame=batch_start,
+                        end_frame=batch_end,
                         frame_count=frame_count,
                         is_first_batch=(batch_idx == 0),
                         is_last_batch=(batch_idx == num_batches - 1),
@@ -1465,17 +1618,13 @@ class SAM2AnnotationApp:
 
                     # Set initial prompt or mask
                     if batch_info.is_first_batch:
-                        # First batch: use user's points
+                        # First batch: use user's points (at local index 0)
                         self.root.after(0, lambda: self.tracking_status_var.set(
                             f"Tracking: Batch 1/{num_batches} - Setting initial prompt..."
                         ))
-                        # Find the local frame index for the current frame
-                        local_frame_idx = self.current_index - start_frame
-                        if local_frame_idx < 0 or local_frame_idx >= frame_count:
-                            local_frame_idx = 0
 
                         self.video_predictor.set_initial_prompt(
-                            frame_idx=local_frame_idx,
+                            frame_idx=0,  # Local index within batch
                             obj_id=self.tracking_state.current_obj_id,
                             foreground_points=self.state.foreground_points,
                             background_points=self.state.background_points,
@@ -1501,7 +1650,7 @@ class SAM2AnnotationApp:
 
                     def batch_progress_callback(current, total, local_frame_idx, mask):
                         # Convert local to global frame index
-                        global_frame_idx = start_frame + local_frame_idx
+                        global_frame_idx = batch_start + local_frame_idx
                         overall_processed = frames_processed_before + current
 
                         def update_ui():
@@ -1540,19 +1689,29 @@ class SAM2AnnotationApp:
 
                         self.root.after(0, update_ui)
 
+                    # Define stop check callback
+                    def stop_check():
+                        return self.tracking_state.is_stop_requested()
+
                     batch_results = self.video_predictor.propagate_tracking(
-                        progress_callback=batch_progress_callback
+                        progress_callback=batch_progress_callback,
+                        stop_check=stop_check,
                     )
 
                     # Convert local results to global frame indices
                     for local_idx, result in batch_results.items():
-                        global_idx = start_frame + local_idx
+                        global_idx = batch_start + local_idx
                         all_results[global_idx] = result
                         self.tracking_frame_map[global_idx] = self.image_list[global_idx]
 
+                    # Check if stopped during this batch
+                    if self.tracking_state.is_stop_requested():
+                        self.root.after(0, lambda r=dict(all_results): self._on_tracking_stopped(r))
+                        return
+
                     # Check for low confidence in this batch
                     batch_low_conf = [
-                        start_frame + local_idx
+                        batch_start + local_idx
                         for local_idx, result in batch_results.items()
                         if result.is_low_confidence
                     ]
@@ -1564,7 +1723,7 @@ class SAM2AnnotationApp:
                         last_local_idx = max(batch_results.keys())
                         current_mask = batch_results[last_local_idx].mask
 
-                    # Clear VRAM before next batch (except for last batch)
+                    # Clear VRAM and pause for user review (except for last batch)
                     if not batch_info.is_last_batch:
                         self.root.after(0, lambda b=batch_idx, n=num_batches: (
                             self.status_var.set(
@@ -1572,6 +1731,21 @@ class SAM2AnnotationApp:
                             )
                         ))
                         self.video_predictor.clear_vram()
+
+                        # Show batch pause dialog for user review
+                        batch_results_copy = dict(batch_results)
+                        self.root.after(0, lambda b=batch_idx, n=num_batches, r=batch_results_copy: (
+                            self._show_batch_pause_dialog(b, n, r)
+                        ))
+
+                        # Wait for user to continue or stop
+                        self._batch_continue_event.clear()
+                        self._batch_continue_event.wait()
+
+                        # Check if user chose to stop
+                        if self.tracking_state.is_stop_requested():
+                            self.root.after(0, lambda r=dict(all_results): self._on_tracking_stopped(r))
+                            return
 
                 # Show warning if any batches had low confidence frames
                 if low_conf_batches:
@@ -1585,6 +1759,8 @@ class SAM2AnnotationApp:
 
             except Exception as e:
                 self.root.after(0, lambda: self._on_tracking_error(str(e)))
+            finally:
+                self.root.after(0, lambda: self.tracking_state.set_processing(False))
 
         thread = threading.Thread(target=batch_tracking_task, daemon=True)
         thread.start()
@@ -1806,6 +1982,114 @@ class SAM2AnnotationApp:
         self._update_image_listbox()
         self._update_display()
 
+    def _on_stop_tracking(self):
+        """Handle stop button click during tracking."""
+        if not self.tracking_state.is_processing:
+            return
+
+        result = messagebox.askyesno(
+            "Stop Tracking",
+            "Processing will stop after the current frame.\n"
+            "Results obtained so far will be preserved.\n\n"
+            "Do you want to stop?",
+            icon="warning"
+        )
+
+        if result:
+            self.tracking_state.request_stop()
+            self.status_var.set("Stopping... (waiting for current frame)")
+            self.stop_tracking_btn.config(state=tk.DISABLED)
+
+    def _show_batch_pause_dialog(
+        self, batch_idx: int, num_batches: int, batch_results: Dict
+    ):
+        """Show batch pause dialog for user review and decision."""
+        self.tracking_state.pause_for_batch_review(batch_idx, num_batches)
+
+        # Update batch info
+        self.batch_info_var.set(f"Batch {batch_idx + 1}/{num_batches} completed")
+
+        # Calculate summary
+        total_frames = len(batch_results)
+        low_conf_count = sum(1 for r in batch_results.values() if r.is_low_confidence)
+        self.batch_summary_var.set(
+            f"({total_frames} frames, {low_conf_count} low confidence)"
+        )
+
+        # Show batch pause frame
+        self.batch_pause_frame.pack(fill=tk.X, pady=(3, 0))
+
+        # Update UI state
+        self._update_tracking_ui_state()
+
+        # Update status
+        self.tracking_status_var.set(
+            f"Batch {batch_idx + 1}/{num_batches} complete - Review and continue"
+        )
+        self.status_var.set(
+            f"Processed {total_frames} frames. "
+            f"Low confidence: {low_conf_count}. "
+            f"Review results and click Continue or Stop."
+        )
+
+    def _hide_batch_pause_frame(self):
+        """Hide the batch pause control frame."""
+        self.batch_pause_frame.pack_forget()
+
+    def _on_continue_batch(self):
+        """Continue to the next batch after pause."""
+        self._hide_batch_pause_frame()
+        self.tracking_state.resume_from_pause()
+        self.tracking_state.set_processing(True)
+        self._update_tracking_ui_state()
+
+        # Signal worker thread to continue
+        self._batch_continue_event.set()
+
+    def _on_stop_at_batch(self):
+        """Stop processing at the current batch."""
+        self._hide_batch_pause_frame()
+        self.tracking_state.resume_from_pause()
+        self.tracking_state.request_stop()
+
+        # Signal worker thread to exit
+        self._batch_continue_event.set()
+
+    def _on_tracking_stopped(self, results: Dict):
+        """Called when tracking is stopped by user."""
+        self.tracking_state.set_tracking_results(results)
+        self.tracking_state.set_processing(False)
+        self.progress_bar.pack_forget()
+        self.progress_var.set(0)
+
+        total_frames = len(results)
+        low_conf_count = len(self.tracking_state.low_confidence_frames)
+
+        self.tracking_status_var.set(
+            f"Tracking: Stopped ({total_frames} frames processed)"
+        )
+
+        self._update_tracking_ui_state()
+        self._update_image_listbox()
+        self._update_display()
+
+        # Show exclusion frame for review
+        if total_frames > 0:
+            self.exclusion_frame.pack(fill=tk.X, pady=(3, 0))
+
+        messagebox.showinfo(
+            "Tracking Stopped",
+            f"Tracking stopped by user.\n\n"
+            f"Frames processed: {total_frames}\n"
+            f"Low confidence: {low_conf_count}\n\n"
+            f"You can review and apply the results obtained so far."
+        )
+
+        self.status_var.set(
+            f"Tracking stopped. {total_frames} frames processed. "
+            f"Click 'Apply All' to save results."
+        )
+
     def _update_image_listbox(self):
         """Update image list display with tracking status and exclusion checkboxes."""
         self.image_listbox.delete(0, tk.END)
@@ -1815,7 +2099,8 @@ class SAM2AnnotationApp:
             if path in self.annotated_images:
                 prefix = "[✓]"
                 color = "black"
-            elif self.tracking_state.is_tracking_initialized:
+            elif i in self.tracking_state.tracking_results:
+                # Only show tracking status for frames that have actual results
                 is_excluded = self.tracking_state.is_frame_excluded(i)
                 is_low_conf = i in self.tracking_state.low_confidence_frames
 
