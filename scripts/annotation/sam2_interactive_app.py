@@ -508,6 +508,7 @@ class SAM2AnnotationApp:
         self.current_image_path: Optional[Path] = None
         self.image_list: List[Path] = []
         self.current_index: int = 0
+        self.points_frame_index: Optional[int] = None  # Frame where points were added
         self.annotated_images: set = set()
 
         # Tracking mode state
@@ -913,6 +914,7 @@ class SAM2AnnotationApp:
 
         # Reset annotation state
         self.state.reset()
+        self.points_frame_index = None
         self.predictor.reset_mask_state()
 
         # Set image in predictor
@@ -985,18 +987,20 @@ class SAM2AnnotationApp:
                 box_color = tuple(mask_color)
                 cv2.rectangle(display, (x1, y1), (x2, y2), box_color, 2)
 
-        # Draw foreground points (green with plus)
-        for x, y in self.state.foreground_points:
-            cv2.circle(display, (x, y), 8, (0, 255, 0), -1)
-            cv2.circle(display, (x, y), 8, (255, 255, 255), 2)
-            cv2.line(display, (x - 5, y), (x + 5, y), (255, 255, 255), 2)
-            cv2.line(display, (x, y - 5), (x, y + 5), (255, 255, 255), 2)
+        # Draw points only on the frame where they were added
+        if self.points_frame_index is None or self.current_index == self.points_frame_index:
+            # Draw foreground points (green with plus)
+            for x, y in self.state.foreground_points:
+                cv2.circle(display, (x, y), 5, (0, 255, 0), -1)
+                cv2.circle(display, (x, y), 5, (255, 255, 255), 2)
+                cv2.line(display, (x - 3, y), (x + 3, y), (255, 255, 255), 2)
+                cv2.line(display, (x, y - 3), (x, y + 3), (255, 255, 255), 2)
 
-        # Draw background points (red with minus)
-        for x, y in self.state.background_points:
-            cv2.circle(display, (x, y), 8, (255, 0, 0), -1)
-            cv2.circle(display, (x, y), 8, (255, 255, 255), 2)
-            cv2.line(display, (x - 5, y), (x + 5, y), (255, 255, 255), 2)
+            # Draw background points (red with minus)
+            for x, y in self.state.background_points:
+                cv2.circle(display, (x, y), 5, (255, 0, 0), -1)
+                cv2.circle(display, (x, y), 5, (255, 255, 255), 2)
+                cv2.line(display, (x - 3, y), (x + 3, y), (255, 255, 255), 2)
 
         # Draw saved annotation bounding box (orange) if no active annotation
         if (
@@ -1067,6 +1071,10 @@ class SAM2AnnotationApp:
         if coords is None:
             return
 
+        # Record frame where points were first added
+        if self.points_frame_index is None:
+            self.points_frame_index = self.current_index
+
         self.state.add_foreground_point(*coords)
         self._run_segmentation()
 
@@ -1075,6 +1083,10 @@ class SAM2AnnotationApp:
         coords = self._canvas_to_image_coords(event.x, event.y)
         if coords is None:
             return
+
+        # Record frame where points were first added
+        if self.points_frame_index is None:
+            self.points_frame_index = self.current_index
 
         self.state.add_background_point(*coords)
         self._run_segmentation()
@@ -1178,6 +1190,7 @@ class SAM2AnnotationApp:
     def _on_reset(self):
         """Handle reset action."""
         self.state.reset()
+        self.points_frame_index = None
         if self.predictor:
             self.predictor.reset_mask_state()
         self._update_display()
