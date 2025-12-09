@@ -3,40 +3,22 @@
   "categories": [
     {
       "id": 0,
-      "name": "kitchen_item",
-      "display_name": "Kitchen Item"
-    },
-    {
-      "id": 1,
-      "name": "task_item",
-      "display_name": "Task Item"
-    },
-    {
-      "id": 2,
-      "name": "drink",
-      "display_name": "Drink"
+      "name": "food",
+      "display_name": "Food"
     }
   ],
   "objects": [
     {
       "class_id": 0,
-      "class_name": "bottle01",
-      "category_id": 2,
+      "class_name": "speaker",
+      "category_id": 0,
       "object_type": "consistent",
       "target_samples": 100,
-      "collected_samples": 150
+      "collected_samples": 200
     },
     {
       "class_id": 1,
-      "class_name": "bottle02",
-      "category_id": 1,
-      "object_type": "consistent",
-      "target_samples": 100,
-      "collected_samples": 100
-    },
-    {
-      "class_id": 2,
-      "class_name": "postbox",
+      "class_name": "banana",
       "category_id": 0,
       "object_type": "consistent",
       "target_samples": 100,

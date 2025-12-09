@@ -307,7 +307,7 @@ def render_dataset_preparation_panel(
 
     # Generate button
     if st.button(
-        "🚀 Generate Dataset",
+        "Generate Dataset",
         type="primary",
         use_container_width=True,
         disabled=len(selected_classes) == 0

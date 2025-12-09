@@ -44,7 +44,7 @@ def show_annotation_page():
     # Inject Mission Control styles
     inject_training_styles()
 
-    st.title("SAM2 Interactive Annotation")
+    st.title("🎯 SAM2 Interactive Annotation")
 
     # Get services from session state (profile-aware)
     if "task_manager" not in st.session_state or "path_coordinator" not in st.session_state:
@@ -265,12 +265,11 @@ For large image sequences, the application automatically manages GPU memory:
 
 def _render_prepare_dataset(path_coordinator: PathCoordinator):
     """Render dataset preparation section with class status."""
-    text_primary = COLORS["text_primary"]
-    st.html(f"""
+    st.html("""
     <div style="
         font-family: 'JetBrains Mono', monospace;
         font-size: 0.9rem;
-        color: {text_primary};
+        color: inherit;
         margin-bottom: 16px;
     ">
         Create training-ready datasets from your annotated data
@@ -282,11 +281,11 @@ def _render_prepare_dataset(path_coordinator: PathCoordinator):
     classes = preparer.get_available_classes()
 
     # Class status section
-    st.html(f"""
+    st.html("""
     <div style="
         font-family: 'JetBrains Mono', monospace;
         font-size: 0.9rem;
-        color: {text_primary};
+        color: inherit;
         margin-bottom: 12px;
         display: flex;
         align-items: center;

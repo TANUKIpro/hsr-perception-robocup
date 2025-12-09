@@ -23,7 +23,7 @@ def show_dashboard_page():
     # Render common sidebar
     render_common_sidebar()
 
-    st.title("Dashboard")
+    st.title("📊 Dashboard")
 
     # Profile Management Section
     render_profile_management(
