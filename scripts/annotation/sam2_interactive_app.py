@@ -1988,18 +1988,26 @@ class SAM2AnnotationApp:
         if not self.tracking_state.is_processing:
             return
 
+        # Pause processing BEFORE showing dialog
+        self.tracking_state.request_stop()
+        self.status_var.set("Paused - waiting for confirmation...")
+
         result = messagebox.askyesno(
             "Stop Tracking",
-            "Processing will stop after the current frame.\n"
+            "Processing is paused.\n"
             "Results obtained so far will be preserved.\n\n"
             "Do you want to stop?",
             icon="warning"
         )
 
         if result:
-            self.tracking_state.request_stop()
-            self.status_var.set("Stopping... (waiting for current frame)")
+            # User confirmed stop
+            self.status_var.set("Stopping...")
             self.stop_tracking_btn.config(state=tk.DISABLED)
+        else:
+            # User cancelled - resume processing
+            self.tracking_state.clear_stop_request()
+            self.status_var.set("Resumed tracking...")
 
     def _show_batch_pause_dialog(
         self, batch_idx: int, num_batches: int, batch_results: Dict
