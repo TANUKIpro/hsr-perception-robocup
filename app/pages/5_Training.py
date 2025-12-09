@@ -67,26 +67,7 @@ def show_training_page():
     # Inject custom CSS
     inject_training_styles()
 
-    # Page header with Mission Control styling
-    st.html(f"""
-    <div class="mc-page-header mc-animate-fade">
-        <div style="display: flex; align-items: center; gap: 12px;">
-            <span style="font-size: 1.5rem;">{ICONS["model"]}</span>
-            <h1 style="
-                margin: 0;
-                font-family: 'JetBrains Mono', monospace;
-                font-size: 1.75rem;
-                font-weight: 600;
-            ">Model Training</h1>
-        </div>
-        <div style="
-            font-family: 'Inter', sans-serif;
-            font-size: 0.85rem;
-            margin-top: 4px;
-            opacity: 0.7;
-        ">Competition-optimized YOLOv8 fine-tuning with GPU auto-scaling</div>
-    </div>
-    """)
+    st.title("🚀 Model Training")
 
     # Get services from session state (profile-aware)
     if "task_manager" not in st.session_state or "path_coordinator" not in st.session_state:
@@ -653,7 +634,7 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
     # Start button
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if st.button("🚀 Start Training", type="primary", use_container_width=True):
+        if st.button("Start Training", type="primary", use_container_width=True):
             task_id = task_manager.start_training(
                 dataset_yaml=str(data_yaml),
                 base_model=base_model,
@@ -838,35 +819,68 @@ def _render_trained_models(path_coordinator: PathCoordinator):
                     except Exception:
                         pass
 
-            # Model paths
+            # Model paths with download buttons
             if model["best_path"]:
-                st.html(f"""
-                <div style="
-                    border-radius: 6px;
-                    padding: 8px 12px;
-                    margin-bottom: 8px;
-                    font-family: 'JetBrains Mono', monospace;
-                    font-size: 0.75rem;
-                ">
-                    <span style="color: {COLORS["success"]};">●</span>
-                    <span style="opacity: 0.5;">Best:</span>
-                    <span style="opacity: 0.7;">{model['best_path']}</span>
-                </div>
-                """)
+                col_best_path, col_best_dl = st.columns([5, 1])
+                with col_best_path:
+                    st.html(f"""
+                    <div style="
+                        border-radius: 6px;
+                        padding: 8px 12px;
+                        font-family: 'JetBrains Mono', monospace;
+                        font-size: 0.75rem;
+                    ">
+                        <span style="color: {COLORS["success"]};">●</span>
+                        <span style="opacity: 0.5;">Best:</span>
+                        <span style="opacity: 0.7;">{model['best_path']}</span>
+                    </div>
+                    """)
+                with col_best_dl:
+                    best_path = Path(model["best_path"])
+                    if best_path.exists():
+                        from datetime import datetime
+                        profile_name = st.session_state.profile_manager.get_active_profile().display_name
+                        download_time = datetime.now().strftime("%Y%m%d-%H%M%S")
+                        with open(best_path, "rb") as f:
+                            st.download_button(
+                                label="⬇",
+                                data=f.read(),
+                                file_name=f"{profile_name}_{model['name']}_{download_time}_best.pt",
+                                mime="application/octet-stream",
+                                key=f"dl_best_{model['name']}",
+                                use_container_width=True
+                            )
 
             if model["last_path"]:
-                st.html(f"""
-                <div style="
-                    border-radius: 6px;
-                    padding: 8px 12px;
-                    font-family: 'JetBrains Mono', monospace;
-                    font-size: 0.75rem;
-                ">
-                    <span style="opacity: 0.5;">○</span>
-                    <span style="opacity: 0.5;">Last:</span>
-                    <span style="opacity: 0.7;">{model['last_path']}</span>
-                </div>
-                """)
+                col_last_path, col_last_dl = st.columns([5, 1])
+                with col_last_path:
+                    st.html(f"""
+                    <div style="
+                        border-radius: 6px;
+                        padding: 8px 12px;
+                        font-family: 'JetBrains Mono', monospace;
+                        font-size: 0.75rem;
+                    ">
+                        <span style="opacity: 0.5;">○</span>
+                        <span style="opacity: 0.5;">Last:</span>
+                        <span style="opacity: 0.7;">{model['last_path']}</span>
+                    </div>
+                    """)
+                with col_last_dl:
+                    last_path = Path(model["last_path"])
+                    if last_path.exists():
+                        from datetime import datetime
+                        profile_name = st.session_state.profile_manager.get_active_profile().display_name
+                        download_time = datetime.now().strftime("%Y%m%d-%H%M%S")
+                        with open(last_path, "rb") as f:
+                            st.download_button(
+                                label="⬇",
+                                data=f.read(),
+                                file_name=f"{profile_name}_{model['name']}_{download_time}_last.pt",
+                                mime="application/octet-stream",
+                                key=f"dl_last_{model['name']}",
+                                use_container_width=True
+                            )
 
             # Action button
             st.markdown("<div style='height: 12px'></div>", unsafe_allow_html=True)

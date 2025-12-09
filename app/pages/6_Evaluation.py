@@ -41,7 +41,7 @@ def show_evaluation_page():
     from components.common_sidebar import render_common_sidebar
     render_common_sidebar()
 
-    st.title("Model Evaluation")
+    st.title("📈 Model Evaluation")
 
     # Get services from session state (profile-aware)
     if "task_manager" not in st.session_state or "path_coordinator" not in st.session_state:
@@ -484,16 +484,28 @@ def _render_robustness_test(path_coordinator: PathCoordinator):
 
     st.markdown("---")
 
-    # Row 2: Image selection (full width)
+    # Row 2: Image Source and Test Mode (2 columns)
+    col_source, col_mode = st.columns(2)
+
+    with col_source:
+        image_source = st.radio(
+            "Image Source",
+            ["Select from Dataset", "Upload Image"],
+            horizontal=True,
+            key="robustness_image_source"
+        )
+
+    with col_mode:
+        test_mode = st.radio(
+            "Test Mode",
+            ["Real-time Preview", "Batch Test", "Similar Object Test"],
+            horizontal=True,
+            key="robustness_mode"
+        )
+
+    # Image selection based on source
     test_image = None
     test_image_path = None
-
-    image_source = st.radio(
-        "Image Source",
-        ["Select from Dataset", "Upload Image"],
-        horizontal=True,
-        key="robustness_image_source"
-    )
 
     if image_source == "Upload Image":
         uploaded = st.file_uploader(
@@ -539,14 +551,6 @@ def _render_robustness_test(path_coordinator: PathCoordinator):
         return
 
     st.markdown("---")
-
-    # Test mode selection
-    test_mode = st.radio(
-        "Test Mode",
-        ["Real-time Preview", "Batch Test", "Similar Object Test"],
-        horizontal=True,
-        key="robustness_mode"
-    )
 
     if test_mode == "Real-time Preview":
         render_realtime_preview(model, test_image, conf_threshold)
