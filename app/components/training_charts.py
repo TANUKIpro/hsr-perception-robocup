@@ -359,7 +359,7 @@ def render_loss_breakdown_chart(
 
 def _render_empty_chart_placeholder():
     """Render placeholder when no training data is available."""
-    st.markdown("""
+    st.html("""
     <div style="
         display: flex;
         flex-direction: column;
@@ -387,4 +387,4 @@ def _render_empty_chart_placeholder():
             margin-top: 4px;
         ">Chart will update as epochs complete</div>
     </div>
-    """, unsafe_allow_html=True)
+    """)

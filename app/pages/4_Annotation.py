@@ -266,7 +266,7 @@ For large image sequences, the application automatically manages GPU memory:
 def _render_prepare_dataset(path_coordinator: PathCoordinator):
     """Render dataset preparation section with class status."""
     text_primary = COLORS["text_primary"]
-    st.markdown(f"""
+    st.html(f"""
     <div style="
         font-family: 'JetBrains Mono', monospace;
         font-size: 0.9rem;
@@ -275,14 +275,14 @@ def _render_prepare_dataset(path_coordinator: PathCoordinator):
     ">
         Create training-ready datasets from your annotated data
     </div>
-    """, unsafe_allow_html=True)
+    """)
 
     # Get dataset preparer
     preparer = DatasetPreparer(path_coordinator)
     classes = preparer.get_available_classes()
 
     # Class status section
-    st.markdown(f"""
+    st.html(f"""
     <div style="
         font-family: 'JetBrains Mono', monospace;
         font-size: 0.9rem;
@@ -295,7 +295,7 @@ def _render_prepare_dataset(path_coordinator: PathCoordinator):
         <span>📊</span>
         <span>Class Status</span>
     </div>
-    """, unsafe_allow_html=True)
+    """)
 
     render_class_status_grid(classes, columns=2)
 

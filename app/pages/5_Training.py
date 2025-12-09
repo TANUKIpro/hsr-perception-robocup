@@ -68,7 +68,7 @@ def show_training_page():
     inject_training_styles()
 
     # Page header with Mission Control styling
-    st.markdown(f"""
+    st.html(f"""
     <div class="mc-page-header mc-animate-fade">
         <div style="display: flex; align-items: center; gap: 12px;">
             <span style="font-size: 1.5rem;">{ICONS["model"]}</span>
@@ -86,7 +86,7 @@ def show_training_page():
             opacity: 0.7;
         ">Competition-optimized YOLOv8 fine-tuning with GPU auto-scaling</div>
     </div>
-    """, unsafe_allow_html=True)
+    """)
 
     # Get services from session state (profile-aware)
     if "task_manager" not in st.session_state or "path_coordinator" not in st.session_state:
@@ -150,7 +150,7 @@ def _render_active_training_view(active_task, task_manager: TaskManager, path_co
 
     with col1:
         # Training progress chart
-        st.markdown(f"""
+        st.html(f"""
         <div style="
             border-radius: 12px;
             padding: 16px;
@@ -161,12 +161,12 @@ def _render_active_training_view(active_task, task_manager: TaskManager, path_co
                 opacity: 0.7;
                 margin-bottom: 12px;
             ">{ICONS["accuracy"]} Training Progress</div>
-        """, unsafe_allow_html=True)
+        """)
 
         training_history = task.extra_data.get("training_history", []) if task.extra_data else []
         render_training_chart(training_history, target_map50=0.85, height=320)
 
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.html("</div>")
 
     with col2:
         # GPU and config info
@@ -195,7 +195,7 @@ def _render_active_training_view(active_task, task_manager: TaskManager, path_co
             # Config summary
             config = task.extra_data.get("config", {})
             if config:
-                st.markdown(f"""
+                st.html(f"""
                 <div style="
                     border-radius: 12px;
                     padding: 16px;
@@ -228,7 +228,7 @@ def _render_active_training_view(active_task, task_manager: TaskManager, path_co
                         </div>
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
+                """)
 
     st.markdown("<div style='height: 24px'></div>", unsafe_allow_html=True)
 
@@ -277,7 +277,7 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
     """Render training configuration with Mission Control aesthetic."""
 
     # Dataset selection section
-    st.markdown(f"""
+    st.html(f"""
     <div style="
         font-family: 'JetBrains Mono', monospace;
         font-size: 0.9rem;
@@ -289,13 +289,13 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
         <span>{ICONS["dataset"]}</span>
         <span>Dataset Selection</span>
     </div>
-    """, unsafe_allow_html=True)
+    """)
 
     sessions = path_coordinator.get_annotation_sessions()
     ready_sessions = [s for s in sessions if s["has_data_yaml"]]
 
     if not ready_sessions:
-        st.markdown(f"""
+        st.html(f"""
         <div class="mc-validation warning mc-animate-fade">
             <span class="icon">⚠</span>
             <div>
@@ -305,7 +305,7 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
                 </span>
             </div>
         </div>
-        """, unsafe_allow_html=True)
+        """)
         return
 
     # Check for pre-selected dataset
@@ -347,7 +347,7 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
             val_count = len(list(val_dir.glob("*"))) if val_dir.exists() else 0
 
             # Dataset info card
-            st.markdown(f"""
+            st.html(f"""
             <div style="
                 border-radius: 12px;
                 padding: 16px;
@@ -392,14 +392,14 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
                     </div>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+            """)
 
             # Class names expander
             with st.expander("View Classes", expanded=False):
                 cols = st.columns(3)
                 for i, name in enumerate(class_names):
                     with cols[i % 3]:
-                        st.markdown(f"""
+                        st.html(f"""
                         <div style="
                             border-radius: 4px;
                             padding: 4px 8px;
@@ -410,7 +410,7 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
                         ">
                             <span style="opacity: 0.5;">{i}:</span> {name}
                         </div>
-                        """, unsafe_allow_html=True)
+                        """)
 
         except Exception as e:
             st.error(f"Error reading dataset config: {e}")
@@ -419,7 +419,7 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
     st.markdown("<div style='height: 24px'></div>", unsafe_allow_html=True)
 
     # Hardware detection section
-    st.markdown(f"""
+    st.html(f"""
     <div style="
         font-family: 'JetBrains Mono', monospace;
         font-size: 0.9rem;
@@ -431,7 +431,7 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
         <span>⚡</span>
         <span>Hardware & GPU Scaling</span>
     </div>
-    """, unsafe_allow_html=True)
+    """)
 
     gpu_available = False
     gpu_name = ""
@@ -498,7 +498,7 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
     st.markdown("<div style='height: 24px'></div>", unsafe_allow_html=True)
 
     # Model configuration section
-    st.markdown(f"""
+    st.html(f"""
     <div style="
         font-family: 'JetBrains Mono', monospace;
         font-size: 0.9rem;
@@ -510,7 +510,7 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
         <span>{ICONS["model"]}</span>
         <span>Model Configuration</span>
     </div>
-    """, unsafe_allow_html=True)
+    """)
 
     col1, col2 = st.columns(2)
 
@@ -563,7 +563,7 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
     st.markdown("<div style='height: 24px'></div>", unsafe_allow_html=True)
 
     # Monitoring section
-    st.markdown(f"""
+    st.html(f"""
     <div style="
         font-family: 'JetBrains Mono', monospace;
         font-size: 0.9rem;
@@ -575,7 +575,7 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
         <span>{ICONS["tensorboard"]}</span>
         <span>Monitoring</span>
     </div>
-    """, unsafe_allow_html=True)
+    """)
 
     enable_tensorboard = st.checkbox(
         "Enable TensorBoard",
@@ -666,7 +666,7 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
                 tensorboard_port=tensorboard_port,
             )
 
-            st.markdown(f"""
+            st.html(f"""
             <div class="mc-validation success mc-animate-fade" style="margin-top: 16px;">
                 <span class="icon">✓</span>
                 <div>
@@ -676,7 +676,7 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
                     </span>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+            """)
 
             if enable_tensorboard:
                 st.info(f"TensorBoard will be available at http://localhost:{tensorboard_port}")
@@ -688,7 +688,7 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
 
 def _render_trained_models(path_coordinator: PathCoordinator):
     """Render list of trained models with Mission Control aesthetic."""
-    st.markdown(f"""
+    st.html(f"""
     <div style="
         font-family: 'JetBrains Mono', monospace;
         font-size: 0.9rem;
@@ -700,12 +700,12 @@ def _render_trained_models(path_coordinator: PathCoordinator):
         <span>{ICONS["model"]}</span>
         <span>Trained Models</span>
     </div>
-    """, unsafe_allow_html=True)
+    """)
 
     models = path_coordinator.get_trained_models()
 
     if not models:
-        st.markdown(f"""
+        st.html(f"""
         <div style="
             border: 1px dashed currentColor;
             border-radius: 12px;
@@ -729,13 +729,13 @@ def _render_trained_models(path_coordinator: PathCoordinator):
                 margin-top: 4px;
             ">Run training to create one</div>
         </div>
-        """, unsafe_allow_html=True)
+        """)
         return
 
     for model in models:
         with st.expander(f"📦 {model['name']}", expanded=False):
             # Model info header
-            st.markdown(f"""
+            st.html(f"""
             <div style="
                 display: flex;
                 justify-content: space-between;
@@ -748,7 +748,7 @@ def _render_trained_models(path_coordinator: PathCoordinator):
                     opacity: 0.5;
                 ">Created: {model['created'][:19]}</div>
             </div>
-            """, unsafe_allow_html=True)
+            """)
 
             # Check for training result
             model_dir = Path(model["best_path"]).parent.parent if model["best_path"] else None
@@ -771,7 +771,7 @@ def _render_trained_models(path_coordinator: PathCoordinator):
                         badge_color = COLORS["success"] if target_achieved else COLORS["warning"]
                         badge_text = "TARGET MET" if target_achieved else "BELOW TARGET"
 
-                        st.markdown(f"""
+                        st.html(f"""
                         <div style="
                             border-radius: 8px;
                             padding: 16px;
@@ -833,14 +833,14 @@ def _render_trained_models(path_coordinator: PathCoordinator):
                                 </div>
                             </div>
                         </div>
-                        """, unsafe_allow_html=True)
+                        """)
 
                     except Exception:
                         pass
 
             # Model paths
             if model["best_path"]:
-                st.markdown(f"""
+                st.html(f"""
                 <div style="
                     border-radius: 6px;
                     padding: 8px 12px;
@@ -852,10 +852,10 @@ def _render_trained_models(path_coordinator: PathCoordinator):
                     <span style="opacity: 0.5;">Best:</span>
                     <span style="opacity: 0.7;">{model['best_path']}</span>
                 </div>
-                """, unsafe_allow_html=True)
+                """)
 
             if model["last_path"]:
-                st.markdown(f"""
+                st.html(f"""
                 <div style="
                     border-radius: 6px;
                     padding: 8px 12px;
@@ -866,7 +866,7 @@ def _render_trained_models(path_coordinator: PathCoordinator):
                     <span style="opacity: 0.5;">Last:</span>
                     <span style="opacity: 0.7;">{model['last_path']}</span>
                 </div>
-                """, unsafe_allow_html=True)
+                """)
 
             # Action button
             st.markdown("<div style='height: 12px'></div>", unsafe_allow_html=True)
@@ -877,7 +877,7 @@ def _render_trained_models(path_coordinator: PathCoordinator):
 
 def _render_training_history(task_manager: TaskManager):
     """Render training task history."""
-    st.markdown(f"""
+    st.html(f"""
     <div style="
         font-family: 'JetBrains Mono', monospace;
         font-size: 0.9rem;
@@ -889,7 +889,7 @@ def _render_training_history(task_manager: TaskManager):
         <span>📜</span>
         <span>Training History</span>
     </div>
-    """, unsafe_allow_html=True)
+    """)
 
     render_task_list(
         task_type="training",
