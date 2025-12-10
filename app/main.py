@@ -115,31 +115,5 @@ def main():
     st.caption("Target: mAP ≥ 85%, Inference ≤ 100ms")
 
 
-# Legacy exports for backward compatibility during transition
-# These can be removed once all references are updated
-def show_dashboard():
-    """Legacy: Redirect to dashboard page."""
-    from pages import show_dashboard_page
-    show_dashboard_page()
-
-
-def show_registry():
-    """Legacy: Redirect to registry page."""
-    from pages import show_registry_page
-    show_registry_page()
-
-
-def show_collection():
-    """Legacy: Redirect to collection page."""
-    from pages import show_collection_page
-    show_collection_page()
-
-
-def show_settings():
-    """Legacy: Redirect to settings page."""
-    from pages import show_settings_page
-    show_settings_page()
-
-
 if __name__ == "__main__":
     main()

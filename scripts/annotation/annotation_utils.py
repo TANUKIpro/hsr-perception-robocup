@@ -411,12 +411,27 @@ def update_collected_samples(
         json.dump(config, f, indent=2, ensure_ascii=False)
 
 
-def mask_to_bbox(mask) -> Optional[Tuple[int, int, int, int]]:
+def mask_to_bbox(
+    mask,
+    margin_ratio: float = 0.0,
+    image_shape: Optional[Tuple[int, int]] = None,
+    use_contour: bool = False,
+) -> Optional[Tuple[int, int, int, int]]:
     """
     Convert boolean mask to bounding box.
 
+    This is the unified implementation that consolidates functionality from:
+    - Basic NumPy-based detection (default)
+    - Contour-based detection for complex shapes (use_contour=True)
+    - Margin expansion for better coverage (margin_ratio > 0)
+
     Args:
-        mask: Boolean mask array (H, W)
+        mask: Boolean or binary mask array (H, W)
+        margin_ratio: Ratio to expand bbox by (e.g., 0.02 = 2% of bbox size).
+                      Requires image_shape to be set for proper clamping.
+        image_shape: (height, width) of image, required if margin_ratio > 0
+        use_contour: If True, use OpenCV contour detection (finds largest contour).
+                     Falls back to NumPy bounds if no contours found.
 
     Returns:
         Bounding box as (x_min, y_min, x_max, y_max) or None if empty mask
@@ -426,11 +441,60 @@ def mask_to_bbox(mask) -> Optional[Tuple[int, int, int, int]]:
     if not np.any(mask):
         return None
 
-    rows = np.any(mask, axis=1)
-    cols = np.any(mask, axis=0)
+    x_min, y_min, x_max, y_max = 0, 0, 0, 0
 
-    y_min, y_max = np.where(rows)[0][[0, -1]]
-    x_min, x_max = np.where(cols)[0][[0, -1]]
+    if use_contour:
+        import cv2
+
+        # Convert to uint8 for contour detection
+        mask_uint8 = mask.astype(np.uint8)
+        if mask_uint8.max() == 1:
+            mask_uint8 = mask_uint8 * 255
+
+        contours, _ = cv2.findContours(
+            mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+        )
+
+        if contours:
+            # Get bounding rect of largest contour
+            largest = max(contours, key=cv2.contourArea)
+            x, y, w, h = cv2.boundingRect(largest)
+            x_min, y_min = x, y
+            x_max, y_max = x + w, y + h
+        else:
+            # Fallback to NumPy bounds
+            use_contour = False
+
+    if not use_contour:
+        # NumPy-based detection (default or fallback)
+        rows = np.any(mask, axis=1)
+        cols = np.any(mask, axis=0)
+
+        if not np.any(rows) or not np.any(cols):
+            return None
+
+        y_min, y_max = np.where(rows)[0][[0, -1]]
+        x_min, x_max = np.where(cols)[0][[0, -1]]
+
+    # Apply margin if requested
+    if margin_ratio > 0:
+        bbox_w = x_max - x_min
+        bbox_h = y_max - y_min
+        margin_x = int(bbox_w * margin_ratio)
+        margin_y = int(bbox_h * margin_ratio)
+
+        x_min = x_min - margin_x
+        y_min = y_min - margin_y
+        x_max = x_max + margin_x
+        y_max = y_max + margin_y
+
+        # Clamp to image boundaries if shape provided
+        if image_shape is not None:
+            img_h, img_w = image_shape
+            x_min = max(0, x_min)
+            y_min = max(0, y_min)
+            x_max = min(img_w, x_max)
+            y_max = min(img_h, y_max)
 
     return (int(x_min), int(y_min), int(x_max), int(y_max))
 

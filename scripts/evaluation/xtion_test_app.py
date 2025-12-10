@@ -15,198 +15,81 @@ Usage:
 
 import argparse
 import sys
-import threading
 import time
 import tkinter as tk
 from pathlib import Path
 from tkinter import messagebox, ttk
-from typing import List, Optional
+from typing import Optional
 
 import cv2
 import numpy as np
 from PIL import Image, ImageTk
 
-# ROS2 imports
-import rclpy
-from rclpy.node import Node
-from rclpy.executors import SingleThreadedExecutor
-from sensor_msgs.msg import Image as RosImage
-
 # YOLO import
 from ultralytics import YOLO
 
+# Add gui_framework to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-def imgmsg_to_cv2(msg: RosImage) -> np.ndarray:
-    """Convert sensor_msgs/Image to OpenCV image without cv_bridge."""
-    if msg.encoding in ['16UC1']:
-        dtype = np.uint16
-    elif msg.encoding in ['32FC1']:
-        dtype = np.float32
-    else:
-        dtype = np.uint8
-
-    if msg.encoding in ['rgb8', 'bgr8']:
-        channels = 3
-    elif msg.encoding in ['rgba8', 'bgra8']:
-        channels = 4
-    elif msg.encoding in ['mono8', 'mono16', '16UC1', '32FC1']:
-        channels = 1
-    else:
-        channels = 3
-
-    if channels == 1:
-        img = np.frombuffer(msg.data, dtype=dtype).reshape(msg.height, msg.width)
-    else:
-        img = np.frombuffer(msg.data, dtype=dtype).reshape(msg.height, msg.width, channels)
-
-    if msg.encoding == 'rgb8':
-        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-    elif msg.encoding == 'rgba8':
-        img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
-    elif msg.encoding == 'bgra8':
-        img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
-    elif msg.encoding == 'mono8':
-        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-    elif msg.encoding == 'mono16':
-        img = (img / 256).astype(np.uint8)
-        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-    elif msg.encoding in ['16UC1', '32FC1']:
-        img = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
-        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-
-    return img
+from gui_framework import ROS2App, AppTheme
+from gui_framework.components import TopicSelector, StatusBar
 
 
-class ROS2ImageSubscriber(Node):
-    """ROS2 node for subscribing to image topics."""
-
-    def __init__(self):
-        super().__init__('xtion_test_app')
-        self.latest_frame: Optional[np.ndarray] = None
-        self.frame_lock = threading.Lock()
-        self.subscription = None
-        self.current_topic: Optional[str] = None
-
-    def subscribe_to_topic(self, topic: str):
-        """Subscribe to a new image topic."""
-        if self.subscription is not None:
-            self.destroy_subscription(self.subscription)
-            self.subscription = None
-
-        self.current_topic = topic
-        self.latest_frame = None
-
-        if topic:
-            self.subscription = self.create_subscription(
-                RosImage,
-                topic,
-                self._image_callback,
-                10
-            )
-            self.get_logger().info(f"Subscribed to {topic}")
-
-    def _image_callback(self, msg: RosImage):
-        """Handle incoming image message."""
-        try:
-            frame = imgmsg_to_cv2(msg)
-            with self.frame_lock:
-                self.latest_frame = frame
-        except Exception as e:
-            self.get_logger().error(f"Failed to convert image: {e}")
-
-    def get_frame(self) -> Optional[np.ndarray]:
-        """Get the latest frame (thread-safe)."""
-        with self.frame_lock:
-            if self.latest_frame is not None:
-                return self.latest_frame.copy()
-            return None
-
-    def get_image_topics(self) -> List[str]:
-        """Get list of available image topics."""
-        topics = self.get_topic_names_and_types()
-        image_topics = []
-        for name, types in topics:
-            for t in types:
-                if 'sensor_msgs/msg/Image' in t or 'sensor_msgs/Image' in t:
-                    image_topics.append(name)
-                    break
-        return sorted(image_topics)
-
-
-class XtionTestApp:
+class XtionTestApp(ROS2App):
     """Main Xtion test application with Tkinter GUI."""
 
-    def __init__(self, root: tk.Tk, model_path: str, conf_threshold: float = 0.25):
-        self.root = root
-        self.root.title("Xtion Live Test - YOLO Inference")
-        self.root.geometry("900x750")
-        self.root.resizable(True, True)
+    def __init__(
+        self,
+        root: tk.Tk,
+        model_path: str,
+        conf_threshold: float = 0.25,
+    ) -> None:
+        """
+        Initialize the Xtion test application.
 
+        Args:
+            root: Tkinter root window
+            model_path: Path to YOLO model file
+            conf_threshold: Initial confidence threshold
+        """
         self.model_path = model_path
         self.conf_threshold = conf_threshold
 
-        # ROS2 setup
-        self.ros_node: Optional[ROS2ImageSubscriber] = None
-        self.executor: Optional[SingleThreadedExecutor] = None
-        self.ros_thread: Optional[threading.Thread] = None
-        self.ros_running = False
-
-        # YOLO model
+        # YOLO model (loaded later)
         self.model: Optional[YOLO] = None
 
         # Preview state
         self.preview_active = False
-        self.preview_label: Optional[tk.Label] = None
 
         # FPS calculation
-        self.frame_times: List[float] = []
+        self.frame_times: list[float] = []
         self.fps = 0.0
 
         # Detection results
-        self.latest_detections: List[dict] = []
+        self.latest_detections: list[dict] = []
 
-        # Initialize ROS2
-        self._init_ros2()
-
-        # Load YOLO model
+        # Load YOLO model before building GUI
         self._load_model()
 
-        # Build GUI
-        self._build_gui()
+        # Initialize ROS2 app (this calls _build_gui)
+        super().__init__(
+            root,
+            title="Xtion Live Test - YOLO Inference",
+            node_name="xtion_test_app",
+            geometry="900x750",
+            min_size=(700, 550),
+        )
 
         # Start preview update loop
         self._start_preview_loop()
 
-        # Handle window close
-        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
-
-    def _init_ros2(self):
-        """Initialize ROS2 node and executor."""
-        try:
-            rclpy.init()
-            self.ros_node = ROS2ImageSubscriber()
-            self.executor = SingleThreadedExecutor()
-            self.executor.add_node(self.ros_node)
-
-            # Start ROS2 spinning in background thread
-            self.ros_running = True
-            self.ros_thread = threading.Thread(target=self._ros_spin_thread, daemon=True)
-            self.ros_thread.start()
-
-        except Exception as e:
-            messagebox.showerror("ROS2 Error", f"Failed to initialize ROS2: {e}")
-            sys.exit(1)
-
-    def _ros_spin_thread(self):
-        """Background thread for ROS2 spinning."""
-        while self.ros_running and rclpy.ok():
-            self.executor.spin_once(timeout_sec=0.01)
-
-    def _load_model(self):
+    def _load_model(self) -> None:
         """Load YOLO model."""
         try:
             if not Path(self.model_path).exists():
-                messagebox.showerror("Model Error", f"Model not found: {self.model_path}")
+                messagebox.showerror(
+                    "Model Error", f"Model not found: {self.model_path}"
+                )
                 sys.exit(1)
 
             self.model = YOLO(self.model_path)
@@ -216,7 +99,7 @@ class XtionTestApp:
             messagebox.showerror("Model Error", f"Failed to load model: {e}")
             sys.exit(1)
 
-    def _build_gui(self):
+    def _build_gui(self) -> None:
         """Build the GUI layout."""
         # Main container
         main_frame = ttk.Frame(self.root, padding="10")
@@ -229,34 +112,34 @@ class XtionTestApp:
         model_name = Path(self.model_path).name
         ttk.Label(model_frame, text=f"Model: {model_name}").pack(side=tk.LEFT)
 
-        # === Topic Selection ===
-        topic_frame = ttk.LabelFrame(main_frame, text="Topic Selection", padding="5")
+        # === Topic Selection (using component) ===
+        topic_frame = ttk.LabelFrame(
+            main_frame, text="Topic Selection", padding="5"
+        )
         topic_frame.pack(fill=tk.X, pady=(0, 10))
 
-        ttk.Label(topic_frame, text="Image Topic:").pack(side=tk.LEFT)
-
-        self.topic_var = tk.StringVar()
-        self.topic_combo = ttk.Combobox(
+        self.topic_selector = TopicSelector(
             topic_frame,
-            textvariable=self.topic_var,
-            state="readonly",
-            width=50
+            ros_node=self.ros_node,
+            on_change=self._on_topic_changed,
         )
-        self.topic_combo.pack(side=tk.LEFT, padx=(5, 5), fill=tk.X, expand=True)
-        self.topic_combo.bind("<<ComboboxSelected>>", self._on_topic_changed)
-
-        refresh_btn = ttk.Button(topic_frame, text="Refresh", command=self._refresh_topics)
-        refresh_btn.pack(side=tk.LEFT)
+        self.topic_selector.pack(fill=tk.X)
 
         # === Preview Area ===
-        preview_frame = ttk.LabelFrame(main_frame, text="Camera Preview + Detection", padding="5")
+        preview_frame = ttk.LabelFrame(
+            main_frame, text="Camera Preview + Detection", padding="5"
+        )
         preview_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
 
-        self.preview_label = ttk.Label(preview_frame, text="No image - Select a topic", anchor="center")
+        self.preview_label = ttk.Label(
+            preview_frame, text="No image - Select a topic", anchor="center"
+        )
         self.preview_label.pack(fill=tk.BOTH, expand=True)
 
         # === Confidence Threshold ===
-        conf_frame = ttk.LabelFrame(main_frame, text="Confidence Threshold", padding="5")
+        conf_frame = ttk.LabelFrame(
+            main_frame, text="Confidence Threshold", padding="5"
+        )
         conf_frame.pack(fill=tk.X, pady=(0, 10))
 
         self.conf_var = tk.DoubleVar(value=self.conf_threshold)
@@ -266,7 +149,7 @@ class XtionTestApp:
             to=1.0,
             variable=self.conf_var,
             orient=tk.HORIZONTAL,
-            command=self._on_conf_changed
+            command=self._on_conf_changed,
         )
         self.conf_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
 
@@ -274,7 +157,9 @@ class XtionTestApp:
         self.conf_label.pack(side=tk.LEFT)
 
         # === Detection Results ===
-        detection_frame = ttk.LabelFrame(main_frame, text="Detections", padding="5")
+        detection_frame = ttk.LabelFrame(
+            main_frame, text="Detections", padding="5"
+        )
         detection_frame.pack(fill=tk.X, pady=(0, 10))
 
         self.detection_text = tk.Text(detection_frame, height=5, state=tk.DISABLED)
@@ -290,54 +175,28 @@ class XtionTestApp:
         self.status_label = ttk.Label(status_frame, text="Status: Waiting for topic")
         self.status_label.pack(side=tk.RIGHT)
 
-        # Initial topic refresh (must be after status_label is created)
-        self._refresh_topics()
+        # Initial topic refresh
+        self.topic_selector.refresh_topics()
 
-    def _refresh_topics(self):
-        """Refresh the list of available topics."""
-        topics = self.ros_node.get_image_topics()
-
-        # Add common Xtion/RealSense topics if not in list
-        common_topics = [
-            "/camera/color/image_raw",
-            "/camera/rgb/image_raw",
-            "/hsrb/head_rgbd_sensor/rgb/image_rect_color",
-        ]
-
-        all_topics = list(set(topics + [t for t in common_topics if t not in topics]))
-        all_topics.sort()
-
-        self.topic_combo['values'] = all_topics
-
-        if all_topics and not self.topic_var.get():
-            # Auto-select first available topic
-            for topic in all_topics:
-                if topic in topics:  # Prioritize actually available topics
-                    self.topic_var.set(topic)
-                    self._on_topic_changed(None)
-                    break
-
-    def _on_topic_changed(self, event):
+    def _on_topic_changed(self, topic: str) -> None:
         """Handle topic selection change."""
-        topic = self.topic_var.get()
         if topic:
-            self.ros_node.subscribe_to_topic(topic)
             self.status_label.config(text=f"Status: Connected to {topic}")
             self.preview_active = True
 
-    def _on_conf_changed(self, value):
+    def _on_conf_changed(self, value: str) -> None:
         """Handle confidence threshold change."""
         self.conf_threshold = float(value)
         self.conf_label.config(text=f"{self.conf_threshold:.2f}")
 
-    def _start_preview_loop(self):
+    def _start_preview_loop(self) -> None:
         """Start the preview update loop."""
         self._update_preview()
 
-    def _update_preview(self):
+    def _update_preview(self) -> None:
         """Update the preview with latest frame and detection results."""
         if self.preview_active:
-            frame = self.ros_node.get_frame()
+            frame = self.get_frame()
 
             if frame is not None:
                 start_time = time.time()
@@ -355,10 +214,9 @@ class XtionTestApp:
                     class_id = int(box.cls.item())
                     class_name = self.model.names[class_id]
                     conf = box.conf.item()
-                    self.latest_detections.append({
-                        'class': class_name,
-                        'confidence': conf
-                    })
+                    self.latest_detections.append(
+                        {"class": class_name, "confidence": conf}
+                    )
 
                 # Update detection text
                 self._update_detection_text()
@@ -380,29 +238,24 @@ class XtionTestApp:
                 img = Image.fromarray(img)
                 photo = ImageTk.PhotoImage(img)
 
-                self.preview_label.configure(image=photo)
-                self.preview_label.image = photo
+                self.preview_label.configure(image=photo, text="")
+                self.preview_label.image = photo  # Keep reference
 
         # Schedule next update (~30 FPS)
         self.root.after(33, self._update_preview)
 
     def _resize_for_display(self, frame: np.ndarray) -> np.ndarray:
         """Resize frame to fit display area dynamically."""
-        # Get window size
-        window_width = self.root.winfo_width()
-        window_height = self.root.winfo_height()
+        # Get preview label size
+        label_width = self.preview_label.winfo_width()
+        label_height = self.preview_label.winfo_height()
 
-        # Reserved space for other UI components (padding included)
-        # model_frame + topic_frame + confidence + results + margins
-        reserved_height = 300
-        reserved_width = 40
-
-        # Calculate available size
-        max_width = max(window_width - reserved_width, 400)
-        max_height = max(window_height - reserved_height, 200)
+        # Skip if size is too small
+        if label_width <= 1 or label_height <= 1:
+            return frame
 
         h, w = frame.shape[:2]
-        scale = min(max_width / w, max_height / h)
+        scale = min(label_width / w, label_height / h)
 
         new_w = int(w * scale)
         new_h = int(h * scale)
@@ -412,7 +265,7 @@ class XtionTestApp:
 
         return frame
 
-    def _update_detection_text(self):
+    def _update_detection_text(self) -> None:
         """Update the detection results text."""
         self.detection_text.config(state=tk.NORMAL)
         self.detection_text.delete(1.0, tk.END)
@@ -426,34 +279,28 @@ class XtionTestApp:
 
         self.detection_text.config(state=tk.DISABLED)
 
-    def _on_close(self):
+    def _on_close(self) -> None:
         """Handle window close event."""
         self.preview_active = False
-        self.ros_running = False
-
-        if self.ros_thread:
-            self.ros_thread.join(timeout=1.0)
-
-        if self.ros_node:
-            self.ros_node.destroy_node()
-
-        try:
-            rclpy.shutdown()
-        except Exception:
-            pass
-
+        self._shutdown_ros2()
         self.root.destroy()
 
 
-def main():
+def main() -> None:
+    """Main entry point."""
     parser = argparse.ArgumentParser(description="Xtion Live Test - YOLO Inference")
     parser.add_argument("--model", required=True, help="Path to YOLO model (.pt)")
     parser.add_argument("--conf", type=float, default=0.25, help="Confidence threshold")
     args = parser.parse_args()
 
     root = tk.Tk()
+
+    # Apply theme
+    style = ttk.Style()
+    AppTheme.apply(style)
+
     app = XtionTestApp(root, args.model, args.conf)
-    root.mainloop()
+    app.run()
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ Provides UI for managing profiles (create, update, delete) in the dashboard.
 """
 
 import streamlit as st
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -13,8 +14,8 @@ if TYPE_CHECKING:
 
 def render_profile_management(
     profile_manager: "ProfileManager",
-    on_profile_deleted: callable = None
-):
+    on_profile_deleted: Callable[[], None] | None = None
+) -> None:
     """
     Render profile management section in dashboard.
 
@@ -72,7 +73,7 @@ def render_profile_management(
     _render_delete_confirm_dialog(profile_manager, on_profile_deleted)
 
 
-def _render_create_profile_dialog(profile_manager: "ProfileManager"):
+def _render_create_profile_dialog(profile_manager: "ProfileManager") -> None:
     """Render create profile dialog."""
     if not st.session_state.get("show_create_profile", False):
         return
@@ -102,8 +103,8 @@ def _render_create_profile_dialog(profile_manager: "ProfileManager"):
 
 def _render_delete_confirm_dialog(
     profile_manager: "ProfileManager",
-    on_profile_deleted: callable = None
-):
+    on_profile_deleted: Callable[[], None] | None = None
+) -> None:
     """Render delete confirmation dialog."""
     if not st.session_state.get("show_delete_confirm", False):
         return

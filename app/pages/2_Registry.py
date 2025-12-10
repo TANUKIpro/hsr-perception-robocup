@@ -4,9 +4,10 @@ Registry Page
 Provides UI for managing object definitions and registration.
 """
 
-import streamlit as st
-from pathlib import Path
 import sys
+from pathlib import Path
+
+import streamlit as st
 
 # Add app directory to path
 app_dir = Path(__file__).parent.parent
@@ -18,10 +19,11 @@ from components.object_editor import render_object_editor
 from components.object_viewer import render_object_viewer
 from components.object_form import render_add_object_form
 from components.ihr_import import render_ihr_import
+from object_registry import ObjectRegistry
 
 
-def show_registry_page():
-    """Registry page for managing objects."""
+def show_registry_page() -> None:
+    """Render the registry page for managing objects."""
     render_common_sidebar()
 
     st.title("📋 Object Registry")
@@ -39,7 +41,7 @@ def show_registry_page():
         render_ihr_import(registry)
 
 
-def _render_view_tab(registry):
+def _render_view_tab(registry: ObjectRegistry) -> None:
     """Render the View Objects tab."""
     objects = registry.get_all_objects()
 

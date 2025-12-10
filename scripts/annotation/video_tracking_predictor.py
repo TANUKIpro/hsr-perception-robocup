@@ -745,23 +745,5 @@ class VideoTrackingPredictor:
         self._cleanup_temp_dir()
 
 
-def mask_to_bbox(mask: np.ndarray) -> Optional[Tuple[int, int, int, int]]:
-    """
-    Convert boolean mask to bounding box.
-
-    Args:
-        mask: Boolean mask array (H, W)
-
-    Returns:
-        Bounding box as (x_min, y_min, x_max, y_max) or None if empty mask
-    """
-    if not np.any(mask):
-        return None
-
-    rows = np.any(mask, axis=1)
-    cols = np.any(mask, axis=0)
-
-    y_min, y_max = np.where(rows)[0][[0, -1]]
-    x_min, x_max = np.where(cols)[0][[0, -1]]
-
-    return (int(x_min), int(y_min), int(x_max), int(y_max))
+# Re-export from annotation_utils for backward compatibility
+from annotation_utils import mask_to_bbox

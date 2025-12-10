@@ -4,9 +4,10 @@ Collection Page
 Provides UI for data collection from multiple sources.
 """
 
-import streamlit as st
-from pathlib import Path
 import sys
+from pathlib import Path
+
+import streamlit as st
 
 # Add app directory to path
 app_dir = Path(__file__).parent.parent
@@ -17,10 +18,11 @@ from components.common_sidebar import render_common_sidebar
 from components.ros2_collection import render_ros2_collection
 from components.captured_images_tree import render_captured_images_tree
 from components.video_extractor import render_video_extractor
+from object_registry import ObjectRegistry, RegisteredObject
 
 
-def show_collection_page():
-    """Collection page for capturing/importing images."""
+def show_collection_page() -> None:
+    """Render the collection page for capturing/importing images."""
     render_common_sidebar()
 
     st.title("📸 Data Collection")
@@ -71,7 +73,7 @@ def show_collection_page():
         _render_folder_import_tab(registry, selected_id)
 
 
-def _render_object_selector(objects: list):
+def _render_object_selector(objects: list[RegisteredObject]) -> tuple[RegisteredObject | None, int]:
     """Render object selector and return selected object."""
     object_options = {
         f"{obj.id}. {obj.display_name} ({obj.collected_samples}/{obj.target_samples})": obj.id
@@ -93,7 +95,7 @@ def _render_object_selector(objects: list):
     return obj, selected_id
 
 
-def _render_collection_status(obj):
+def _render_collection_status(obj: RegisteredObject) -> None:
     """Render current collection status metrics."""
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -107,7 +109,7 @@ def _render_collection_status(obj):
     st.progress(min(pct / 100, 1.0))
 
 
-def _render_reference_images(registry, selected_id: int):
+def _render_reference_images(registry: ObjectRegistry, selected_id: int) -> None:
     """Render reference images section."""
     ref_images = registry.get_reference_images(selected_id)
     if ref_images:
@@ -118,7 +120,7 @@ def _render_reference_images(registry, selected_id: int):
                 st.image(img_path, width=150)
 
 
-def _render_local_camera_tab(registry, selected_id: int):
+def _render_local_camera_tab(registry: ObjectRegistry, selected_id: int) -> None:
     """Render local camera capture tab."""
     st.subheader("Camera Capture")
     st.write("Use your device camera to capture images.")
@@ -152,7 +154,7 @@ def _render_local_camera_tab(registry, selected_id: int):
                 st.write(f"Total collected: {new_count}")
 
 
-def _render_file_upload_tab(registry, selected_id: int):
+def _render_file_upload_tab(registry: ObjectRegistry, selected_id: int) -> None:
     """Render file upload tab."""
     st.subheader("File Upload")
     st.write("Upload one or more images.")
@@ -182,7 +184,7 @@ def _render_file_upload_tab(registry, selected_id: int):
         st.rerun()
 
 
-def _render_folder_import_tab(registry, selected_id: int):
+def _render_folder_import_tab(registry: ObjectRegistry, selected_id: int) -> None:
     """Render folder import tab."""
     st.subheader("Folder Import")
     st.write("Import all images from a folder path.")

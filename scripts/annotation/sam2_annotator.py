@@ -15,7 +15,9 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 
-from annotation_utils import AnnotationResult, bbox_to_yolo, write_yolo_label
+from annotation_utils import AnnotationResult, bbox_to_yolo, mask_to_bbox, write_yolo_label
+from base_annotator import BaseAnnotator
+from visualization import draw_mask_overlay, visualize_annotation_result
 
 # Add scripts directory to path for common module imports
 _scripts_dir = Path(__file__).parent.parent
@@ -33,7 +35,7 @@ from common.constants import (
 from common.config_utils import get_sam2_model_config
 
 
-class SAM2Annotator:
+class SAM2Annotator(BaseAnnotator):
     """
     Auto-annotation using Segment Anything 2.
 
@@ -154,56 +156,6 @@ class SAM2Annotator:
 
         return valid_masks[0]
 
-    def _mask_to_bbox(
-        self,
-        mask: np.ndarray,
-        image_shape: Tuple[int, int],
-    ) -> Tuple[int, int, int, int]:
-        """
-        Convert binary mask to bounding box.
-
-        Args:
-            mask: Binary mask array
-            image_shape: (height, width) of image
-
-        Returns:
-            Tuple (x_min, y_min, x_max, y_max)
-        """
-        # Find contours
-        contours, _ = cv2.findContours(
-            mask.astype(np.uint8),
-            cv2.RETR_EXTERNAL,
-            cv2.CHAIN_APPROX_SIMPLE,
-        )
-
-        if not contours:
-            # Fallback: use mask bounds directly
-            rows = np.any(mask, axis=1)
-            cols = np.any(mask, axis=0)
-            if not np.any(rows) or not np.any(cols):
-                return (0, 0, 0, 0)
-
-            y_min, y_max = np.where(rows)[0][[0, -1]]
-            x_min, x_max = np.where(cols)[0][[0, -1]]
-        else:
-            # Get bounding rect of largest contour
-            largest = max(contours, key=cv2.contourArea)
-            x, y, w, h = cv2.boundingRect(largest)
-            x_min, y_min = x, y
-            x_max, y_max = x + w, y + h
-
-        # Add margin
-        h, w = image_shape
-        margin_x = int((x_max - x_min) * self.bbox_margin_ratio)
-        margin_y = int((y_max - y_min) * self.bbox_margin_ratio)
-
-        x_min = max(0, x_min - margin_x)
-        y_min = max(0, y_min - margin_y)
-        x_max = min(w, x_max + margin_x)
-        y_max = min(h, y_max + margin_y)
-
-        return (x_min, y_min, x_max, y_max)
-
     def annotate_image(
         self,
         image_path: str,
@@ -246,9 +198,17 @@ class SAM2Annotator:
 
         # Convert mask to bbox
         mask_array = best_mask["segmentation"]
-        x_min, y_min, x_max, y_max = self._mask_to_bbox(mask_array, (img_h, img_w))
+        bbox = mask_to_bbox(
+            mask_array,
+            margin_ratio=self.bbox_margin_ratio,
+            image_shape=(img_h, img_w),
+            use_contour=True,
+        )
 
         # Skip if bbox is invalid
+        if bbox is None:
+            return None
+        x_min, y_min, x_max, y_max = bbox
         if x_max <= x_min or y_max <= y_min:
             return None
 
@@ -329,17 +289,21 @@ class SAM2Annotator:
         image_path: str,
         output_path: Optional[str] = None,
         show: bool = True,
+        window_title: str = "SAM2 Annotation",
     ) -> np.ndarray:
         """
         Visualize SAM2 annotation with mask overlay.
+
+        Overrides base class to include mask overlay visualization.
 
         Args:
             image_path: Path to input image
             output_path: Optional path to save visualization
             show: If True, display in window
+            window_title: Window title for display
 
         Returns:
-            Annotated image
+            Annotated image with mask overlay
         """
         self._load_model()
 
@@ -351,49 +315,21 @@ class SAM2Annotator:
 
         if annotation is not None:
             bbox, mask = annotation
-            img_h, img_w = image.shape[:2]
-
-            # Draw mask overlay
-            mask_overlay = np.zeros_like(image)
-            mask_overlay[mask] = [0, 255, 0]  # Green overlay
-            image = cv2.addWeighted(image, 1, mask_overlay, 0.3, 0)
-
-            # Draw bounding box
-            from annotation_utils import yolo_to_bbox
-            x_min, y_min, x_max, y_max = yolo_to_bbox(*bbox, img_w, img_h)
-            cv2.rectangle(image, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
-
-            # Add label
-            label = f"YOLO: ({bbox[0]:.3f}, {bbox[1]:.3f}, {bbox[2]:.3f}, {bbox[3]:.3f})"
-            cv2.putText(
-                image,
-                label,
-                (x_min, y_min - 10),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
-                (0, 255, 0),
-                2,
-            )
+            # Draw mask overlay first, then bbox
+            image = draw_mask_overlay(image, mask)
+            result = visualize_annotation_result(image, bbox)
         else:
-            cv2.putText(
-                image,
-                "No object detected",
-                (10, 30),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1,
-                (0, 0, 255),
-                2,
-            )
+            result = visualize_annotation_result(image, None)
 
         if output_path:
-            cv2.imwrite(output_path, image)
+            cv2.imwrite(output_path, result)
 
         if show:
-            cv2.imshow("SAM2 Annotation", image)
+            cv2.imshow(window_title, result)
             cv2.waitKey(0)
             cv2.destroyAllWindows()
 
-        return image
+        return result
 
 
 def main():

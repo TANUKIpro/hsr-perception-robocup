@@ -37,8 +37,11 @@ from PIL import Image, ImageTk
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from annotation_utils import (
     bbox_to_yolo,
+    mask_to_bbox,
     write_yolo_label,
     batch_save_yolo_labels,
     read_yolo_label,
@@ -50,6 +53,7 @@ from video_tracking_predictor import (
     BatchInfo,
     BatchTrackingProgress,
 )
+from gui_framework import AppTheme
 
 
 # =============================================================================
@@ -981,7 +985,7 @@ class SAM2AnnotationApp:
             display = cv2.addWeighted(display, 1.0, mask_overlay, 0.4, 0)
 
             # Draw bounding box
-            bbox = self._mask_to_bbox(display_mask)
+            bbox = mask_to_bbox(display_mask, use_contour=True)
             if bbox:
                 x1, y1, x2, y2 = bbox
                 box_color = tuple(mask_color)
@@ -1119,38 +1123,6 @@ class SAM2AnnotationApp:
         except Exception as e:
             self.status_var.set(f"Segmentation failed: {e}")
 
-    def _mask_to_bbox(
-        self, mask: np.ndarray
-    ) -> Optional[Tuple[int, int, int, int]]:
-        """Convert mask to bounding box."""
-        # Find contours
-        mask_uint8 = mask.astype(np.uint8) * 255
-        contours, _ = cv2.findContours(
-            mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-        )
-
-        if not contours:
-            # Fallback: use mask bounds
-            rows = np.any(mask, axis=1)
-            cols = np.any(mask, axis=0)
-            if not np.any(rows) or not np.any(cols):
-                return None
-
-            y_indices = np.where(rows)[0]
-            x_indices = np.where(cols)[0]
-            return (
-                int(x_indices[0]),
-                int(y_indices[0]),
-                int(x_indices[-1]),
-                int(y_indices[-1]),
-            )
-
-        # Get bounding rect of largest contour
-        largest = max(contours, key=cv2.contourArea)
-        x, y, w, h = cv2.boundingRect(largest)
-
-        return (x, y, x + w, y + h)
-
     def _update_point_info(self):
         """Update point count and IoU display."""
         fg, bg = self.state.get_point_counts()
@@ -1204,7 +1176,7 @@ class SAM2AnnotationApp:
             return
 
         # Get bounding box from mask
-        bbox = self._mask_to_bbox(self.state.current_mask)
+        bbox = mask_to_bbox(self.state.current_mask, use_contour=True)
         if bbox is None:
             messagebox.showwarning("Invalid Mask", "Could not extract bounding box.")
             return
@@ -2254,11 +2226,9 @@ Controls:
     # Create main window
     root = tk.Tk()
 
-    # Set theme
+    # Apply theme
     style = ttk.Style()
-    available_themes = style.theme_names()
-    if "clam" in available_themes:
-        style.theme_use("clam")
+    AppTheme.apply(style)
 
     # Create app
     app = SAM2AnnotationApp(

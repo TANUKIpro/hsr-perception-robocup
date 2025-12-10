@@ -9,6 +9,10 @@ import streamlit as st
 import subprocess
 from pathlib import Path
 import sys
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from services.task_manager import Task
 
 # Add app directory to path
 app_dir = Path(__file__).parent.parent
@@ -35,7 +39,7 @@ TARGET_MAP50 = 0.85
 TARGET_INFERENCE_MS = 100.0
 
 
-def show_evaluation_page():
+def show_evaluation_page() -> None:
     """Main evaluation page."""
     # Render common sidebar
     from components.common_sidebar import render_common_sidebar
@@ -85,7 +89,7 @@ def show_evaluation_page():
         _render_xtion_live_test(path_coordinator)
 
 
-def _render_run_evaluation(task_manager: TaskManager, path_coordinator: PathCoordinator):
+def _render_run_evaluation(task_manager: TaskManager, path_coordinator: PathCoordinator) -> None:
     """Render evaluation configuration and run section."""
     st.subheader("Configure Evaluation")
 
@@ -182,7 +186,7 @@ def _render_run_evaluation(task_manager: TaskManager, path_coordinator: PathCoor
         st.rerun()
 
 
-def _render_evaluation_results(task: "TaskInfo"):
+def _render_evaluation_results(task: "Task") -> None:
     """Render results from a completed evaluation task."""
     if not task.extra_data:
         return
@@ -270,7 +274,7 @@ def _render_evaluation_results(task: "TaskInfo"):
         st.dataframe(df, use_container_width=True)
 
 
-def _render_evaluation_results_list(task_manager: TaskManager):
+def _render_evaluation_results_list(task_manager: TaskManager) -> None:
     """Render list of evaluation results."""
     st.subheader("Evaluation History")
 
@@ -294,7 +298,7 @@ def _render_evaluation_results_list(task_manager: TaskManager):
             _render_evaluation_results(task)
 
 
-def _render_visual_test(path_coordinator: PathCoordinator):
+def _render_visual_test(path_coordinator: PathCoordinator) -> None:
     """Render visual prediction test."""
     st.subheader("Visual Prediction Test")
 
@@ -423,7 +427,7 @@ def _render_visual_test(path_coordinator: PathCoordinator):
                     st.error(f"Prediction failed: {e}")
 
 
-def _render_robustness_test(path_coordinator: PathCoordinator):
+def _render_robustness_test(path_coordinator: PathCoordinator) -> None:
     """Render robustness test interface."""
     st.subheader("Robustness Test")
     st.markdown("""
@@ -562,7 +566,7 @@ def _render_robustness_test(path_coordinator: PathCoordinator):
         render_similar_object_test(model, dataset_path, conf_threshold)
 
 
-def _render_xtion_live_test(path_coordinator: PathCoordinator):
+def _render_xtion_live_test(path_coordinator: PathCoordinator) -> None:
     """Render Xtion live test section."""
     st.subheader("Xtion Live Test")
     st.write("Test trained models in real-time using the Xtion camera.")

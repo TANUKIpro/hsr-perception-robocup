@@ -5,9 +5,11 @@ Main dashboard with profile management, collection statistics,
 and training readiness overview.
 """
 
-import streamlit as st
-from pathlib import Path
 import sys
+from pathlib import Path
+from typing import Any
+
+import streamlit as st
 
 # Add app directory to path
 app_dir = Path(__file__).parent.parent
@@ -16,10 +18,11 @@ if str(app_dir) not in sys.path:
 
 from components.common_sidebar import render_common_sidebar, _reinitialize_services
 from components.profile_management import render_profile_management
+from object_registry import RegisteredObject
 
 
-def show_dashboard_page():
-    """Dashboard page with overview statistics."""
+def show_dashboard_page() -> None:
+    """Render the dashboard page with overview statistics."""
     # Render common sidebar
     render_common_sidebar()
 
@@ -64,7 +67,7 @@ def show_dashboard_page():
     _render_training_readiness(objects)
 
 
-def _render_overall_stats(stats: dict):
+def _render_overall_stats(stats: dict[str, Any]) -> None:
     """Render overall statistics metrics."""
     col1, col2, col3, col4 = st.columns(4)
 
@@ -79,7 +82,7 @@ def _render_overall_stats(stats: dict):
         st.metric("Ready for Training", f"{stats['ready_objects']}/{stats['total_objects']}", f"{ready_pct:.0f}%")
 
 
-def _render_pipeline_status():
+def _render_pipeline_status() -> None:
     """Render pipeline status section."""
     st.subheader("Pipeline Status")
 
@@ -105,7 +108,7 @@ def _render_pipeline_status():
         st.metric("Active Tasks", len(active_tasks))
 
 
-def _render_category_progress(stats: dict):
+def _render_category_progress(stats: dict[str, Any]) -> None:
     """Render progress by category."""
     st.subheader("Progress by Category")
 
@@ -118,7 +121,7 @@ def _render_category_progress(stats: dict):
                 st.progress(min(pct / 100, 1.0))
 
 
-def _render_object_progress(objects: list):
+def _render_object_progress(objects: list[RegisteredObject]) -> None:
     """Render per-object progress section."""
     st.subheader("Collection Progress by Object")
 
@@ -154,7 +157,7 @@ def _render_object_progress(objects: list):
         st.info("No objects registered yet. Go to Registry to add objects.")
 
 
-def _render_training_readiness(objects: list):
+def _render_training_readiness(objects: list[RegisteredObject]) -> None:
     """Render training readiness section."""
     st.subheader("Training Readiness")
 

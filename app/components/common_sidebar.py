@@ -22,7 +22,7 @@ from services.task_manager import TaskManager
 from object_registry import ObjectRegistry
 
 
-def _ensure_session_state():
+def _ensure_session_state() -> None:
     """Ensure all required session state variables are initialized."""
     if "profile_manager" not in st.session_state:
         st.session_state.profile_manager = ProfileManager()
@@ -46,7 +46,7 @@ def _ensure_session_state():
         st.session_state.current_object_id = None
 
 
-def _reinitialize_services():
+def _reinitialize_services() -> None:
     """Reinitialize all services after profile switch."""
     st.session_state.path_coordinator = PathCoordinator(
         profile_manager=st.session_state.profile_manager
@@ -59,7 +59,7 @@ def _reinitialize_services():
     )
 
 
-def _render_profile_selector():
+def _render_profile_selector() -> None:
     """Render profile selector in sidebar."""
     profile_manager = st.session_state.profile_manager
 
@@ -93,7 +93,7 @@ def _render_profile_selector():
         st.rerun()
 
 
-def render_common_sidebar():
+def render_common_sidebar() -> None:
     """
     Render common sidebar for all pages.
 

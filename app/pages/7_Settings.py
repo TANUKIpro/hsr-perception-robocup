@@ -7,6 +7,11 @@ Provides UI for application settings and configuration.
 import streamlit as st
 from pathlib import Path
 import sys
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from object_registry import ObjectRegistry
+    from services.path_coordinator import PathCoordinator
 
 # Add app directory to path
 app_dir = Path(__file__).parent.parent
@@ -17,7 +22,7 @@ from components.common_sidebar import render_common_sidebar
 from components.system_status import render_system_status
 
 
-def show_settings_page():
+def show_settings_page() -> None:
     """Settings page."""
     render_common_sidebar()
 
@@ -45,7 +50,7 @@ def show_settings_page():
     _render_about()
 
 
-def _render_data_management(registry, path_coordinator):
+def _render_data_management(registry: "ObjectRegistry", path_coordinator: "PathCoordinator") -> None:
     """Render data management section."""
     st.subheader("Data Management")
 
@@ -82,7 +87,7 @@ def _render_data_management(registry, path_coordinator):
             st.write(f"  • {cat}")
 
 
-def _render_data_paths(path_coordinator):
+def _render_data_paths(path_coordinator: "PathCoordinator") -> None:
     """Render data paths summary."""
     st.subheader("Data Paths")
 
@@ -91,7 +96,7 @@ def _render_data_paths(path_coordinator):
         st.write(f"**{key}:** `{path}`")
 
 
-def _render_about():
+def _render_about() -> None:
     """Render about section."""
     st.subheader("About")
 

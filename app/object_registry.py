@@ -6,22 +6,25 @@ Supports profile-based data isolation via PathCoordinator.
 """
 
 import json
+import logging
 import shutil
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from services.path_coordinator import PathCoordinator
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
 class ObjectVersion:
     """A version/variant of an object."""
     version: int
-    image_path: Optional[str] = None
-    source_link: Optional[str] = None
+    image_path: str | None = None
+    source_link: str | None = None
 
 
 @dataclass
@@ -30,8 +33,8 @@ class ObjectProperties:
     is_heavy: bool = False
     is_tiny: bool = False
     has_liquid: bool = False
-    size_cm: Optional[str] = None
-    grasp_strategy: Optional[str] = None
+    size_cm: str | None = None
+    grasp_strategy: str | None = None
 
 
 @dataclass
@@ -41,15 +44,15 @@ class RegisteredObject:
     name: str
     display_name: str
     category: str
-    versions: List[ObjectVersion] = field(default_factory=list)
+    versions: list[ObjectVersion] = field(default_factory=list)
     properties: ObjectProperties = field(default_factory=ObjectProperties)
     remarks: str = ""
     target_samples: int = 100
     collected_samples: int = 0
-    last_updated: Optional[str] = None
-    thumbnail_path: Optional[str] = None
+    last_updated: str | None = None
+    thumbnail_path: str | None = None
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "name": self.name,
@@ -65,7 +68,7 @@ class RegisteredObject:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "RegisteredObject":
+    def from_dict(cls, data: dict[str, Any]) -> "RegisteredObject":
         versions = [ObjectVersion(**v) for v in data.get("versions", [])]
         properties = ObjectProperties(**data.get("properties", {}))
         return cls(
@@ -90,7 +93,7 @@ class ObjectRegistry:
     Supports profile-based data isolation via PathCoordinator.
     """
 
-    def __init__(self, path_coordinator: Optional["PathCoordinator"] = None):
+    def __init__(self, path_coordinator: "PathCoordinator | None" = None) -> None:
         """
         Initialize object registry.
 
@@ -120,9 +123,10 @@ class ObjectRegistry:
         self.thumbnails_dir.mkdir(exist_ok=True)
 
         # Load or initialize registry
-        self.objects: Dict[int, RegisteredObject] = {}
-        self.categories: List[str] = []
+        self.objects: dict[int, RegisteredObject] = {}
+        self.categories: list[str] = []
         self._load()
+        logger.debug(f"ObjectRegistry initialized with {len(self.objects)} objects")
 
     def _load(self) -> None:
         """Load registry from file."""
@@ -168,22 +172,22 @@ class ObjectRegistry:
             return True
         return False
 
-    def get_object(self, obj_id: int) -> Optional[RegisteredObject]:
+    def get_object(self, obj_id: int) -> RegisteredObject | None:
         """Get an object by ID."""
         return self.objects.get(obj_id)
 
-    def get_object_by_name(self, name: str) -> Optional[RegisteredObject]:
+    def get_object_by_name(self, name: str) -> RegisteredObject | None:
         """Get an object by name."""
         for obj in self.objects.values():
             if obj.name == name:
                 return obj
         return None
 
-    def get_all_objects(self) -> List[RegisteredObject]:
+    def get_all_objects(self) -> list[RegisteredObject]:
         """Get all objects sorted by ID."""
         return sorted(self.objects.values(), key=lambda x: x.id)
 
-    def get_objects_by_category(self, category: str) -> List[RegisteredObject]:
+    def get_objects_by_category(self, category: str) -> list[RegisteredObject]:
         """Get objects filtered by category."""
         return [obj for obj in self.objects.values() if obj.category == category]
 
@@ -199,7 +203,7 @@ class ObjectRegistry:
             self.categories.append(category)
             self._save()
 
-    def update_object(self, obj_id: int, updates: dict) -> bool:
+    def update_object(self, obj_id: int, updates: dict[str, Any]) -> bool:
         """Update object fields."""
         obj = self.get_object(obj_id)
         if not obj:
@@ -240,7 +244,7 @@ class ObjectRegistry:
         return True
 
     # Thumbnail Management
-    def set_thumbnail(self, obj_id: int, image_path: str) -> Optional[str]:
+    def set_thumbnail(self, obj_id: int, image_path: str) -> str | None:
         """Set thumbnail image for an object."""
         obj = self.get_object(obj_id)
         if not obj:
@@ -257,7 +261,7 @@ class ObjectRegistry:
         self._save()
         return str(dst)
 
-    def save_thumbnail_from_bytes(self, obj_id: int, image_data: bytes, extension: str = ".jpg") -> Optional[str]:
+    def save_thumbnail_from_bytes(self, obj_id: int, image_data: bytes, extension: str = ".jpg") -> str | None:
         """Save thumbnail from bytes (for clipboard paste)."""
         obj = self.get_object(obj_id)
         if not obj:
@@ -272,7 +276,7 @@ class ObjectRegistry:
         self._save()
         return str(dst)
 
-    def get_thumbnail_path(self, obj_id: int) -> Optional[str]:
+    def get_thumbnail_path(self, obj_id: int) -> str | None:
         """Get full path to thumbnail image."""
         obj = self.get_object(obj_id)
         if not obj or not obj.thumbnail_path:
@@ -283,7 +287,7 @@ class ObjectRegistry:
         return None
 
     # Reference Image Management
-    def add_reference_image(self, obj_id: int, image_path: str, version: int = 1) -> Optional[str]:
+    def add_reference_image(self, obj_id: int, image_path: str, version: int = 1) -> str | None:
         """Add a reference image for an object."""
         obj = self.get_object(obj_id)
         if not obj:
@@ -312,7 +316,7 @@ class ObjectRegistry:
         self._save()
         return str(dst)
 
-    def get_reference_images(self, obj_id: int) -> List[str]:
+    def get_reference_images(self, obj_id: int) -> list[str]:
         """Get all reference image paths for an object."""
         obj = self.get_object(obj_id)
         if not obj:
@@ -333,7 +337,7 @@ class ObjectRegistry:
         obj_dir.mkdir(exist_ok=True)
         return obj_dir
 
-    def add_collected_image(self, obj_id: int, image_path: str) -> Optional[str]:
+    def add_collected_image(self, obj_id: int, image_path: str) -> str | None:
         """Add a collected image for an object."""
         obj = self.get_object(obj_id)
         if not obj:
@@ -350,7 +354,7 @@ class ObjectRegistry:
         self.update_collection_count(obj_id)
         return str(dst)
 
-    def save_collected_image(self, obj_id: int, image_data: bytes, extension: str = ".jpg") -> Optional[str]:
+    def save_collected_image(self, obj_id: int, image_data: bytes, extension: str = ".jpg") -> str | None:
         """Save collected image from bytes."""
         obj = self.get_object(obj_id)
         if not obj:
@@ -367,7 +371,7 @@ class ObjectRegistry:
         self.update_collection_count(obj_id)
         return str(dst)
 
-    def get_collected_images(self, obj_id: int) -> List[str]:
+    def get_collected_images(self, obj_id: int) -> list[str]:
         """Get all collected image paths for an object."""
         obj = self.get_object(obj_id)
         if not obj:
@@ -404,7 +408,7 @@ class ObjectRegistry:
             self.update_collection_count(obj_id)
 
     # Statistics
-    def get_collection_stats(self) -> dict:
+    def get_collection_stats(self) -> dict[str, Any]:
         """Get overall collection statistics."""
         total_target = sum(obj.target_samples for obj in self.objects.values())
         total_collected = sum(obj.collected_samples for obj in self.objects.values())

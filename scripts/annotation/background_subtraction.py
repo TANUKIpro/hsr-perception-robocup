@@ -10,13 +10,13 @@ import argparse
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional, Tuple
+from typing import Optional, Tuple
 
 import cv2
 import numpy as np
-from tqdm import tqdm
 
-from annotation_utils import AnnotationResult, bbox_to_yolo, write_yolo_label
+from annotation_utils import bbox_to_yolo
+from base_annotator import BaseAnnotator
 
 # Add scripts directory to path for common module imports
 _scripts_dir = Path(__file__).parent.parent
@@ -24,7 +24,6 @@ if str(_scripts_dir) not in sys.path:
     sys.path.insert(0, str(_scripts_dir))
 
 from common.constants import (
-    IMAGE_EXTENSIONS,
     DEFAULT_BBOX_MARGIN_RATIO,
     DEFAULT_MIN_CONTOUR_AREA,
     DEFAULT_MAX_CONTOUR_AREA_RATIO,
@@ -46,7 +45,7 @@ class AnnotatorConfig:
     max_contour_area_ratio: float = DEFAULT_MAX_CONTOUR_AREA_RATIO
 
 
-class BackgroundSubtractionAnnotator:
+class BackgroundSubtractionAnnotator(BaseAnnotator):
     """
     Auto-annotation using background subtraction.
 
@@ -242,124 +241,7 @@ class BackgroundSubtractionAnnotator:
 
         return yolo_bbox
 
-    def annotate_batch(
-        self,
-        image_dir: str,
-        class_id: int,
-        output_dir: str,
-        progress_callback: Optional[Callable[[int, int], None]] = None,
-    ) -> AnnotationResult:
-        """
-        Annotate all images in a directory.
-
-        Args:
-            image_dir: Directory containing images to annotate
-            class_id: YOLO class ID for all images
-            output_dir: Directory for output label files
-            progress_callback: Optional callback(current, total) for progress
-
-        Returns:
-            AnnotationResult with statistics
-        """
-        image_path = Path(image_dir)
-        output_path = Path(output_dir)
-        output_path.mkdir(parents=True, exist_ok=True)
-
-        # Find all images
-        images = [
-            f
-            for f in image_path.iterdir()
-            if f.suffix.lower() in IMAGE_EXTENSIONS
-        ]
-
-        result = AnnotationResult(total_images=len(images))
-
-        for i, img_file in enumerate(tqdm(images, desc="Annotating")):
-            bbox = self.annotate_image(str(img_file))
-
-            if bbox is not None:
-                # Write label file
-                label_path = output_path / f"{img_file.stem}.txt"
-                write_yolo_label(str(label_path), class_id, bbox)
-                result.successful += 1
-            else:
-                result.failed += 1
-                result.failed_paths.append(str(img_file))
-
-            if progress_callback:
-                progress_callback(i + 1, len(images))
-
-        return result
-
-    def visualize_annotation(
-        self,
-        image_path: str,
-        output_path: Optional[str] = None,
-        show: bool = True,
-    ) -> np.ndarray:
-        """
-        Visualize annotation result on image.
-
-        Args:
-            image_path: Path to input image
-            output_path: Optional path to save visualization
-            show: If True, display image in window
-
-        Returns:
-            Annotated image with bounding box drawn
-        """
-        image = cv2.imread(image_path)
-        if image is None:
-            raise ValueError(f"Failed to load image: {image_path}")
-
-        img_h, img_w = image.shape[:2]
-
-        # Get annotation
-        bbox = self.annotate_image(image_path)
-
-        if bbox is not None:
-            # Convert back to pixel coordinates
-            from annotation_utils import yolo_to_bbox
-
-            x_min, y_min, x_max, y_max = yolo_to_bbox(*bbox, img_w, img_h)
-
-            # Draw bounding box
-            cv2.rectangle(
-                image, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2
-            )
-
-            # Add label
-            label = f"({bbox[0]:.3f}, {bbox[1]:.3f}, {bbox[2]:.3f}, {bbox[3]:.3f})"
-            cv2.putText(
-                image,
-                label,
-                (x_min, y_min - 10),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
-                (0, 255, 0),
-                2,
-            )
-        else:
-            # No detection
-            cv2.putText(
-                image,
-                "No object detected",
-                (10, 30),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1,
-                (0, 0, 255),
-                2,
-            )
-
-        if output_path:
-            cv2.imwrite(output_path, image)
-
-        if show:
-            cv2.imshow("Annotation", image)
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
-
-        return image
+    # annotate_batch and visualize_annotation are inherited from BaseAnnotator
 
 
 def create_background_from_images(

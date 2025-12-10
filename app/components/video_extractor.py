@@ -8,13 +8,13 @@ import streamlit as st
 import re
 import shutil
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from services.path_coordinator import PathCoordinator
 
 
-def render_video_extractor(path_coordinator: "PathCoordinator"):
+def render_video_extractor(path_coordinator: "PathCoordinator") -> None:
     """
     Render video frame extractor UI.
 
@@ -83,7 +83,7 @@ def _extract_frames_preview(
     target_frames: int,
     class_name: str,
     preview_dir: Path
-):
+) -> None:
     """Extract frames from video to preview directory."""
     import cv2
 
@@ -167,7 +167,7 @@ def _save_frames_to_dataset(
     return saved
 
 
-def _render_preview_thumbnails(preview_dir: Path):
+def _render_preview_thumbnails(preview_dir: Path) -> None:
     """Render preview thumbnails grid."""
     preview_files = sorted(preview_dir.glob("*.jpg")) if preview_dir.exists() else []
     if not preview_files:

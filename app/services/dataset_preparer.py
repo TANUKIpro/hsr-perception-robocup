@@ -9,7 +9,10 @@ import shutil
 import random
 from pathlib import Path
 from dataclasses import dataclass
-from typing import List, Dict, Tuple, Optional
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from services.path_coordinator import PathCoordinator
 import yaml
 
 
@@ -21,7 +24,7 @@ class ClassInfo:
     label_count: int
     matched_count: int
     images_dir: Path
-    labels_dir: Path
+    labels_dir: Path | None
 
     @property
     def match_ratio(self) -> float:
@@ -52,11 +55,11 @@ class ClassInfo:
 class DatasetResult:
     """Result of dataset preparation."""
     success: bool
-    output_dir: Optional[Path]
+    output_dir: Path | None
     train_count: int
     val_count: int
-    class_names: List[str]
-    error_message: Optional[str] = None
+    class_names: list[str]
+    error_message: str | None = None
 
 
 class DatasetPreparer:
@@ -67,7 +70,7 @@ class DatasetPreparer:
     creates train/val splits, and generates data.yaml.
     """
 
-    def __init__(self, path_coordinator):
+    def __init__(self, path_coordinator: "PathCoordinator") -> None:
         """
         Initialize DatasetPreparer.
 
@@ -76,7 +79,7 @@ class DatasetPreparer:
         """
         self.path_coordinator = path_coordinator
 
-    def get_available_classes(self) -> List[ClassInfo]:
+    def get_available_classes(self) -> list[ClassInfo]:
         """
         Get list of available classes with their statistics.
 
@@ -129,13 +132,13 @@ class DatasetPreparer:
 
         return classes
 
-    def get_ready_classes(self) -> List[ClassInfo]:
+    def get_ready_classes(self) -> list[ClassInfo]:
         """Get only classes that are ready for training."""
         return [c for c in self.get_available_classes() if c.is_ready]
 
     def prepare_dataset(
         self,
-        class_names: List[str],
+        class_names: list[str],
         output_name: str,
         val_ratio: float = 0.2,
         seed: int = 42,
@@ -250,7 +253,7 @@ class DatasetPreparer:
     def _find_matching_pairs(
         self,
         cls: ClassInfo,
-    ) -> List[Tuple[Path, Path, str]]:
+    ) -> list[tuple[Path, Path, str]]:
         """Find matching image-label pairs for a class."""
         pairs = []
 
@@ -265,11 +268,11 @@ class DatasetPreparer:
 
     def _process_pairs(
         self,
-        pairs: List[Tuple[Path, Path, str]],
+        pairs: list[tuple[Path, Path, str]],
         output_dir: Path,
         split: str,
-        class_mapping: Dict[str, int],
-    ):
+        class_mapping: dict[str, int],
+    ) -> None:
         """Process pairs and copy to output directory."""
         for image_path, label_path, class_name in pairs:
             # Generate unique filename
@@ -287,7 +290,7 @@ class DatasetPreparer:
             with open(label_dest, 'w') as f:
                 f.write('\n'.join(remapped_lines))
 
-    def _remap_labels(self, label_path: Path, new_class_id: int) -> List[str]:
+    def _remap_labels(self, label_path: Path, new_class_id: int) -> list[str]:
         """Read label file and remap class IDs."""
         lines = []
         with open(label_path, 'r') as f:
