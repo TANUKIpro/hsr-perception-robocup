@@ -37,6 +37,8 @@ from PIL import Image, ImageTk
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from annotation_utils import (
     bbox_to_yolo,
     write_yolo_label,
@@ -50,6 +52,7 @@ from video_tracking_predictor import (
     BatchInfo,
     BatchTrackingProgress,
 )
+from gui_framework import AppTheme
 
 
 # =============================================================================
@@ -2254,11 +2257,9 @@ Controls:
     # Create main window
     root = tk.Tk()
 
-    # Set theme
+    # Apply theme
     style = ttk.Style()
-    available_themes = style.theme_names()
-    if "clam" in available_themes:
-        style.theme_use("clam")
+    AppTheme.apply(style)
 
     # Create app
     app = SAM2AnnotationApp(
