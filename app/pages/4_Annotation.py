@@ -9,9 +9,11 @@ Also includes dataset preparation functionality to create
 training-ready datasets from annotated data.
 """
 
-import streamlit as st
-from pathlib import Path
 import sys
+from pathlib import Path
+from typing import Any
+
+import streamlit as st
 
 # Add app directory to path
 app_dir = Path(__file__).parent.parent
@@ -35,7 +37,7 @@ from components.dataset_status import (
 from components.training_styles import inject_training_styles, COLORS, ICONS
 
 
-def _get_annotation_progress(raw_captures_dir: Path, annotated_dir: Path) -> dict:
+def _get_annotation_progress(raw_captures_dir: Path, annotated_dir: Path) -> dict[str, dict[str, Any]]:
     """
     Calculate annotation progress for each class.
 
@@ -106,8 +108,8 @@ def _get_annotation_progress(raw_captures_dir: Path, annotated_dir: Path) -> dic
     return progress
 
 
-def show_annotation_page():
-    """Main annotation page."""
+def show_annotation_page() -> None:
+    """Render the main annotation page."""
     # Render common sidebar
     from components.common_sidebar import render_common_sidebar
     render_common_sidebar()
@@ -146,7 +148,7 @@ def show_annotation_page():
         _render_annotation_history(task_manager)
 
 
-def _render_run_annotation(task_manager: TaskManager, path_coordinator: PathCoordinator):
+def _render_run_annotation(task_manager: TaskManager, path_coordinator: PathCoordinator) -> None:
     """Render SAM2 Interactive Annotation section."""
     st.subheader("Launch Annotation Application")
 
@@ -400,7 +402,7 @@ For large image sequences, the application automatically manages GPU memory:
         """)
 
 
-def _render_prepare_dataset(path_coordinator: PathCoordinator):
+def _render_prepare_dataset(path_coordinator: PathCoordinator) -> None:
     """Render dataset preparation section with class status."""
     st.html("""
     <div style="
@@ -461,7 +463,7 @@ def _render_prepare_dataset(path_coordinator: PathCoordinator):
                     st.switch_page("pages/5_Training.py")
 
 
-def _render_annotation_sessions(path_coordinator: PathCoordinator):
+def _render_annotation_sessions(path_coordinator: PathCoordinator) -> None:
     """Render list of annotation sessions."""
     st.subheader("Annotation Sessions")
 
@@ -507,7 +509,7 @@ def _render_annotation_sessions(path_coordinator: PathCoordinator):
                     st.info("Go to Training page to start training with this dataset")
 
 
-def _render_annotation_history(task_manager: TaskManager):
+def _render_annotation_history(task_manager: TaskManager) -> None:
     """Render annotation task history."""
     st.subheader("Annotation History")
 

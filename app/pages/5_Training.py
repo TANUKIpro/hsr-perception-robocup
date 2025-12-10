@@ -15,6 +15,10 @@ Integrates with scripts/training/quick_finetune.py via TaskManager.
 import streamlit as st
 from pathlib import Path
 import sys
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from services.task_manager import Task
 
 # Add app directory to path
 app_dir = Path(__file__).parent.parent
@@ -58,7 +62,7 @@ from components.progress_display import (
 )
 
 
-def show_training_page():
+def show_training_page() -> None:
     """Main training page with Mission Control aesthetic."""
     # Render common sidebar
     from components.common_sidebar import render_common_sidebar
@@ -101,7 +105,7 @@ def show_training_page():
         _render_training_history(task_manager)
 
 
-def _get_active_training_task(task_manager: TaskManager):
+def _get_active_training_task(task_manager: TaskManager) -> "Task | None":
     """Get active training task if exists."""
     tasks = task_manager.get_active_tasks(task_type="training")
     if tasks:
@@ -109,7 +113,7 @@ def _get_active_training_task(task_manager: TaskManager):
     return None
 
 
-def _render_active_training_view(active_task, task_manager: TaskManager, path_coordinator):
+def _render_active_training_view(active_task: "Task", task_manager: TaskManager, path_coordinator: PathCoordinator) -> None:
     """Render the active training view with Mission Control aesthetic."""
     task = task_manager.get_task(active_task.task_id)
 
@@ -254,7 +258,7 @@ def _render_active_training_view(active_task, task_manager: TaskManager, path_co
         st.rerun()
 
 
-def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoordinator):
+def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoordinator) -> None:
     """Render training configuration with Mission Control aesthetic."""
 
     # Dataset selection section
@@ -678,7 +682,7 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
             st.rerun()
 
 
-def _render_trained_models(path_coordinator: PathCoordinator):
+def _render_trained_models(path_coordinator: PathCoordinator) -> None:
     """Render list of trained models with Mission Control aesthetic."""
     st.html(f"""
     <div style="
@@ -900,7 +904,7 @@ def _render_trained_models(path_coordinator: PathCoordinator):
                 st.info("Go to Evaluation page to evaluate this model")
 
 
-def _render_training_history(task_manager: TaskManager):
+def _render_training_history(task_manager: TaskManager) -> None:
     """Render training task history."""
     st.html(f"""
     <div style="

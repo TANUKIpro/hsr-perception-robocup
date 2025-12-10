@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from services.path_coordinator import PathCoordinator
 
 
-def render_captured_images_tree(path_coordinator: "PathCoordinator"):
+def render_captured_images_tree(path_coordinator: "PathCoordinator") -> None:
     """
     Render captured images directory tree.
 

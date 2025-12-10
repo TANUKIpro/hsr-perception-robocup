@@ -6,8 +6,12 @@ and dataset preparation UI in the Annotation page.
 """
 
 import streamlit as st
-from typing import List, Optional
+from collections.abc import Callable
 from datetime import datetime
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from services.dataset_preparer import ClassInfo, DatasetResult
 
 from .training_styles import COLORS, ICONS
 
@@ -40,7 +44,7 @@ STATUS_CONFIG = {
 }
 
 
-def render_class_status_card(class_info):
+def render_class_status_card(class_info: "ClassInfo") -> None:
     """
     Render a single class status card using Streamlit components.
 
@@ -66,7 +70,7 @@ def render_class_status_card(class_info):
         st.progress(class_info.match_ratio)
 
 
-def render_class_status_grid(classes: List, columns: int = 2):
+def render_class_status_grid(classes: list["ClassInfo"], columns: int = 2) -> None:
     """
     Render a grid of class status cards.
 
@@ -169,15 +173,18 @@ def render_class_status_grid(classes: List, columns: int = 2):
 
 
 def render_dataset_preparation_panel(
-    classes: List,
-    on_generate: callable = None,
-):
+    classes: list["ClassInfo"],
+    on_generate: Callable[[], None] | None = None,
+) -> dict[str, Any] | None:
     """
     Render dataset preparation panel with class selection and options.
 
     Args:
         classes: List of ClassInfo objects
         on_generate: Callback when generate button is clicked
+
+    Returns:
+        Dictionary with selected parameters or None if not submitted
     """
     ready_classes = [c for c in classes if c.is_ready]
 
@@ -321,7 +328,7 @@ def render_dataset_preparation_panel(
     return None
 
 
-def render_dataset_result(result, dataset_name: str):
+def render_dataset_result(result: "DatasetResult", dataset_name: str) -> None:
     """
     Render dataset generation result.
 

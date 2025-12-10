@@ -11,13 +11,14 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from object_registry import ObjectRegistry, RegisteredObject
     from services.path_coordinator import PathCoordinator
+    from services.ros2_bridge import ROS2Bridge
 
 
 def render_ros2_collection(
     obj: "RegisteredObject",
     registry: "ObjectRegistry",
     path_coordinator: "PathCoordinator"
-):
+) -> None:
     """
     Render ROS2 collection tab content.
 
@@ -48,7 +49,7 @@ def render_ros2_collection(
     _render_usage_guide()
 
 
-def _get_ros2_bridge():
+def _get_ros2_bridge() -> "ROS2Bridge | None":
     """Get ROS2Bridge instance or show error."""
     try:
         from services.ros2_bridge import ROS2Bridge
@@ -58,7 +59,7 @@ def _get_ros2_bridge():
         return None
 
 
-def _render_ros2_status(ros2_bridge) -> bool:
+def _render_ros2_status(ros2_bridge: "ROS2Bridge") -> bool:
     """
     Render ROS2 availability status.
 
@@ -86,7 +87,7 @@ def _render_ros2_status(ros2_bridge) -> bool:
     return True
 
 
-def _render_capture_node_status(ros2_bridge):
+def _render_capture_node_status(ros2_bridge: "ROS2Bridge") -> None:
     """Render capture node status."""
     if ros2_bridge.check_capture_node_running():
         st.success("Capture node is running")
@@ -101,7 +102,7 @@ def _render_capture_node_status(ros2_bridge):
         )
 
 
-def _render_capture_app_launcher(ros2_bridge, path_coordinator: "PathCoordinator"):
+def _render_capture_app_launcher(ros2_bridge: "ROS2Bridge", path_coordinator: "PathCoordinator") -> None:
     """Render capture application launcher section."""
     st.subheader("Image Capture Application")
 
@@ -153,7 +154,7 @@ def _render_capture_app_launcher(ros2_bridge, path_coordinator: "PathCoordinator
             """)
 
 
-def _render_usage_guide():
+def _render_usage_guide() -> None:
     """Render application usage guide."""
     with st.expander("How to Use", expanded=False):
         st.markdown("""
