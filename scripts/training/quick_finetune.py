@@ -59,6 +59,12 @@ COMPETITION_CONFIG = {
     "lrf": 0.01,
     "momentum": 0.937,
     "weight_decay": 0.0005,
+    # Warmup settings (for stable fine-tuning)
+    "warmup_epochs": 3,
+    "warmup_momentum": 0.8,
+    "warmup_bias_lr": 0.1,
+    # Layer freeze (prevent overfitting on small datasets)
+    "freeze": 10,  # Freeze first 10 backbone layers
     # Augmentation settings
     "augment": True,
     "hsv_h": 0.015,
@@ -208,8 +214,13 @@ class CompetitionTrainer:
         self._check_cuda()
 
     def _check_cuda(self) -> None:
-        """Check CUDA availability and log GPU info."""
-        log_gpu_status(verbose=True)
+        """Check CUDA availability and abort if not available for training."""
+        has_gpu = log_gpu_status(verbose=True)
+        if not has_gpu and not self.config.get("allow_cpu", False):
+            raise RuntimeError(
+                "GPU not available. Training on CPU would exceed time limit (2-3 hours). "
+                "Check CUDA drivers or use --allow-cpu to override."
+            )
 
     def _generate_run_name(self) -> str:
         """Generate unique run name with timestamp."""
@@ -390,7 +401,8 @@ class CompetitionTrainer:
                     break  # Success
 
                 except RuntimeError as e:
-                    if "out of memory" in str(e).lower() or "CUDA" in str(e):
+                    error_msg = str(e).lower()
+                    if "out of memory" in error_msg or "oom" in error_msg:
                         print(f"\n{Fore.YELLOW}OOM detected. Attempting recovery...{Style.RESET_ALL}")
 
                         recovery_config = oom_recovery.get_recovery_config()
@@ -402,9 +414,20 @@ class CompetitionTrainer:
                               f"{oom_recovery.get_changes_summary()}")
                         current_config = recovery_config
 
+                        # Cleanup old model before retry to prevent memory leak
+                        import gc
+                        del model
+                        gc.collect()
+                        torch.cuda.empty_cache()
+                        torch.cuda.synchronize()
+
                         # Reload model for retry
                         model = YOLO(self.base_model)
                         self._setup_tensorboard(model)
+                    elif "cuda" in error_msg:
+                        # CUDA general error (not OOM) - fail immediately
+                        print(f"{Fore.RED}CUDA error detected (not OOM): {e}{Style.RESET_ALL}")
+                        raise
                     else:
                         raise
         else:

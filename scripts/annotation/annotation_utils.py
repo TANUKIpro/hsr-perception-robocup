@@ -250,8 +250,10 @@ def create_dataset_yaml(
         class_names: List of class names (index = class_id)
         test_path: Optional path to test images directory
     """
+    # Use relative path "." so that data.yaml works both on host and in Docker container
+    # YOLOv8 resolves relative paths from the location of the data.yaml file
     config = {
-        "path": str(Path(output_path).parent.absolute()),
+        "path": ".",
         "train": train_path,
         "val": val_path,
         "names": {i: name for i, name in enumerate(class_names)},
