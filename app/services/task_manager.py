@@ -371,6 +371,7 @@ class TaskManager:
         auto_scale: bool = True,
         enable_tensorboard: bool = True,
         tensorboard_port: int = 6006,
+        advanced_params: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Start training task.
@@ -385,6 +386,7 @@ class TaskManager:
             auto_scale: Enable GPU auto-scaling for model/batch selection
             enable_tensorboard: Enable TensorBoard monitoring
             tensorboard_port: Port for TensorBoard server
+            advanced_params: Advanced training parameters from UI (overrides auto-scaling)
 
         Returns:
             Task ID
@@ -405,6 +407,7 @@ class TaskManager:
                 "fast_mode": fast_mode,
                 "auto_scale": auto_scale,
                 "enable_tensorboard": enable_tensorboard,
+                "advanced_params": advanced_params,
             }
         )
         self._save_status(task)
@@ -444,6 +447,10 @@ class TaskManager:
             cmd.extend(["--tensorboard-port", str(tensorboard_port)])
         else:
             cmd.append("--no-tensorboard")
+
+        # Advanced parameters (JSON encoded)
+        if advanced_params:
+            cmd.extend(["--advanced-params", json.dumps(advanced_params)])
 
         self._launch_subprocess(cmd, task)
         return task_id

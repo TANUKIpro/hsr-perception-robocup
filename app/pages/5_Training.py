@@ -543,6 +543,16 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
 
     st.markdown("<div style='height: 24px'></div>", unsafe_allow_html=True)
 
+    # Advanced Parameters section
+    from components.training_advanced_params import render_advanced_parameters_section
+
+    advanced_params = render_advanced_parameters_section(
+        auto_scale=auto_scale,
+        gpu_tier=gpu_tier,
+    )
+
+    st.markdown("<div style='height: 24px'></div>", unsafe_allow_html=True)
+
     # Monitoring section
     st.html(f"""
     <div style="
@@ -645,6 +655,7 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
                 auto_scale=auto_scale,
                 enable_tensorboard=enable_tensorboard,
                 tensorboard_port=tensorboard_port,
+                advanced_params=advanced_params,
             )
 
             st.html(f"""
