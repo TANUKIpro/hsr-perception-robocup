@@ -427,7 +427,7 @@ Examples:
     if args.time_only:
         # Just measure inference time
         mean_ms, std_ms = evaluator.measure_inference_time()
-        target = EvaluationReport.TARGET_INFERENCE_MS
+        target = TARGET_INFERENCE_MS
         status = (
             f"{Fore.GREEN}PASS{Style.RESET_ALL}"
             if mean_ms <= target

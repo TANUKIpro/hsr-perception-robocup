@@ -279,19 +279,34 @@ def main():
         if not trainer._validate_dataset(args.dataset):
             raise ValueError("Dataset validation failed")
 
-        # Start training
-        import time
-        start_time = time.time()
+        # Change working directory to dataset directory for relative path resolution
+        # This allows data.yaml to use "path: ." which works in both host and container
+        import os
+        dataset_path = Path(args.dataset).resolve()  # Resolve to absolute path
+        dataset_dir = dataset_path.parent
+        original_cwd = os.getcwd()
 
-        results = model.train(
-            data=args.dataset,
-            project=str(trainer.output_dir),
-            name=trainer.run_name,
-            verbose=True,
-            **config,
-        )
+        try:
+            os.chdir(dataset_dir)
+            print(f"Changed working directory to: {dataset_dir}")
 
-        training_time = (time.time() - start_time) / 60  # minutes
+            # Start training
+            import time
+            start_time = time.time()
+
+            results = model.train(
+                data=str(dataset_path),  # Use resolved absolute path
+                project=str(trainer.output_dir),
+                name=trainer.run_name,
+                verbose=True,
+                **config,
+            )
+
+            training_time = (time.time() - start_time) / 60  # minutes
+        finally:
+            # Always restore original working directory
+            os.chdir(original_cwd)
+            print(f"Restored working directory to: {original_cwd}")
 
         # Extract final metrics
         try:
