@@ -127,6 +127,7 @@ def main():
     parser.add_argument("--tensorboard", action="store_true", default=True, help="Enable TensorBoard")
     parser.add_argument("--no-tensorboard", action="store_true", help="Disable TensorBoard")
     parser.add_argument("--tensorboard-port", type=int, default=6006, help="TensorBoard port")
+    parser.add_argument("--advanced-params", type=str, default=None, help="Advanced parameters as JSON string")
     args = parser.parse_args()
 
     task_id = args.task_id
@@ -197,6 +198,38 @@ def main():
             config["batch"] = args.batch
         if args.model:
             config["model"] = args.model
+
+        # Apply advanced parameters (highest priority - overrides GPU scaling)
+        if args.advanced_params:
+            try:
+                import json
+                advanced = json.loads(args.advanced_params)
+
+                # Whitelist validation for security
+                allowed_keys = {
+                    # Augmentation
+                    "hsv_h", "hsv_s", "hsv_v", "degrees", "translate", "scale", "shear",
+                    "flipud", "fliplr", "mosaic", "mixup",
+                    # Optimizer
+                    "optimizer", "lr0", "lrf", "momentum", "weight_decay",
+                    # Performance
+                    "workers", "cache", "amp", "imgsz", "patience", "close_mosaic",
+                    # Checkpoint
+                    "save", "save_period", "exist_ok",
+                }
+
+                # Filter to only allowed keys
+                filtered_params = {k: v for k, v in advanced.items() if k in allowed_keys}
+                config.update(filtered_params)
+
+                print(f"Applied {len(filtered_params)} advanced parameters:")
+                for key, value in filtered_params.items():
+                    print(f"  {key}: {value}")
+
+            except json.JSONDecodeError as e:
+                print(f"Warning: Failed to parse advanced parameters: {e}")
+            except Exception as e:
+                print(f"Warning: Error applying advanced parameters: {e}")
 
         update_task_status(
             task_id,
