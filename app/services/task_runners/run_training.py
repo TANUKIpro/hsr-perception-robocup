@@ -212,6 +212,8 @@ def main():
                     "flipud", "fliplr", "mosaic", "mixup",
                     # Optimizer
                     "optimizer", "lr0", "lrf", "momentum", "weight_decay",
+                    # LLRD (Layer-wise Learning Rate Decay)
+                    "llrd_enabled", "llrd_decay_rate",
                     # Performance
                     "workers", "cache", "amp", "imgsz", "patience", "close_mosaic",
                     # Layer freeze (prevents overfitting)
@@ -323,6 +325,10 @@ def main():
         dataset_dir = dataset_path.parent
         original_cwd = os.getcwd()
 
+        # Extract LLRD parameters from config
+        llrd_enabled = config.pop("llrd_enabled", False)
+        llrd_decay_rate = config.pop("llrd_decay_rate", 0.9)
+
         try:
             os.chdir(dataset_dir)
             print(f"Changed working directory to: {dataset_dir}")
@@ -331,13 +337,52 @@ def main():
             import time
             start_time = time.time()
 
-            results = model.train(
-                data=str(dataset_path),  # Use resolved absolute path
-                project=str(trainer.output_dir),
-                name=trainer.run_name,
-                verbose=True,
-                **config,
-            )
+            if llrd_enabled:
+                # Use LLRD-enabled custom trainer
+                print(f"LLRD enabled with decay_rate={llrd_decay_rate}")
+                from training.llrd_trainer import LLRDDetectionTrainer, LLRDConfig
+
+                llrd_config = LLRDConfig(enabled=True, decay_rate=llrd_decay_rate)
+
+                # Build overrides for LLRD trainer
+                llrd_overrides = {
+                    "data": str(dataset_path),
+                    "model": base_model,
+                    "project": str(trainer.output_dir),
+                    "name": trainer.run_name,
+                    "verbose": True,
+                    **config,
+                }
+
+                llrd_trainer = LLRDDetectionTrainer(
+                    overrides=llrd_overrides,
+                    llrd_config=llrd_config,
+                )
+
+                # Add progress callbacks to LLRD trainer
+                llrd_trainer.add_callback("on_train_start", progress_callback.on_train_start)
+                llrd_trainer.add_callback("on_train_epoch_end", progress_callback.on_train_epoch_end)
+                llrd_trainer.add_callback("on_train_end", progress_callback.on_train_end)
+
+                # Add TensorBoard callbacks if enabled
+                if tensorboard_enabled:
+                    llrd_trainer.add_callback("on_pretrain_routine_start", tb_callback.on_pretrain_routine_start)
+                    llrd_trainer.add_callback("on_train_epoch_start", tb_callback.on_train_epoch_start)
+                    llrd_trainer.add_callback("on_train_epoch_end", tb_callback.on_train_epoch_end)
+                    llrd_trainer.add_callback("on_fit_epoch_end", tb_callback.on_fit_epoch_end)
+                    llrd_trainer.add_callback("on_train_end", tb_callback.on_train_end)
+
+                # Train with LLRD
+                results = llrd_trainer.train()
+            else:
+                # Use standard YOLO training
+                results = model.train(
+                    data=str(dataset_path),  # Use resolved absolute path
+                    project=str(trainer.output_dir),
+                    name=trainer.run_name,
+                    verbose=True,
+                    **config,
+                )
 
             training_time = (time.time() - start_time) / 60  # minutes
         finally:
@@ -378,6 +423,8 @@ def main():
                 "run_dir": str(run_dir),
                 "tensorboard_url": tensorboard_url,
                 "gpu_tier": gpu_tier,
+                "llrd_enabled": llrd_enabled,
+                "llrd_decay_rate": llrd_decay_rate if llrd_enabled else None,
                 "config": {
                     "model": config.get("model"),
                     "batch": config.get("batch"),
