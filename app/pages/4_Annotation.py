@@ -11,7 +11,7 @@ training-ready datasets from annotated data.
 
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List, Optional
 
 import streamlit as st
 
@@ -19,6 +19,11 @@ import streamlit as st
 app_dir = Path(__file__).parent.parent
 if str(app_dir) not in sys.path:
     sys.path.insert(0, str(app_dir))
+
+# Add scripts directory to path
+scripts_dir = Path(__file__).parent.parent.parent / "scripts"
+if str(scripts_dir) not in sys.path:
+    sys.path.insert(0, str(scripts_dir))
 
 from services.task_manager import TaskManager, TaskStatus
 from services.path_coordinator import PathCoordinator
@@ -127,9 +132,10 @@ def show_annotation_page() -> None:
     task_manager = st.session_state.task_manager
     path_coordinator = st.session_state.path_coordinator
 
-    # Tabs for different sections
-    tab1, tab2, tab3, tab4 = st.tabs([
+    # Tabs for different sections (ordered by workflow)
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "🎯 Run Annotation",
+        "🎨 Generate Synthetic",
         "📦 Prepare Dataset",
         "📁 Sessions",
         "📜 History"
@@ -139,12 +145,15 @@ def show_annotation_page() -> None:
         _render_run_annotation(task_manager, path_coordinator)
 
     with tab2:
-        _render_prepare_dataset(path_coordinator)
+        _render_generate_synthetic(path_coordinator)
 
     with tab3:
-        _render_annotation_sessions(path_coordinator)
+        _render_prepare_dataset(path_coordinator)
 
     with tab4:
+        _render_annotation_sessions(path_coordinator)
+
+    with tab5:
         _render_annotation_history(task_manager)
 
 
@@ -521,6 +530,392 @@ def _render_annotation_history(task_manager: TaskManager) -> None:
         limit=10,
         show_active_only=False,
     )
+
+
+# =============================================================================
+# Copy-Paste Augmentation Tabs
+# =============================================================================
+
+
+def _get_mask_stats(path_coordinator: PathCoordinator) -> Dict[str, int]:
+    """
+    Get mask counts per class for synthetic generation.
+
+    Returns:
+        Dictionary mapping class_name to mask count
+    """
+    annotated_dir = path_coordinator.get_path("annotated_dir")
+    stats = {}
+
+    if not annotated_dir.exists():
+        return stats
+
+    for class_dir in annotated_dir.iterdir():
+        if not class_dir.is_dir():
+            continue
+
+        masks_dir = class_dir / "masks"
+        if masks_dir.exists():
+            # Count both naming conventions
+            mask_count = len(list(masks_dir.glob("*_mask.png")))
+            if mask_count == 0:
+                mask_count = len(list(masks_dir.glob("*.png")))
+            if mask_count > 0:
+                stats[class_dir.name] = mask_count
+
+    return stats
+
+
+def _generate_preview_images(
+    path_coordinator: PathCoordinator,
+    selected_classes: List[str],
+    scale_range: tuple,
+    enable_white_balance: bool,
+    max_objects: int,
+    seed: int = 42,
+    num_samples: int = 3,
+) -> List[tuple]:
+    """
+    Generate preview synthetic images.
+
+    Args:
+        path_coordinator: PathCoordinator instance
+        selected_classes: List of class names to include
+        scale_range: (min_scale, max_scale) tuple
+        enable_white_balance: Whether to enable white balance adjustment
+        max_objects: Maximum objects per image
+        seed: Random seed for reproducibility
+        num_samples: Number of preview images to generate
+
+    Returns:
+        List of (image_rgb, class_names) tuples
+    """
+    import cv2
+    import numpy as np
+    from augmentation.copy_paste_augmentor import CopyPasteAugmentor, CopyPasteConfig
+
+    config = CopyPasteConfig(
+        scale_range=scale_range,
+        enable_white_balance=enable_white_balance,
+        max_objects_per_image=max_objects,
+        seed=seed,
+    )
+
+    augmentor = CopyPasteAugmentor(config)
+    augmentor.rng = np.random.RandomState(seed)
+
+    # Load backgrounds
+    backgrounds_dir = path_coordinator.get_path("backgrounds_dir")
+    backgrounds = augmentor._load_images(backgrounds_dir)
+
+    # Load objects from masks
+    annotated_dir = path_coordinator.get_path("annotated_dir")
+    objects, target_resolution = augmentor._load_objects_from_masks(
+        annotated_dir=annotated_dir,
+        class_names=selected_classes,
+        alpha_blur_sigma=config.edge_blur_sigma,
+    )
+
+    if not backgrounds or not objects:
+        return []
+
+    previews = []
+    for i in range(num_samples):
+        # Select random background
+        bg_idx = augmentor.rng.randint(0, len(backgrounds))
+        bg_path = backgrounds[bg_idx]
+        background = cv2.imread(str(bg_path))
+
+        if background is None:
+            continue
+
+        # Resize background to match source image resolution
+        if target_resolution is not None:
+            target_h, target_w = target_resolution
+            background = cv2.resize(
+                background, (target_w, target_h), interpolation=cv2.INTER_LINEAR
+            )
+
+        # Generate synthetic image
+        result = augmentor.generate_synthetic_image(
+            background=background,
+            objects=objects,
+        )
+
+        # Convert BGR to RGB for display
+        image_rgb = cv2.cvtColor(result.image, cv2.COLOR_BGR2RGB)
+        class_names = [pr.class_name for pr in result.paste_results]
+
+        previews.append((image_rgb, class_names))
+
+    return previews
+
+
+def _render_generate_synthetic(path_coordinator: PathCoordinator) -> None:
+    """Render synthetic image generation section."""
+    st.subheader("Generate Synthetic Training Images")
+
+    st.markdown("""
+    Generate synthetic training images by pasting annotated objects onto background images.
+    Uses masks from SAM2 annotation directly with edge blending and white balance adjustment.
+    """)
+
+    # Check for masks from annotation
+    mask_stats = _get_mask_stats(path_coordinator)
+
+    if not mask_stats:
+        st.warning(
+            "No annotated masks found. Please run annotation first using the 'Run Annotation' tab."
+        )
+        st.info("Masks are automatically saved during SAM2 annotation.")
+        return
+
+    # Check for backgrounds
+    backgrounds = path_coordinator.get_background_images()
+
+    if not backgrounds:
+        st.warning(
+            "No background images found. Please add backgrounds to the backgrounds directory."
+        )
+        backgrounds_dir = path_coordinator.get_path("backgrounds_dir")
+        st.info(f"Add background images to: `{backgrounds_dir}`")
+
+        # Show upload option
+        _render_background_upload(path_coordinator)
+        return
+
+    # Object selection (based on available masks)
+    st.markdown("##### Select Classes to Include")
+
+    selected_classes = []
+    cols = st.columns(3)
+    for idx, (class_name, mask_count) in enumerate(sorted(mask_stats.items())):
+        with cols[idx % 3]:
+            if st.checkbox(f"{class_name} ({mask_count} masks)", value=True, key=f"synth_obj_{class_name}"):
+                selected_classes.append(class_name)
+
+    if not selected_classes:
+        st.warning("Please select at least one class.")
+        return
+
+    st.markdown("---")
+
+    # Generation settings
+    st.markdown("##### Generation Settings")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        # Count real images
+        real_count = 0
+        raw_dir = path_coordinator.get_path("raw_captures_dir")
+        for class_name in selected_classes:
+            class_raw = raw_dir / class_name
+            if class_raw.exists():
+                real_count += len(list(class_raw.glob("*.jpg"))) + len(list(class_raw.glob("*.png")))
+
+        synthetic_ratio = st.slider(
+            "Synthetic:Real Ratio",
+            min_value=1.0,
+            max_value=3.0,
+            value=2.0,
+            step=0.5,
+            help="Ratio of synthetic images to real images (e.g., 2.0 = 2:1)",
+            key="synth_ratio"
+        )
+
+        target_count = int(real_count * synthetic_ratio)
+        st.caption(f"Real images: {real_count} → Synthetic to generate: {target_count}")
+
+    with col2:
+        enable_white_balance = st.checkbox(
+            "Enable White Balance",
+            value=True,
+            help="Adjust object colors to match background lighting",
+            key="synth_wb"
+        )
+
+        max_objects = st.slider(
+            "Max Objects per Image",
+            min_value=1,
+            max_value=5,
+            value=3,
+            help="Maximum number of objects to paste per synthetic image",
+            key="synth_max_obj"
+        )
+
+    col3, col4 = st.columns(2)
+
+    with col3:
+        scale_min = st.slider(
+            "Min Scale",
+            min_value=0.3,
+            max_value=1.0,
+            value=0.5,
+            step=0.1,
+            key="synth_scale_min"
+        )
+
+    with col4:
+        scale_max = st.slider(
+            "Max Scale",
+            min_value=0.5,
+            max_value=2.0,
+            value=1.5,
+            step=0.1,
+            key="synth_scale_max"
+        )
+
+    st.markdown("---")
+
+    # Background preview
+    st.markdown(f"##### Backgrounds ({len(backgrounds)} available)")
+
+    with st.expander("Preview Backgrounds", expanded=False):
+        bg_cols = st.columns(4)
+        for idx, bg in enumerate(backgrounds[:8]):
+            with bg_cols[idx % 4]:
+                try:
+                    import cv2
+                    img = cv2.imread(bg["path"])
+                    if img is not None:
+                        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                        st.image(img_rgb, caption=bg["name"], use_container_width=True)
+                except Exception:
+                    st.caption(bg["name"])
+
+    # Add upload option
+    _render_background_upload(path_coordinator)
+
+    st.markdown("---")
+
+    # Preview Section
+    st.markdown("##### Preview")
+
+    # Initialize preview seed in session state
+    if "synth_preview_seed" not in st.session_state:
+        st.session_state["synth_preview_seed"] = 42
+
+    # Generate Preview button
+    if st.button("🔄 Generate Preview", key="synth_preview_btn"):
+        import time
+        st.session_state["synth_preview_seed"] = int(time.time() * 1000) % (2**31)
+
+    # Generate and display preview images
+    try:
+        previews = _generate_preview_images(
+            path_coordinator=path_coordinator,
+            selected_classes=selected_classes,
+            scale_range=(scale_min, scale_max),
+            enable_white_balance=enable_white_balance,
+            max_objects=max_objects,
+            seed=st.session_state["synth_preview_seed"],
+            num_samples=3,
+        )
+
+        if previews:
+            preview_cols = st.columns(3)
+            for idx, (image, class_names) in enumerate(previews):
+                with preview_cols[idx]:
+                    st.image(image, use_container_width=True)
+                    if class_names:
+                        st.caption(f"Classes: {', '.join(class_names)}")
+                    else:
+                        st.caption("No objects placed")
+        else:
+            st.info("Could not generate preview. Check masks and backgrounds.")
+
+    except Exception as e:
+        st.warning(f"Preview generation failed: {str(e)}")
+
+    st.markdown("---")
+
+    # Generate button
+    if st.button("🎨 Generate Synthetic Dataset", type="primary", use_container_width=True, key="synth_gen_btn"):
+        try:
+            from augmentation.copy_paste_augmentor import CopyPasteAugmentor, CopyPasteConfig
+
+            config = CopyPasteConfig(
+                synthetic_to_real_ratio=synthetic_ratio,
+                scale_range=(scale_min, scale_max),
+                enable_white_balance=enable_white_balance,
+                max_objects_per_image=max_objects,
+            )
+
+            augmentor = CopyPasteAugmentor(config)
+
+            # Create output session
+            output_dir = path_coordinator.get_synthetic_session_dir()
+
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+
+            def progress_callback(current: int, total: int, message: str):
+                progress_bar.progress(current / total)
+                status_text.text(message)
+
+            # Generate batch
+            annotated_dir = path_coordinator.get_path("annotated_dir")
+            backgrounds_dir = path_coordinator.get_path("backgrounds_dir")
+
+            stats = augmentor.generate_batch(
+                backgrounds_dir=backgrounds_dir,
+                annotated_dir=annotated_dir,
+                output_dir=output_dir,
+                real_image_count=real_count,
+                class_names=selected_classes,
+                progress_callback=progress_callback,
+            )
+
+            progress_bar.progress(1.0)
+            status_text.empty()
+
+            if "error" in stats:
+                st.error(stats["error"])
+            else:
+                st.success(
+                    f"Generated {stats['generated']} synthetic images. "
+                    f"Failed: {stats.get('failed', 0)}"
+                )
+                st.info(f"Output saved to: `{output_dir}`")
+
+                # Per-class stats
+                if stats.get("per_class"):
+                    st.markdown("**Objects per class:**")
+                    for cls, count in stats["per_class"].items():
+                        st.caption(f"- {cls}: {count}")
+
+        except Exception as e:
+            st.error(f"Error during generation: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc())
+
+
+def _render_background_upload(path_coordinator: PathCoordinator) -> None:
+    """Render background image upload widget."""
+    with st.expander("➕ Add Background Image", expanded=False):
+        uploaded_file = st.file_uploader(
+            "Upload Background Image",
+            type=["jpg", "jpeg", "png"],
+            help="Upload a background image for synthetic data generation",
+            key="bg_upload"
+        )
+
+        if uploaded_file is not None:
+            import tempfile
+
+            with tempfile.NamedTemporaryFile(delete=False, suffix=Path(uploaded_file.name).suffix) as tmp:
+                tmp.write(uploaded_file.getvalue())
+                tmp_path = tmp.name
+
+            try:
+                saved_path = path_coordinator.add_background_image(tmp_path, uploaded_file.name)
+                st.success(f"Background saved: {uploaded_file.name}")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Failed to save background: {str(e)}")
+            finally:
+                Path(tmp_path).unlink(missing_ok=True)
 
 
 # For Streamlit native multipage
