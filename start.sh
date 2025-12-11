@@ -204,6 +204,16 @@ build_image() {
         cd "$PROJECT_ROOT"
         if docker compose build; then
             success "Docker image build completed"
+
+            # Clean up dangling images after successful build
+            info "Cleaning up old images..."
+            local pruned
+            pruned=$(docker image prune -f 2>/dev/null | grep "Total reclaimed space" || echo "")
+            if [ -n "$pruned" ]; then
+                success "Cleanup: $pruned"
+            else
+                success "Cleanup: no unused images to remove"
+            fi
         else
             error "Docker image build failed"
         fi
