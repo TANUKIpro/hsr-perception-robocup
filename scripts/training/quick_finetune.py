@@ -45,6 +45,7 @@ from .tensorboard_monitor import (
 from .training_config import TrainingConfig
 
 # Competition-optimized training configuration (legacy compatibility)
+# Updated for better generalization based on Tier 1 recommendations
 COMPETITION_CONFIG = {
     # Model settings
     "model": "yolov8m.pt",
@@ -58,7 +59,7 @@ COMPETITION_CONFIG = {
     "lr0": 0.001,
     "lrf": 0.01,
     "momentum": 0.937,
-    "weight_decay": 0.0005,
+    "weight_decay": 0.001,  # Increased from 0.0005 for better regularization
     # Warmup settings (for stable fine-tuning)
     "warmup_epochs": 3,
     "warmup_momentum": 0.8,
@@ -76,17 +77,17 @@ COMPETITION_CONFIG = {
     "shear": 2.0,
     "flipud": 0.0,
     "fliplr": 0.5,
-    "mosaic": 0.8,  # Reduced from 1.0 for small datasets
+    "mosaic": 0.7,  # Reduced from 0.8 for better generalization on small datasets
     "mixup": 0.1,
     # Performance settings
     "workers": 8,
     "cache": True,  # Cache images in RAM for speed
     "amp": True,  # Automatic mixed precision
-    "close_mosaic": 15,  # Disable mosaic for final N epochs (increased from 10)
-    # Overfitting prevention (Tier 1)
-    "label_smoothing": 0.0,  # Can be increased for small datasets (0.05-0.1)
-    "cos_lr": False,  # Cosine LR schedule
-    "multi_scale": False,  # Multi-scale training (increases VRAM)
+    "close_mosaic": 20,  # Increased from 15 for longer pure-image training
+    # Overfitting prevention (Tier 1) - enabled for better generalization
+    "label_smoothing": 0.05,  # Enabled for overfitting prevention
+    "cos_lr": True,  # Enabled for smoother LR decay
+    "multi_scale": False,  # Keep False due to VRAM consumption (enabled in GPU scaler for HIGH tier)
     # Checkpointing
     "save": True,
     "save_period": 5,

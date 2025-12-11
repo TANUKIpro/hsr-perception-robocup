@@ -21,9 +21,10 @@ from .training_styles import COLORS, ICONS
 PRESETS = {
     "Competition": {
         # Competition-optimized: Balanced settings (~45 min training)
+        # Updated for better generalization based on Tier 1 recommendations
         "imgsz": 640,
         "patience": 10,
-        "close_mosaic": 15,  # Increased from 10 for better final epochs
+        "close_mosaic": 20,  # Increased from 15 for longer pure-image training
         "freeze": 10,  # Freeze first 10 backbone layers to prevent overfitting
         "warmup_epochs": 3,  # Warmup for stable fine-tuning
         # Augmentation
@@ -36,7 +37,7 @@ PRESETS = {
         "shear": 2.0,
         "flipud": 0.0,
         "fliplr": 0.5,
-        "mosaic": 0.8,  # Reduced from 1.0 for small datasets
+        "mosaic": 0.7,  # Reduced from 0.8 for better generalization on small datasets
         "mixup": 0.1,
         # Optimizer
         "optimizer": "AdamW",
@@ -44,10 +45,10 @@ PRESETS = {
         "lrf": 0.01,
         "momentum": 0.937,
         "weight_decay": 0.001,  # Increased for regularization
-        # Overfitting prevention
-        "label_smoothing": 0.0,
-        "cos_lr": False,
-        "multi_scale": False,
+        # Overfitting prevention - enabled for better generalization
+        "label_smoothing": 0.05,  # Added for overfitting prevention
+        "cos_lr": True,  # Enabled for smoother LR decay
+        "multi_scale": False,  # Keep False due to VRAM consumption
         # Performance
         "workers": 8,
         "cache": True,
@@ -97,12 +98,13 @@ PRESETS = {
     },
     "High Accuracy": {
         # High accuracy: Stronger augmentation, optimized to prevent overfitting
+        # Updated for maximum generalization based on Tier 1 recommendations
         "imgsz": 640,
         "patience": 10,  # Reduced from 15 to prevent overfitting
-        "close_mosaic": 15,  # Increased for better final epochs
+        "close_mosaic": 25,  # Increased from 15 for longer pure-image training
         "freeze": 10,  # Freeze first 10 backbone layers to prevent overfitting
         "warmup_epochs": 3,  # Warmup for stable fine-tuning
-        # Augmentation (stronger)
+        # Augmentation (stronger but conservative mosaic)
         "hsv_h": 0.02,
         "hsv_s": 0.8,
         "hsv_v": 0.5,
@@ -112,7 +114,7 @@ PRESETS = {
         "shear": 3.0,
         "flipud": 0.0,
         "fliplr": 0.5,
-        "mosaic": 0.8,  # Reduced from 1.0 for small datasets
+        "mosaic": 0.6,  # Reduced from 0.8 for better generalization
         "mixup": 0.2,
         # Optimizer (optimized for fine-tuning)
         "optimizer": "AdamW",
@@ -120,10 +122,10 @@ PRESETS = {
         "lrf": 0.01,  # Adjusted final LR scale
         "momentum": 0.937,
         "weight_decay": 0.001,  # Increased from 0.0005 for regularization
-        # Overfitting prevention - enabled for high accuracy
+        # Overfitting prevention - all enabled for high accuracy
         "label_smoothing": 0.1,
         "cos_lr": True,
-        "multi_scale": False,
+        "multi_scale": True,  # Enabled for scale invariance (requires more VRAM)
         # Performance
         "workers": 8,
         "cache": True,
@@ -135,9 +137,10 @@ PRESETS = {
     },
     "Few-Shot": {
         # Few-Shot Optimization: For very small datasets (<500 images)
+        # Updated for maximum overfitting prevention based on Tier 1 recommendations
         "imgsz": 640,
         "patience": 8,  # Lower patience for small datasets
-        "close_mosaic": 20,  # More epochs without mosaic
+        "close_mosaic": 25,  # Increased from 20 for longer pure-image training
         "freeze": 15,  # More frozen layers to prevent overfitting
         "warmup_epochs": 3,  # Warmup for stable fine-tuning
         # Augmentation - conservative for small datasets
