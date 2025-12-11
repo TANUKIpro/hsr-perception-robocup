@@ -76,13 +76,17 @@ COMPETITION_CONFIG = {
     "shear": 2.0,
     "flipud": 0.0,
     "fliplr": 0.5,
-    "mosaic": 1.0,
+    "mosaic": 0.8,  # Reduced from 1.0 for small datasets
     "mixup": 0.1,
     # Performance settings
     "workers": 8,
     "cache": True,  # Cache images in RAM for speed
     "amp": True,  # Automatic mixed precision
-    "close_mosaic": 10,  # Disable mosaic for final N epochs
+    "close_mosaic": 15,  # Disable mosaic for final N epochs (increased from 10)
+    # Overfitting prevention (Tier 1)
+    "label_smoothing": 0.0,  # Can be increased for small datasets (0.05-0.1)
+    "cos_lr": False,  # Cosine LR schedule
+    "multi_scale": False,  # Multi-scale training (increases VRAM)
     # Checkpointing
     "save": True,
     "save_period": 5,

@@ -216,6 +216,8 @@ def main():
                     "workers", "cache", "amp", "imgsz", "patience", "close_mosaic",
                     # Layer freeze (prevents overfitting)
                     "freeze", "warmup_epochs",
+                    # Overfitting prevention (Tier 1)
+                    "label_smoothing", "cos_lr", "multi_scale",
                     # Checkpoint
                     "save", "save_period", "exist_ok",
                 }

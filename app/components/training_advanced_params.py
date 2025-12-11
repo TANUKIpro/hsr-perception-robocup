@@ -23,7 +23,7 @@ PRESETS = {
         # Competition-optimized: Balanced settings (~45 min training)
         "imgsz": 640,
         "patience": 10,
-        "close_mosaic": 10,
+        "close_mosaic": 15,  # Increased from 10 for better final epochs
         "freeze": 10,  # Freeze first 10 backbone layers to prevent overfitting
         "warmup_epochs": 3,  # Warmup for stable fine-tuning
         # Augmentation
@@ -36,7 +36,7 @@ PRESETS = {
         "shear": 2.0,
         "flipud": 0.0,
         "fliplr": 0.5,
-        "mosaic": 1.0,
+        "mosaic": 0.8,  # Reduced from 1.0 for small datasets
         "mixup": 0.1,
         # Optimizer
         "optimizer": "AdamW",
@@ -44,6 +44,10 @@ PRESETS = {
         "lrf": 0.01,
         "momentum": 0.937,
         "weight_decay": 0.001,  # Increased for regularization
+        # Overfitting prevention
+        "label_smoothing": 0.0,
+        "cos_lr": False,
+        "multi_scale": False,
         # Performance
         "workers": 8,
         "cache": True,
@@ -78,6 +82,10 @@ PRESETS = {
         "lrf": 0.01,
         "momentum": 0.937,
         "weight_decay": 0.0005,
+        # Overfitting prevention
+        "label_smoothing": 0.0,
+        "cos_lr": False,
+        "multi_scale": False,
         # Performance
         "workers": 4,
         "cache": True,
@@ -91,7 +99,7 @@ PRESETS = {
         # High accuracy: Stronger augmentation, optimized to prevent overfitting
         "imgsz": 640,
         "patience": 10,  # Reduced from 15 to prevent overfitting
-        "close_mosaic": 10,  # Match patience
+        "close_mosaic": 15,  # Increased for better final epochs
         "freeze": 10,  # Freeze first 10 backbone layers to prevent overfitting
         "warmup_epochs": 3,  # Warmup for stable fine-tuning
         # Augmentation (stronger)
@@ -104,7 +112,7 @@ PRESETS = {
         "shear": 3.0,
         "flipud": 0.0,
         "fliplr": 0.5,
-        "mosaic": 1.0,
+        "mosaic": 0.8,  # Reduced from 1.0 for small datasets
         "mixup": 0.2,
         # Optimizer (optimized for fine-tuning)
         "optimizer": "AdamW",
@@ -112,6 +120,48 @@ PRESETS = {
         "lrf": 0.01,  # Adjusted final LR scale
         "momentum": 0.937,
         "weight_decay": 0.001,  # Increased from 0.0005 for regularization
+        # Overfitting prevention - enabled for high accuracy
+        "label_smoothing": 0.1,
+        "cos_lr": True,
+        "multi_scale": False,
+        # Performance
+        "workers": 8,
+        "cache": True,
+        "amp": True,
+        # Checkpoint
+        "save": True,
+        "save_period": 5,
+        "exist_ok": True,
+    },
+    "Few-Shot": {
+        # Few-Shot Optimization: For very small datasets (<500 images)
+        "imgsz": 640,
+        "patience": 8,  # Lower patience for small datasets
+        "close_mosaic": 20,  # More epochs without mosaic
+        "freeze": 15,  # More frozen layers to prevent overfitting
+        "warmup_epochs": 3,  # Warmup for stable fine-tuning
+        # Augmentation - conservative for small datasets
+        "hsv_h": 0.01,
+        "hsv_s": 0.5,
+        "hsv_v": 0.3,
+        "degrees": 5.0,
+        "translate": 0.05,
+        "scale": 0.3,
+        "shear": 1.0,
+        "flipud": 0.0,
+        "fliplr": 0.5,
+        "mosaic": 0.5,  # Reduced mosaic for small datasets
+        "mixup": 0.3,  # Increased mixup for regularization
+        # Optimizer - conservative for fine-tuning
+        "optimizer": "AdamW",
+        "lr0": 0.0005,  # Lower learning rate
+        "lrf": 0.01,
+        "momentum": 0.9,
+        "weight_decay": 0.002,  # Higher weight decay for regularization
+        # Overfitting prevention - all enabled
+        "label_smoothing": 0.1,
+        "cos_lr": True,
+        "multi_scale": False,  # Keep False to avoid OOM on small GPUs
         # Performance
         "workers": 8,
         "cache": True,
@@ -167,7 +217,7 @@ def _render_preset_selector() -> str:
     ">Presets</div>
     """)
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
 
     current_preset = st.session_state.get("current_preset", "Competition")
 
@@ -202,6 +252,17 @@ def _render_preset_selector() -> str:
         ):
             _load_preset("High Accuracy")
             st.session_state.current_preset = "High Accuracy"
+            st.rerun()
+
+    with col4:
+        if st.button(
+            "Few-Shot",
+            use_container_width=True,
+            type="primary" if current_preset == "Few-Shot" else "secondary",
+            help="Optimized for small datasets (<500 images) with overfitting prevention",
+        ):
+            _load_preset("Few-Shot")
+            st.session_state.current_preset = "Few-Shot"
             st.rerun()
 
     return current_preset
@@ -606,6 +667,79 @@ def _render_checkpoint_tab() -> Dict[str, Any]:
     return params
 
 
+def _render_overfitting_prevention_tab() -> Dict[str, Any]:
+    """Render Overfitting Prevention tab with regularization settings."""
+    params = {}
+
+    # Regularization Strategies section
+    st.html("""
+    <div style="
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.75rem;
+        opacity: 0.6;
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    ">Regularization Strategies</div>
+    """)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        params["label_smoothing"] = st.slider(
+            "Label Smoothing",
+            min_value=0.0,
+            max_value=0.2,
+            value=_get_param("label_smoothing", 0.0),
+            step=0.01,
+            help="Apply label smoothing to prevent overconfident predictions. "
+                 "Recommended: 0.05-0.1 for small datasets (<500 images).",
+            key="adv_label_smoothing",
+        )
+    with col2:
+        params["cos_lr"] = st.checkbox(
+            "Cosine LR Schedule",
+            value=_get_param("cos_lr", False),
+            help="Use cosine annealing learning rate schedule for smoother convergence. "
+                 "Helps prevent overfitting by gradually reducing learning rate.",
+            key="adv_cos_lr",
+        )
+
+    st.markdown("<div style='height: 16px'></div>", unsafe_allow_html=True)
+
+    # Multi-scale Training section
+    st.html("""
+    <div style="
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.75rem;
+        opacity: 0.6;
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    ">Scale Augmentation</div>
+    """)
+
+    params["multi_scale"] = st.checkbox(
+        "Multi-scale Training",
+        value=_get_param("multi_scale", False),
+        help="Vary image size ±50% during training for better scale invariance. "
+             "Warning: Increases VRAM usage significantly. Not recommended for GPUs < 8GB.",
+        key="adv_multi_scale",
+    )
+
+    st.markdown("<div style='height: 16px'></div>", unsafe_allow_html=True)
+
+    # Info box with recommendations
+    st.info(
+        "**Few-Shot Dataset Tips (< 500 images):**\n"
+        "- Enable **Label Smoothing** (0.05-0.1) to prevent overconfident predictions\n"
+        "- Use **Cosine LR** for stable training with gradual decay\n"
+        "- Increase **Freeze Layers** (15+) in Performance tab to prevent backbone overfitting\n"
+        "- Consider using the **Few-Shot** preset for optimized settings"
+    )
+
+    return params
+
+
 # =============================================================================
 # Main Entry Point
 # =============================================================================
@@ -655,11 +789,12 @@ def render_advanced_parameters_section(
         st.markdown("<div style='height: 16px'></div>", unsafe_allow_html=True)
 
         # Parameter tabs
-        tab1, tab2, tab3, tab4 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
             "Data Augmentation",
             "Optimizer",
             "Performance",
-            "Checkpoint"
+            "Checkpoint",
+            "Overfitting Prevention"
         ])
 
         with tab1:
@@ -674,12 +809,16 @@ def render_advanced_parameters_section(
         with tab4:
             ckpt_params = _render_checkpoint_tab()
 
+        with tab5:
+            overfit_params = _render_overfitting_prevention_tab()
+
     # Combine all parameters
     all_params = {
         **aug_params,
         **opt_params,
         **perf_params,
         **ckpt_params,
+        **overfit_params,
     }
 
     return all_params
