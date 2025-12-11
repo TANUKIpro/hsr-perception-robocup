@@ -45,6 +45,9 @@ PRESETS = {
         "lrf": 0.01,
         "momentum": 0.937,
         "weight_decay": 0.001,  # Increased for regularization
+        # LLRD (Layer-wise Learning Rate Decay)
+        "llrd_enabled": False,
+        "llrd_decay_rate": 0.9,
         # Overfitting prevention - enabled for better generalization
         "label_smoothing": 0.05,  # Added for overfitting prevention
         "cos_lr": True,  # Enabled for smoother LR decay
@@ -83,6 +86,9 @@ PRESETS = {
         "lrf": 0.01,
         "momentum": 0.937,
         "weight_decay": 0.0005,
+        # LLRD (Layer-wise Learning Rate Decay)
+        "llrd_enabled": False,
+        "llrd_decay_rate": 0.9,
         # Overfitting prevention
         "label_smoothing": 0.0,
         "cos_lr": False,
@@ -122,6 +128,9 @@ PRESETS = {
         "lrf": 0.01,  # Adjusted final LR scale
         "momentum": 0.937,
         "weight_decay": 0.001,  # Increased from 0.0005 for regularization
+        # LLRD (Layer-wise Learning Rate Decay)
+        "llrd_enabled": False,
+        "llrd_decay_rate": 0.9,
         # Overfitting prevention - all enabled for high accuracy
         "label_smoothing": 0.1,
         "cos_lr": True,
@@ -161,6 +170,9 @@ PRESETS = {
         "lrf": 0.01,
         "momentum": 0.9,
         "weight_decay": 0.002,  # Higher weight decay for regularization
+        # LLRD (Layer-wise Learning Rate Decay)
+        "llrd_enabled": False,
+        "llrd_decay_rate": 0.9,
         # Overfitting prevention - all enabled
         "label_smoothing": 0.1,
         "cos_lr": True,
@@ -520,6 +532,44 @@ def _render_optimizer_tab() -> Dict[str, Any]:
             format="%.4f",
             help="L2 regularization strength.",
             key="adv_weight_decay",
+        )
+
+    st.markdown("<div style='height: 16px'></div>", unsafe_allow_html=True)
+
+    # LLRD (Layer-wise Learning Rate Decay)
+    st.html("""
+    <div style="
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.75rem;
+        opacity: 0.6;
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    ">Layer-wise Learning Rate Decay (LLRD)</div>
+    """)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        params["llrd_enabled"] = st.checkbox(
+            "Enable LLRD",
+            value=_get_param("llrd_enabled", False),
+            help="Apply different learning rates to different network depths. "
+                 "Detection head gets the highest LR, backbone gets the lowest. "
+                 "Recommended for fine-tuning to improve generalization (+1-3% mAP).",
+            key="adv_llrd_enabled",
+        )
+    with col2:
+        params["llrd_decay_rate"] = st.slider(
+            "Decay Rate",
+            min_value=0.7,
+            max_value=0.99,
+            value=_get_param("llrd_decay_rate", 0.9),
+            step=0.01,
+            format="%.2f",
+            disabled=not _get_param("llrd_enabled", False),
+            help="LR decay factor per layer depth. 0.9 means each deeper layer "
+                 "gets 90% of the previous layer's LR. Lower values = more aggressive decay.",
+            key="adv_llrd_decay_rate",
         )
 
     return params

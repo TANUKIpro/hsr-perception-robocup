@@ -62,6 +62,10 @@ class OptimizerConfig:
     momentum: float = 0.937
     weight_decay: float = 0.0005
 
+    # Layer-wise Learning Rate Decay (LLRD)
+    llrd_enabled: bool = False  # Enable LLRD for fine-tuning
+    llrd_decay_rate: float = 0.9  # LR decay factor per layer depth
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for YOLO training."""
         return {
@@ -70,6 +74,8 @@ class OptimizerConfig:
             "lrf": self.lrf,
             "momentum": self.momentum,
             "weight_decay": self.weight_decay,
+            "llrd_enabled": self.llrd_enabled,
+            "llrd_decay_rate": self.llrd_decay_rate,
         }
 
 
@@ -189,6 +195,8 @@ class TrainingConfig:
             lrf=config_dict.get("lrf", 0.01),
             momentum=config_dict.get("momentum", 0.937),
             weight_decay=config_dict.get("weight_decay", 0.0005),
+            llrd_enabled=config_dict.get("llrd_enabled", False),
+            llrd_decay_rate=config_dict.get("llrd_decay_rate", 0.9),
         )
 
         performance = PerformanceConfig(
