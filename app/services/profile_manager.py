@@ -365,8 +365,9 @@ class ProfileManager:
 
     def _safe_extract_zip(self, zip_file: zipfile.ZipFile, extract_to: Path) -> None:
         """
-        Safely extract ZIP file with path traversal protection.
+        Safely extract ZIP file with path traversal protection and memory efficiency.
 
+        Uses streaming extraction (file-by-file, chunk-by-chunk) to minimize memory usage.
         Prevents ZipSlip vulnerability by validating all extracted paths.
 
         Args:
@@ -377,6 +378,7 @@ class ProfileManager:
             ValueError: If ZIP contains path traversal attempt (e.g., ../)
         """
         extract_to = extract_to.resolve()
+        CHUNK_SIZE = 8 * 1024 * 1024  # 8MB chunks
 
         for member in zip_file.namelist():
             # Check for absolute paths in ZIP
@@ -396,8 +398,21 @@ class ProfileManager:
                     f"Security error: ZIP contains path traversal attempt: {member}"
                 )
 
-        # Safe to extract
-        zip_file.extractall(extract_to)
+            # Handle directories
+            if member.endswith('/'):
+                member_path.mkdir(parents=True, exist_ok=True)
+                continue
+
+            # Ensure parent directory exists
+            member_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Stream extract file in chunks (memory efficient)
+            with zip_file.open(member) as src, open(member_path, 'wb') as dst:
+                while True:
+                    chunk = src.read(CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    dst.write(chunk)
 
     def _resolve_duplicate_name(self, base_name: str) -> str:
         """
@@ -656,18 +671,18 @@ class ProfileManager:
             new_profile_dir = self.profiles_dir / new_id
             new_profile_dir.mkdir(parents=True, exist_ok=True)
 
-            # 7. Copy data
+            # 7. Move data (more memory efficient than copy)
             for item in extracted_profile.iterdir():
                 if item.name == "export_metadata.json":
                     continue  # Skip export metadata
 
                 dest = new_profile_dir / item.name
-                if item.is_dir():
-                    if dest.exists():
+                if dest.exists():
+                    if dest.is_dir():
                         shutil.rmtree(dest)
-                    shutil.copytree(item, dest)
-                else:
-                    shutil.copy2(item, dest)
+                    else:
+                        dest.unlink()
+                shutil.move(str(item), str(dest))
 
             # 8. Create metadata
             new_profile = ProfileMetadata(

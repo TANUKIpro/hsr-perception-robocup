@@ -4,9 +4,7 @@ Settings Page
 Provides UI for application settings and configuration.
 """
 
-import shutil
 import streamlit as st
-import tempfile
 import zipfile
 from datetime import datetime
 from pathlib import Path
@@ -158,16 +156,26 @@ def _render_profile_import_export(profile_manager: "ProfileManager") -> None:
     # ===== Import Column =====
     with col2:
         st.write("**Import Profile**")
+        st.info("Place ZIP file in `/app/imports/` directory")
 
-        # File uploader
-        uploaded_file = st.file_uploader(
-            "Choose ZIP file",
-            type=["zip"],
-            key="import_profile_uploader",
-            help="Select a profile ZIP file exported from this application"
-        )
+        # Scan for ZIP files in import directory
+        import_dir = Path("/app/imports")
+        if not import_dir.exists():
+            import_dir.mkdir(parents=True, exist_ok=True)
 
-        if uploaded_file is not None:
+        zip_files = sorted(import_dir.glob("*.zip"))
+
+        if not zip_files:
+            st.caption("No ZIP files found in `/app/imports/`")
+        else:
+            # File selector
+            selected_zip = st.selectbox(
+                "Select ZIP file",
+                options=zip_files,
+                format_func=lambda p: f"{p.name} ({p.stat().st_size / (1024*1024):.1f} MB)",
+                key="import_profile_selector"
+            )
+
             # Optional: custom display name
             custom_name = st.text_input(
                 "Custom name (optional)",
@@ -178,22 +186,9 @@ def _render_profile_import_export(profile_manager: "ProfileManager") -> None:
             # Import button
             if st.button("Import Profile", key="import_profile_btn"):
                 try:
-                    # Save uploaded file to temp location using chunked write (memory efficient)
-                    temp_dir = Path(tempfile.mkdtemp())
-                    temp_zip = temp_dir / uploaded_file.name
-                    with open(temp_zip, "wb") as f:
-                        # Write in 8MB chunks to avoid memory issues with large files
-                        chunk_size = 8 * 1024 * 1024
-                        while True:
-                            chunk = uploaded_file.read(chunk_size)
-                            if not chunk:
-                                break
-                            f.write(chunk)
-
-                    # Import
                     with st.spinner("Importing profile..."):
                         imported_profile = profile_manager.import_profile(
-                            str(temp_zip),
+                            str(selected_zip),
                             display_name=custom_name if custom_name else None
                         )
 
@@ -202,15 +197,6 @@ def _render_profile_import_export(profile_manager: "ProfileManager") -> None:
                     st.info(
                         "Switch to the imported profile using the sidebar selector."
                     )
-
-                    # Clean up temp file
-                    try:
-                        if temp_zip.exists():
-                            temp_zip.unlink()
-                        if temp_dir.exists():
-                            shutil.rmtree(temp_dir)
-                    except Exception:
-                        pass  # Cleanup failure is non-critical
 
                     # Rerun to refresh UI
                     st.rerun()
