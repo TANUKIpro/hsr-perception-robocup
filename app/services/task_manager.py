@@ -296,8 +296,10 @@ class TaskManager:
         output_dir: str,
         class_config: str,
         background_path: Optional[str] = None,
-        train_val_split: float = 0.85,
+        train_val_split: float = 0.80,
         min_area: int = 500,
+        group_continuous_frames: bool = True,
+        group_interval_sec: float = 2.0,
     ) -> str:
         """
         Start annotation task.
@@ -308,8 +310,10 @@ class TaskManager:
             output_dir: Output directory for annotated dataset
             class_config: Path to class configuration JSON
             background_path: Background image path (required for background method)
-            train_val_split: Train/val split ratio
+            train_val_split: Train/val split ratio (default: 0.80)
             min_area: Minimum contour area for background method
+            group_continuous_frames: Group continuous frames to prevent data leakage
+            group_interval_sec: Max seconds between frames in same group
 
         Returns:
             Task ID
@@ -333,6 +337,7 @@ class TaskManager:
                 "method": method,
                 "input_dir": input_dir,
                 "output_dir": output_dir,
+                "group_frames": group_continuous_frames,
             }
         )
         self._save_status(task)
@@ -350,10 +355,16 @@ class TaskManager:
             "--class-config", class_config,
             "--split", str(train_val_split),
             "--min-area", str(min_area),
+            "--group-interval", str(group_interval_sec),
         ]
 
         if background_path:
             cmd.extend(["--background", background_path])
+
+        if group_continuous_frames:
+            cmd.append("--group-frames")
+        else:
+            cmd.append("--no-group-frames")
 
         self._launch_subprocess(cmd, task)
         return task_id

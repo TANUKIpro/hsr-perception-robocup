@@ -449,6 +449,8 @@ def _render_prepare_dataset(path_coordinator: PathCoordinator) -> None:
                 class_names=params["classes"],
                 output_name=params["dataset_name"],
                 val_ratio=params["val_ratio"],
+                group_continuous_frames=params.get("group_frames", True),
+                group_interval_sec=params.get("group_interval", 2.0),
             )
 
         render_dataset_result(result, params["dataset_name"])

@@ -26,7 +26,8 @@ DEFAULT_BURST_INTERVAL: float = 0.2  # seconds (5 FPS)
 MIN_SAMPLES_FOR_TRAINING: int = 50
 
 # Dataset splitting
-DEFAULT_TRAIN_RATIO: float = 0.85
+DEFAULT_TRAIN_RATIO: float = 0.80  # 80%/20% split for better validation
+DEFAULT_GROUP_INTERVAL_SEC: float = 2.0  # Group frames within 2 seconds
 
 
 # =============================================================================

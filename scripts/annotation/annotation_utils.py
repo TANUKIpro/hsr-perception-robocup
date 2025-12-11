@@ -7,9 +7,11 @@ for YOLO format annotations.
 
 import json
 import random
+import re
 import shutil
 import sys
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -266,27 +268,115 @@ def create_dataset_yaml(
         yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
 
 
+def _extract_timestamp(filename: str) -> Optional[datetime]:
+    """
+    Extract timestamp from filename.
+
+    Expected format: {class_name}_{YYYYMMDD}_{HHMMSS}_{milliseconds}.{ext}
+    Example: apple_20251211_123456_123.jpg
+
+    Args:
+        filename: Image filename
+
+    Returns:
+        datetime object or None if parsing fails
+    """
+    # Pattern: anything_YYYYMMDD_HHMMSS_mmm.ext
+    pattern = r".*_(\d{8})_(\d{6})_(\d{3})\.\w+$"
+    match = re.match(pattern, filename)
+    if match:
+        date_str, time_str, ms_str = match.groups()
+        try:
+            return datetime.strptime(f"{date_str}_{time_str}", "%Y%m%d_%H%M%S")
+        except ValueError:
+            return None
+    return None
+
+
+def _group_by_timestamp(
+    pairs: List[Tuple[Path, Path]], interval_sec: float
+) -> List[List[Tuple[Path, Path]]]:
+    """
+    Group image-label pairs by timestamp proximity.
+
+    Images captured within `interval_sec` seconds are grouped together
+    to prevent data leakage from continuous burst captures.
+
+    Args:
+        pairs: List of (image_path, label_path) tuples
+        interval_sec: Maximum seconds between frames in same group
+
+    Returns:
+        List of groups, where each group is a list of pairs
+    """
+    if not pairs:
+        return []
+
+    # Sort pairs by timestamp (None timestamps go to end)
+    def sort_key(pair):
+        ts = _extract_timestamp(pair[0].name)
+        return (ts is None, ts or datetime.min)
+
+    sorted_pairs = sorted(pairs, key=sort_key)
+
+    groups = []
+    current_group = []
+    last_ts = None
+
+    for pair in sorted_pairs:
+        ts = _extract_timestamp(pair[0].name)
+
+        # If no timestamp, add to current group
+        if ts is None:
+            current_group.append(pair)
+            continue
+
+        # Check if this frame belongs to a new group
+        if last_ts is not None and (ts - last_ts).total_seconds() > interval_sec:
+            if current_group:
+                groups.append(current_group)
+            current_group = []
+
+        current_group.append(pair)
+        last_ts = ts
+
+    # Add final group
+    if current_group:
+        groups.append(current_group)
+
+    return groups
+
+
 def split_dataset(
     images_dir: str,
     labels_dir: str,
     output_dir: str,
-    train_ratio: float = 0.85,
+    train_ratio: float = 0.80,
     seed: int = 42,
     copy_files: bool = True,
+    group_continuous_frames: bool = True,
+    group_interval_sec: float = 2.0,
 ) -> Dict[str, int]:
     """
     Split dataset into train and validation sets.
+
+    Supports grouping continuous frames to prevent data leakage from
+    burst captures where similar frames could end up in both train and val sets.
 
     Args:
         images_dir: Directory containing images
         labels_dir: Directory containing YOLO label files
         output_dir: Output directory for split dataset
-        train_ratio: Ratio of training data (default: 0.85)
+        train_ratio: Ratio of training data (default: 0.80)
         seed: Random seed for reproducibility
         copy_files: If True, copy files; if False, create symlinks
+        group_continuous_frames: If True, group frames by timestamp to prevent
+            data leakage from burst captures (default: True)
+        group_interval_sec: Maximum seconds between frames to be in same group
+            (default: 2.0 seconds)
 
     Returns:
-        Dictionary with counts: {"train": n, "val": m}
+        Dictionary with counts: {"train": n, "val": m, "groups": g}
     """
     random.seed(seed)
 
@@ -313,11 +403,36 @@ def split_dataset(
         if label_path.exists():
             valid_pairs.append((img_path, label_path))
 
-    # Shuffle and split
-    random.shuffle(valid_pairs)
-    split_idx = int(len(valid_pairs) * train_ratio)
-    train_pairs = valid_pairs[:split_idx]
-    val_pairs = valid_pairs[split_idx:]
+    # Split logic
+    train_pairs = []
+    val_pairs = []
+    num_groups = 0
+
+    if group_continuous_frames and valid_pairs:
+        # Group by timestamp to prevent data leakage
+        groups = _group_by_timestamp(valid_pairs, group_interval_sec)
+        num_groups = len(groups)
+
+        # Shuffle groups (not individual pairs)
+        random.shuffle(groups)
+
+        # Calculate split point based on total images, but split by groups
+        total_images = sum(len(g) for g in groups)
+        target_train = int(total_images * train_ratio)
+
+        current_train_count = 0
+        for group in groups:
+            if current_train_count < target_train:
+                train_pairs.extend(group)
+                current_train_count += len(group)
+            else:
+                val_pairs.extend(group)
+    else:
+        # Traditional random shuffle and split
+        random.shuffle(valid_pairs)
+        split_idx = int(len(valid_pairs) * train_ratio)
+        train_pairs = valid_pairs[:split_idx]
+        val_pairs = valid_pairs[split_idx:]
 
     # Copy/link files
     def transfer_files(pairs, img_dest, lbl_dest):
@@ -337,7 +452,7 @@ def split_dataset(
     transfer_files(train_pairs, train_images, train_labels)
     transfer_files(val_pairs, val_images, val_labels)
 
-    return {"train": len(train_pairs), "val": len(val_pairs)}
+    return {"train": len(train_pairs), "val": len(val_pairs), "groups": num_groups}
 
 
 def load_class_config(config_path: str) -> Dict:
