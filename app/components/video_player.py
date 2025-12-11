@@ -135,11 +135,15 @@ def render_video_player(
     st.subheader("Frame Navigation")
 
     # 2. Frame navigation with pending state pattern
-    # Use separate pending key to avoid Streamlit session_state modification error
     pending_key = "video_frame_pending"
     slider_key = "video_frame_slider"
+    playing_key = "video_playing"
 
-    # Apply pending frame if exists (from button clicks)
+    # Initialize playing state
+    if playing_key not in st.session_state:
+        st.session_state[playing_key] = False
+
+    # Apply pending frame if exists (from play action)
     if pending_key in st.session_state:
         default_frame = st.session_state.pop(pending_key)
     elif slider_key in st.session_state:
@@ -151,46 +155,38 @@ def render_video_player(
     max_frame = max(0, video_info.total_frames - 1)
     default_frame = max(0, min(default_frame, max_frame))
 
-    # Frame slider
+    # Frame slider (display as 1-indexed)
     current_frame = st.slider(
-        "Seek",
+        "Frame",
         min_value=0,
         max_value=max_frame,
         value=default_frame,
         key=slider_key,
+        format=f"%d / {video_info.total_frames}",
         label_visibility="collapsed",
     )
 
-    # Navigation buttons with clear labels
-    col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 1, 1])
+    # Playback controls
+    col1, col2 = st.columns([1, 3])
 
     with col1:
-        if st.button("First", key="video_first", use_container_width=True):
-            st.session_state[pending_key] = 0
-            st.rerun()
+        if st.session_state[playing_key]:
+            if st.button("Stop", key="video_stop", use_container_width=True):
+                st.session_state[playing_key] = False
+                st.rerun()
+        else:
+            if st.button("Play", key="video_play", use_container_width=True):
+                st.session_state[playing_key] = True
+                st.rerun()
 
     with col2:
-        if st.button("Prev", key="video_prev", use_container_width=True):
-            st.session_state[pending_key] = max(0, current_frame - 1)
-            st.rerun()
-
-    with col3:
         # Frame counter display
         current_time = current_frame / video_info.fps if video_info.fps > 0 else 0
+        status = " (Playing...)" if st.session_state[playing_key] else ""
         st.markdown(
-            f"**Frame {current_frame + 1} / {video_info.total_frames}**  \n"
+            f"**Frame {current_frame + 1} / {video_info.total_frames}**{status}  \n"
             f"{current_time:.1f}s / {video_info.duration_sec:.1f}s"
         )
-
-    with col4:
-        if st.button("Next", key="video_next", use_container_width=True):
-            st.session_state[pending_key] = min(max_frame, current_frame + 1)
-            st.rerun()
-
-    with col5:
-        if st.button("Last", key="video_last", use_container_width=True):
-            st.session_state[pending_key] = max_frame
-            st.rerun()
 
     st.markdown("---")
 
@@ -239,3 +235,14 @@ def render_video_player(
             )
     else:
         st.info("No objects detected")
+
+    # Auto-advance if playing
+    if st.session_state[playing_key]:
+        if current_frame < max_frame:
+            time.sleep(0.1)  # ~10fps (considering inference time)
+            st.session_state[pending_key] = current_frame + 1
+            st.rerun()
+        else:
+            # Reached end, stop playing
+            st.session_state[playing_key] = False
+            st.rerun()
