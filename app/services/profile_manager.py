@@ -602,7 +602,7 @@ class ProfileManager:
             raise zipfile.BadZipFile(f"Invalid ZIP file: {zip_path}")
 
         # 2. Check uncompressed size (Zip Bomb protection)
-        MAX_UNCOMPRESSED_SIZE = 2 * 1024 * 1024 * 1024  # 2GB limit
+        MAX_UNCOMPRESSED_SIZE = 4 * 1024 * 1024 * 1024  # 4GB limit
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             total_size = sum(info.file_size for info in zip_ref.infolist())
             if total_size > MAX_UNCOMPRESSED_SIZE:

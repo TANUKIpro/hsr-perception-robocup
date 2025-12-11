@@ -178,11 +178,17 @@ def _render_profile_import_export(profile_manager: "ProfileManager") -> None:
             # Import button
             if st.button("Import Profile", key="import_profile_btn"):
                 try:
-                    # Save uploaded file to temp location
+                    # Save uploaded file to temp location using chunked write (memory efficient)
                     temp_dir = Path(tempfile.mkdtemp())
                     temp_zip = temp_dir / uploaded_file.name
                     with open(temp_zip, "wb") as f:
-                        f.write(uploaded_file.getbuffer())
+                        # Write in 8MB chunks to avoid memory issues with large files
+                        chunk_size = 8 * 1024 * 1024
+                        while True:
+                            chunk = uploaded_file.read(chunk_size)
+                            if not chunk:
+                                break
+                            f.write(chunk)
 
                     # Import
                     with st.spinner("Importing profile..."):
