@@ -68,6 +68,7 @@ services:
       - ${MODELS_DIR:-./models}:/workspace/models
       - ${PROFILES_DIR:-./profiles}:/workspace/profiles
       - ${RUNS_DIR:-./runs}:/workspace/runs
+      - ${IMPORTS_DIR:-./imports}:/app/imports
 
       # Configuration (read-only bind mount for easy editing)
       - ./config:/workspace/config:ro

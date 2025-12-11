@@ -7,6 +7,8 @@ Each profile contains isolated data for objects, datasets, and trained models.
 
 import json
 import shutil
+import tempfile
+import zipfile
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from pathlib import Path
@@ -358,3 +360,351 @@ class ProfileManager:
         self._save_registry(data)
 
         return new_profile
+
+    # ===== Import/Export =====
+
+    def _safe_extract_zip(self, zip_file: zipfile.ZipFile, extract_to: Path) -> None:
+        """
+        Safely extract ZIP file with path traversal protection and memory efficiency.
+
+        Uses streaming extraction (file-by-file, chunk-by-chunk) to minimize memory usage.
+        Prevents ZipSlip vulnerability by validating all extracted paths.
+
+        Args:
+            zip_file: Open ZipFile object
+            extract_to: Extraction target directory
+
+        Raises:
+            ValueError: If ZIP contains path traversal attempt (e.g., ../)
+        """
+        extract_to = extract_to.resolve()
+        CHUNK_SIZE = 8 * 1024 * 1024  # 8MB chunks
+
+        for member in zip_file.namelist():
+            # Check for absolute paths in ZIP
+            if Path(member).is_absolute():
+                raise ValueError(
+                    f"Security error: ZIP contains absolute path: {member}"
+                )
+
+            # Resolve member path
+            member_path = (extract_to / member).resolve()
+
+            # Security check: use relative_to for robust path validation
+            try:
+                member_path.relative_to(extract_to)
+            except ValueError:
+                raise ValueError(
+                    f"Security error: ZIP contains path traversal attempt: {member}"
+                )
+
+            # Handle directories
+            if member.endswith('/'):
+                member_path.mkdir(parents=True, exist_ok=True)
+                continue
+
+            # Ensure parent directory exists
+            member_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Stream extract file in chunks (memory efficient)
+            with zip_file.open(member) as src, open(member_path, 'wb') as dst:
+                while True:
+                    chunk = src.read(CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    dst.write(chunk)
+
+    def _resolve_duplicate_name(self, base_name: str) -> str:
+        """
+        Resolve duplicate profile display name by appending (2), (3), etc.
+
+        Args:
+            base_name: Original display name
+
+        Returns:
+            Unique display name
+
+        Example:
+            "Default Profile" -> "Default Profile (2)" (if duplicate)
+        """
+        data = self._load_registry()
+        existing_names = [p["display_name"] for p in data.get("profiles", [])]
+
+        if base_name not in existing_names:
+            return base_name
+
+        # Try "Name (2)", "Name (3)", etc.
+        counter = 2
+        while True:
+            candidate = f"{base_name} ({counter})"
+            if candidate not in existing_names:
+                return candidate
+            counter += 1
+
+    def export_profile(self, profile_id: str, output_path: str) -> str:
+        """
+        Export a profile to a ZIP file.
+
+        Args:
+            profile_id: Profile ID to export
+            output_path: Output ZIP file path (including .zip extension)
+
+        Returns:
+            str: Absolute path to the generated ZIP file
+
+        Raises:
+            ValueError: Profile not found or invalid output path
+            PermissionError: No write permission
+            OSError: Disk full or other OS error
+        """
+        # 1. Validation
+        profile = self.get_profile(profile_id)
+        if not profile:
+            raise ValueError(f"Profile not found: {profile_id}")
+
+        output_path = Path(output_path)
+        if not output_path.parent.exists():
+            raise ValueError(f"Output directory does not exist: {output_path.parent}")
+
+        # 2. Get profile directory
+        profile_dir = self.get_profile_path(profile_id)
+
+        # 3. Create temporary directory
+        temp_dir = Path(tempfile.mkdtemp(prefix="profile_export_"))
+
+        try:
+            # 4. Copy profile data
+            export_root = temp_dir / profile_id
+            export_root.mkdir()
+
+            # Copy subdirectories
+            for subdir in ["app_data", "datasets", "models"]:
+                src = profile_dir / subdir
+                if src.exists():
+                    shutil.copytree(src, export_root / subdir)
+
+            # Copy profile metadata
+            profile_meta_file = profile_dir / self.PROFILE_METADATA_FILE
+            if profile_meta_file.exists():
+                shutil.copy2(profile_meta_file, export_root / self.PROFILE_METADATA_FILE)
+
+            # 5. Create export metadata
+            export_meta = {
+                "version": "1.0.0",
+                "export_date": datetime.now().isoformat(),
+                "original_profile_id": profile_id,
+                "display_name": profile.display_name,
+                "description": profile.description or "",
+                "created_at": profile.created_at
+            }
+
+            with open(export_root / "export_metadata.json", "w", encoding="utf-8") as f:
+                json.dump(export_meta, f, indent=2, ensure_ascii=False)
+
+            # 6. Create ZIP archive
+            base_name = str(output_path).replace(".zip", "")
+            archive_path = shutil.make_archive(base_name, 'zip', temp_dir)
+
+            return archive_path
+
+        finally:
+            # 7. Cleanup
+            if temp_dir.exists():
+                try:
+                    shutil.rmtree(temp_dir)
+                except Exception:
+                    pass  # Cleanup failure shouldn't block main operation
+
+    def export_profile_to_bytes(self, profile_id: str) -> bytes:
+        """
+        Export a profile to a ZIP file and return as bytes.
+
+        Suitable for browser download via st.download_button().
+
+        Args:
+            profile_id: Profile ID to export
+
+        Returns:
+            bytes: ZIP file content as bytes
+
+        Raises:
+            ValueError: Profile not found
+            OSError: Disk full or other OS error
+        """
+        # 1. Validation
+        profile = self.get_profile(profile_id)
+        if not profile:
+            raise ValueError(f"Profile not found: {profile_id}")
+
+        # 2. Get profile directory
+        profile_dir = self.get_profile_path(profile_id)
+
+        # 3. Create temporary directory
+        temp_dir = Path(tempfile.mkdtemp(prefix="profile_export_"))
+
+        try:
+            # 4. Copy profile data
+            export_root = temp_dir / profile_id
+            export_root.mkdir()
+
+            # Copy subdirectories
+            for subdir in ["app_data", "datasets", "models"]:
+                src = profile_dir / subdir
+                if src.exists():
+                    shutil.copytree(src, export_root / subdir)
+
+            # Copy profile metadata
+            profile_meta_file = profile_dir / self.PROFILE_METADATA_FILE
+            if profile_meta_file.exists():
+                shutil.copy2(profile_meta_file, export_root / self.PROFILE_METADATA_FILE)
+
+            # 5. Create export metadata
+            export_meta = {
+                "version": "1.0.0",
+                "export_date": datetime.now().isoformat(),
+                "original_profile_id": profile_id,
+                "display_name": profile.display_name,
+                "description": profile.description or "",
+                "created_at": profile.created_at
+            }
+
+            with open(export_root / "export_metadata.json", "w", encoding="utf-8") as f:
+                json.dump(export_meta, f, indent=2, ensure_ascii=False)
+
+            # 6. Create ZIP archive in temp directory
+            zip_path = temp_dir / "export.zip"
+            base_name = str(zip_path).replace(".zip", "")
+            archive_path = shutil.make_archive(base_name, 'zip', temp_dir, profile_id)
+
+            # 7. Read ZIP file as bytes
+            with open(archive_path, "rb") as f:
+                zip_bytes = f.read()
+
+            return zip_bytes
+
+        finally:
+            # 8. Cleanup
+            if temp_dir.exists():
+                try:
+                    shutil.rmtree(temp_dir)
+                except Exception:
+                    pass  # Cleanup failure shouldn't block main operation
+
+    def import_profile(self, zip_path: str, display_name: Optional[str] = None) -> ProfileMetadata:
+        """
+        Import a profile from a ZIP file.
+
+        Args:
+            zip_path: Path to the ZIP file to import
+            display_name: Custom display name (uses original name if None)
+
+        Returns:
+            ProfileMetadata: Metadata for the newly created profile
+
+        Raises:
+            FileNotFoundError: ZIP file not found
+            zipfile.BadZipFile: Invalid ZIP format
+            ValueError: Invalid profile structure or security violation
+            OSError: Disk full or other OS error
+        """
+        zip_path = Path(zip_path)
+
+        # 1. Validate ZIP file
+        if not zip_path.exists():
+            raise FileNotFoundError(f"ZIP file not found: {zip_path}")
+
+        if not zipfile.is_zipfile(zip_path):
+            raise zipfile.BadZipFile(f"Invalid ZIP file: {zip_path}")
+
+        # 2. Check uncompressed size (Zip Bomb protection)
+        MAX_UNCOMPRESSED_SIZE = 4 * 1024 * 1024 * 1024  # 4GB limit
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            total_size = sum(info.file_size for info in zip_ref.infolist())
+            if total_size > MAX_UNCOMPRESSED_SIZE:
+                raise ValueError(
+                    f"ZIP file too large: {total_size / (1024**3):.2f} GB "
+                    f"(max: {MAX_UNCOMPRESSED_SIZE / (1024**3):.2f} GB)"
+                )
+
+        # 3. Extract to temporary directory with security check
+        temp_dir = Path(tempfile.mkdtemp(prefix="profile_import_"))
+
+        try:
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                self._safe_extract_zip(zip_ref, temp_dir)
+
+            # 3. Validate profile structure
+            profile_dirs = [d for d in temp_dir.iterdir() if d.is_dir()]
+            if len(profile_dirs) != 1:
+                raise ValueError(
+                    f"Invalid profile structure: Expected single profile directory, "
+                    f"found {len(profile_dirs)}"
+                )
+
+            extracted_profile = profile_dirs[0]
+
+            # Check required files
+            export_meta_path = extracted_profile / "export_metadata.json"
+            profile_meta_path = extracted_profile / self.PROFILE_METADATA_FILE
+
+            if not export_meta_path.exists():
+                raise ValueError("Invalid profile: export_metadata.json not found")
+
+            if not profile_meta_path.exists():
+                raise ValueError("Invalid profile: profile.json not found")
+
+            # Load metadata
+            with open(export_meta_path, 'r', encoding='utf-8') as f:
+                export_meta = json.load(f)
+
+            # 4. Generate new profile ID
+            data = self._load_registry()
+            new_id = self._generate_profile_id([p["id"] for p in data["profiles"]])
+
+            # 5. Resolve duplicate display name
+            if display_name is None:
+                display_name = export_meta.get("display_name", "Imported Profile")
+
+            final_display_name = self._resolve_duplicate_name(display_name)
+
+            # 6. Create new profile directory
+            new_profile_dir = self.profiles_dir / new_id
+            new_profile_dir.mkdir(parents=True, exist_ok=True)
+
+            # 7. Move data (more memory efficient than copy)
+            for item in extracted_profile.iterdir():
+                if item.name == "export_metadata.json":
+                    continue  # Skip export metadata
+
+                dest = new_profile_dir / item.name
+                if dest.exists():
+                    if dest.is_dir():
+                        shutil.rmtree(dest)
+                    else:
+                        dest.unlink()
+                shutil.move(str(item), str(dest))
+
+            # 8. Create metadata
+            new_profile = ProfileMetadata(
+                id=new_id,
+                display_name=final_display_name,
+                created_at=datetime.now().isoformat(),
+                description=export_meta.get("description", "Imported from ZIP")
+            )
+
+            # Save profile metadata
+            self._save_profile_metadata(new_id, new_profile)
+
+            # Add to registry
+            data["profiles"].append(new_profile.to_dict())
+            self._save_registry(data)
+
+            return new_profile
+
+        finally:
+            # 9. Cleanup
+            if temp_dir.exists():
+                try:
+                    shutil.rmtree(temp_dir)
+                except Exception:
+                    pass  # Cleanup failure shouldn't block main operation
