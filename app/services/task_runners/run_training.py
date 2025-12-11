@@ -214,6 +214,8 @@ def main():
                     "optimizer", "lr0", "lrf", "momentum", "weight_decay",
                     # Performance
                     "workers", "cache", "amp", "imgsz", "patience", "close_mosaic",
+                    # Layer freeze (prevents overfitting)
+                    "freeze", "warmup_epochs",
                     # Checkpoint
                     "save", "save_period", "exist_ok",
                 }

@@ -186,9 +186,11 @@ class AutoAnnotator:
         input_dir: str,
         output_dir: str,
         class_config_path: str,
-        train_val_split: float = 0.85,
+        train_val_split: float = 0.80,
         verify: bool = True,
         update_config: bool = True,
+        group_continuous_frames: bool = True,
+        group_interval_sec: float = 2.0,
     ) -> AnnotationReport:
         """
         Run complete annotation pipeline.
@@ -206,9 +208,13 @@ class AutoAnnotator:
             input_dir: Directory containing per-class image subdirectories
             output_dir: Output directory for YOLO dataset
             class_config_path: Path to object_classes.json
-            train_val_split: Ratio of training data (default: 0.85)
+            train_val_split: Ratio of training data (default: 0.80)
             verify: If True, validate generated annotations
             update_config: If True, update collected_samples in config
+            group_continuous_frames: If True, group frames by timestamp to prevent
+                data leakage from burst captures (default: True)
+            group_interval_sec: Maximum seconds between frames to be in same group
+                (default: 2.0 seconds)
 
         Returns:
             AnnotationReport with complete statistics
@@ -300,12 +306,18 @@ class AutoAnnotator:
 
         # Split dataset
         print("\nSplitting dataset...")
+        if group_continuous_frames:
+            print(f"  Grouping continuous frames (interval: {group_interval_sec}s)")
         split_result = split_dataset(
             images_dir=str(images_dir),
             labels_dir=str(labels_dir),
             output_dir=str(output_path),
             train_ratio=train_val_split,
+            group_continuous_frames=group_continuous_frames,
+            group_interval_sec=group_interval_sec,
         )
+        if split_result.get("groups", 0) > 0:
+            print(f"  Groups: {split_result['groups']}")
         print(f"  Train: {split_result['train']}, Val: {split_result['val']}")
 
         # Create dataset.yaml
@@ -394,8 +406,25 @@ Examples:
     parser.add_argument(
         "--split",
         type=float,
-        default=0.85,
-        help="Train/val split ratio (default: 0.85)",
+        default=0.80,
+        help="Train/val split ratio (default: 0.80)",
+    )
+    parser.add_argument(
+        "--group-frames",
+        action="store_true",
+        default=True,
+        help="Group continuous frames to prevent data leakage (default: True)",
+    )
+    parser.add_argument(
+        "--no-group-frames",
+        action="store_true",
+        help="Disable frame grouping (use random split)",
+    )
+    parser.add_argument(
+        "--group-interval",
+        type=float,
+        default=2.0,
+        help="Max seconds between frames in same group (default: 2.0)",
     )
     parser.add_argument(
         "--no-verify",
@@ -431,6 +460,9 @@ Examples:
         annotator_config=annotator_config,
     )
 
+    # Determine grouping settings
+    group_frames = args.group_frames and not args.no_group_frames
+
     try:
         report = annotator.run(
             input_dir=args.input_dir,
@@ -439,6 +471,8 @@ Examples:
             train_val_split=args.split,
             verify=not args.no_verify,
             update_config=not args.no_update_config,
+            group_continuous_frames=group_frames,
+            group_interval_sec=args.group_interval,
         )
 
         print(report.summary())

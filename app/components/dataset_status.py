@@ -255,6 +255,28 @@ def render_dataset_preparation_panel(
             help="Proportion of data to use for validation"
         )
 
+    # Frame grouping settings (to prevent data leakage)
+    with st.expander("🔧 Advanced Split Settings", expanded=False):
+        group_frames = st.checkbox(
+            "Group continuous frames",
+            value=True,
+            help="Group frames captured in quick succession to prevent data leakage. "
+                 "Ensures similar images from burst captures stay in the same split."
+        )
+
+        if group_frames:
+            group_interval = st.slider(
+                "Group interval (seconds)",
+                min_value=0.5,
+                max_value=5.0,
+                value=2.0,
+                step=0.5,
+                help="Maximum time between frames to be grouped together. "
+                     "Frames within this interval will be kept in the same train/val split."
+            )
+        else:
+            group_interval = 2.0
+
     st.markdown("<div style='height: 16px'></div>", unsafe_allow_html=True)
 
     # Preview
@@ -323,6 +345,8 @@ def render_dataset_preparation_panel(
             "classes": selected_classes,
             "dataset_name": dataset_name,
             "val_ratio": val_ratio,
+            "group_frames": group_frames,
+            "group_interval": group_interval,
         }
 
     return None

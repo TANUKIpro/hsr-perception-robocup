@@ -5,8 +5,10 @@ Provides functionality to prepare YOLO training datasets from
 raw captures and annotation labels within the Streamlit app.
 """
 
+import re
 import shutil
 import random
+from datetime import datetime
 from pathlib import Path
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -14,6 +16,90 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from services.path_coordinator import PathCoordinator
 import yaml
+
+
+def _extract_timestamp(filename: str) -> datetime | None:
+    """
+    Extract timestamp from filename.
+
+    Expected format: {class_name}_{YYYYMMDD}_{HHMMSS}_{milliseconds}.{ext}
+    Example: apple_20251211_123456_123.jpg
+
+    Args:
+        filename: Image filename
+
+    Returns:
+        datetime object if timestamp found, None otherwise
+    """
+    # Pattern: something_YYYYMMDD_HHMMSS_mmm.ext
+    pattern = r".*_(\d{8})_(\d{6})_(\d{3})\.\w+$"
+    match = re.match(pattern, filename)
+    if match:
+        date_str, time_str, ms_str = match.groups()
+        try:
+            return datetime.strptime(f"{date_str}_{time_str}", "%Y%m%d_%H%M%S")
+        except ValueError:
+            return None
+    return None
+
+
+def _group_by_timestamp(
+    pairs: list[tuple[Path, Path, str]], interval_sec: float
+) -> list[list[tuple[Path, Path, str]]]:
+    """
+    Group image-label pairs by timestamp proximity.
+
+    Groups images that were captured within interval_sec of each other,
+    ensuring continuous frames from burst captures stay together.
+
+    Args:
+        pairs: List of (image_path, label_path, class_name) tuples
+        interval_sec: Maximum seconds between frames in same group
+
+    Returns:
+        List of groups, each group is a list of pairs
+    """
+    if not pairs:
+        return []
+
+    # Try to extract timestamps
+    pairs_with_ts = []
+    pairs_without_ts = []
+
+    for pair in pairs:
+        ts = _extract_timestamp(pair[0].name)
+        if ts:
+            pairs_with_ts.append((ts, pair))
+        else:
+            pairs_without_ts.append(pair)
+
+    groups = []
+
+    # Group pairs with timestamps
+    if pairs_with_ts:
+        # Sort by timestamp
+        pairs_with_ts.sort(key=lambda x: x[0])
+
+        current_group = []
+        last_ts = None
+
+        for ts, pair in pairs_with_ts:
+            if last_ts and (ts - last_ts).total_seconds() > interval_sec:
+                if current_group:
+                    groups.append(current_group)
+                current_group = []
+
+            current_group.append(pair)
+            last_ts = ts
+
+        if current_group:
+            groups.append(current_group)
+
+    # Add pairs without timestamps as individual groups
+    for pair in pairs_without_ts:
+        groups.append([pair])
+
+    return groups
 
 
 @dataclass
@@ -142,6 +228,8 @@ class DatasetPreparer:
         output_name: str,
         val_ratio: float = 0.2,
         seed: int = 42,
+        group_continuous_frames: bool = True,
+        group_interval_sec: float = 2.0,
     ) -> DatasetResult:
         """
         Prepare a YOLO training dataset from selected classes.
@@ -151,6 +239,10 @@ class DatasetPreparer:
             output_name: Name for the output dataset directory
             val_ratio: Ratio for validation split (0.0-1.0)
             seed: Random seed for reproducibility
+            group_continuous_frames: If True, group frames by timestamp to prevent
+                data leakage from burst captures (default: True)
+            group_interval_sec: Maximum seconds between frames in same group
+                (default: 2.0 seconds)
 
         Returns:
             DatasetResult with success status and statistics
@@ -207,13 +299,27 @@ class DatasetPreparer:
             sorted_names = sorted(class_names)
             class_mapping = {name: idx for idx, name in enumerate(sorted_names)}
 
-            # Shuffle and split
-            random.shuffle(all_pairs)
-            val_count = int(len(all_pairs) * val_ratio)
-            train_count = len(all_pairs) - val_count
+            # Split dataset (with or without grouping)
+            if group_continuous_frames:
+                # Group frames by timestamp
+                groups = _group_by_timestamp(all_pairs, group_interval_sec)
+                random.shuffle(groups)
 
-            train_pairs = all_pairs[:train_count]
-            val_pairs = all_pairs[train_count:]
+                # Split at group level
+                val_group_count = max(1, int(len(groups) * val_ratio))
+                train_groups = groups[:-val_group_count] if val_group_count < len(groups) else []
+                val_groups = groups[-val_group_count:]
+
+                # Flatten back to pairs
+                train_pairs = [pair for group in train_groups for pair in group]
+                val_pairs = [pair for group in val_groups for pair in group]
+            else:
+                # Traditional random split
+                random.shuffle(all_pairs)
+                val_count = int(len(all_pairs) * val_ratio)
+
+                train_pairs = all_pairs[:-val_count] if val_count < len(all_pairs) else []
+                val_pairs = all_pairs[-val_count:] if val_count > 0 else []
 
             # Process pairs
             self._process_pairs(train_pairs, output_dir, "train", class_mapping)

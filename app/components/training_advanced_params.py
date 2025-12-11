@@ -24,6 +24,8 @@ PRESETS = {
         "imgsz": 640,
         "patience": 10,
         "close_mosaic": 10,
+        "freeze": 10,  # Freeze first 10 backbone layers to prevent overfitting
+        "warmup_epochs": 3,  # Warmup for stable fine-tuning
         # Augmentation
         "hsv_h": 0.015,
         "hsv_s": 0.7,
@@ -41,7 +43,7 @@ PRESETS = {
         "lr0": 0.001,
         "lrf": 0.01,
         "momentum": 0.937,
-        "weight_decay": 0.0005,
+        "weight_decay": 0.001,  # Increased for regularization
         # Performance
         "workers": 8,
         "cache": True,
@@ -56,6 +58,8 @@ PRESETS = {
         "imgsz": 480,
         "patience": 5,
         "close_mosaic": 5,
+        "freeze": 10,  # Freeze first 10 backbone layers to prevent overfitting
+        "warmup_epochs": 2,  # Shorter warmup for fast testing
         # Augmentation (reduced)
         "hsv_h": 0.015,
         "hsv_s": 0.5,
@@ -84,10 +88,12 @@ PRESETS = {
         "exist_ok": True,
     },
     "High Accuracy": {
-        # High accuracy: Stronger augmentation, longer training
+        # High accuracy: Stronger augmentation, optimized to prevent overfitting
         "imgsz": 640,
-        "patience": 15,
-        "close_mosaic": 15,
+        "patience": 10,  # Reduced from 15 to prevent overfitting
+        "close_mosaic": 10,  # Match patience
+        "freeze": 10,  # Freeze first 10 backbone layers to prevent overfitting
+        "warmup_epochs": 3,  # Warmup for stable fine-tuning
         # Augmentation (stronger)
         "hsv_h": 0.02,
         "hsv_s": 0.8,
@@ -100,12 +106,12 @@ PRESETS = {
         "fliplr": 0.5,
         "mosaic": 1.0,
         "mixup": 0.2,
-        # Optimizer (slower decay)
+        # Optimizer (optimized for fine-tuning)
         "optimizer": "AdamW",
-        "lr0": 0.0008,
-        "lrf": 0.005,
+        "lr0": 0.0005,  # Reduced from 0.0008 for fine-tuning
+        "lrf": 0.01,  # Adjusted final LR scale
         "momentum": 0.937,
-        "weight_decay": 0.0005,
+        "weight_decay": 0.001,  # Increased from 0.0005 for regularization
         # Performance
         "workers": 8,
         "cache": True,
@@ -510,7 +516,7 @@ def _render_performance_tab() -> Dict[str, Any]:
     ">Training Settings</div>
     """)
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         params["imgsz"] = st.selectbox(
             "Image Size",
@@ -540,6 +546,16 @@ def _render_performance_tab() -> Dict[str, Any]:
             step=1,
             help="Disable mosaic for last N epochs.",
             key="adv_close_mosaic",
+        )
+    with col4:
+        params["freeze"] = st.number_input(
+            "Freeze Layers",
+            min_value=0,
+            max_value=20,
+            value=_get_param("freeze", 10),
+            step=1,
+            help="Freeze first N backbone layers. Prevents overfitting on small datasets.",
+            key="adv_freeze",
         )
 
     return params

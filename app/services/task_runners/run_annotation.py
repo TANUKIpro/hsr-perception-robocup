@@ -27,7 +27,13 @@ def main():
     parser.add_argument("--output-dir", required=True, help="Output directory for dataset")
     parser.add_argument("--class-config", required=True, help="Path to class config JSON")
     parser.add_argument("--background", help="Background image path (for background method)")
-    parser.add_argument("--split", type=float, default=0.85, help="Train/val split ratio")
+    parser.add_argument("--split", type=float, default=0.80, help="Train/val split ratio")
+    parser.add_argument("--group-frames", action="store_true", default=True,
+                        help="Group continuous frames to prevent data leakage")
+    parser.add_argument("--no-group-frames", action="store_true",
+                        help="Disable frame grouping")
+    parser.add_argument("--group-interval", type=float, default=2.0,
+                        help="Max seconds between frames in same group")
     parser.add_argument("--min-area", type=int, default=500, help="Minimum contour area")
     args = parser.parse_args()
 
@@ -70,6 +76,9 @@ def main():
             tasks_dir=tasks_dir
         )
 
+        # Determine grouping settings
+        group_frames = args.group_frames and not args.no_group_frames
+
         # Run annotation
         # Note: The actual annotator doesn't have progress callbacks,
         # so we update progress after completion
@@ -80,6 +89,8 @@ def main():
             train_val_split=args.split,
             verify=True,
             update_config=True,
+            group_continuous_frames=group_frames,
+            group_interval_sec=args.group_interval,
         )
 
         # Calculate result path
