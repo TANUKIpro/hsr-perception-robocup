@@ -260,14 +260,14 @@ class GPUScaler:
                 base_config["imgsz"],
             )
 
-        # Common settings
+        # Common settings - updated for better generalization (Tier 1 recommendations)
         base_config.update(
             {
                 "optimizer": "AdamW",
                 "lr0": 0.001,
                 "lrf": 0.01,
                 "momentum": 0.937,
-                "weight_decay": 0.0005,
+                "weight_decay": 0.001,  # Increased from 0.0005 for better regularization
                 "augment": True,
                 "hsv_h": 0.015,
                 "hsv_s": 0.7,
@@ -278,10 +278,15 @@ class GPUScaler:
                 "shear": 2.0,
                 "flipud": 0.0,
                 "fliplr": 0.5,
-                "mosaic": 1.0,
+                "mosaic": 0.7,  # Reduced from 1.0 for better generalization on small datasets
                 "mixup": 0.1,
                 "amp": True,
-                "close_mosaic": 10,
+                "close_mosaic": 20,  # Increased from 10 for longer pure-image training
+                # Overfitting prevention - Tier 1 recommendations
+                "label_smoothing": 0.05,  # Added for overfitting prevention
+                "cos_lr": True,  # Enabled for smoother LR decay
+                # multi_scale based on GPU tier (only for HIGH/WORKSTATION)
+                "multi_scale": tier in (GPUTier.HIGH, GPUTier.WORKSTATION),
                 "save": True,
                 "save_period": 5,
                 "exist_ok": True,
