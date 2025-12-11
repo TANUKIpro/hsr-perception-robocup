@@ -156,7 +156,7 @@ def _render_profile_import_export(profile_manager: "ProfileManager") -> None:
     # ===== Import Column =====
     with col2:
         st.write("**Import Profile**")
-        st.info("Place ZIP file in `/app/imports/` directory")
+        st.code("docker cp /path/to/profile.zip hsr-perception:/app/imports/", language="bash")
 
         # Scan for ZIP files in import directory
         import_dir = Path("/app/imports")
