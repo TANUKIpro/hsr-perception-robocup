@@ -299,9 +299,20 @@ def _render_evaluation_results_list(task_manager: TaskManager) -> None:
 
 
 def _render_visual_test(path_coordinator: PathCoordinator) -> None:
-    """Render visual prediction test."""
+    """Render visual prediction test with Image and Video tabs."""
     st.subheader("Visual Prediction Test")
 
+    image_tab, video_tab = st.tabs(["Image", "Video"])
+
+    with image_tab:
+        _render_visual_test_image(path_coordinator)
+
+    with video_tab:
+        _render_visual_test_video(path_coordinator)
+
+
+def _render_visual_test_image(path_coordinator: PathCoordinator) -> None:
+    """Render image-based visual test."""
     # Model selection
     models = path_coordinator.get_trained_models()
 
@@ -425,6 +436,53 @@ def _render_visual_test(path_coordinator: PathCoordinator) -> None:
 
                 except Exception as e:
                     st.error(f"Prediction failed: {e}")
+
+
+def _render_visual_test_video(path_coordinator: PathCoordinator) -> None:
+    """Render video-based visual test."""
+    from components.video_player import render_video_player
+
+    # Model selection
+    models = path_coordinator.get_trained_models()
+
+    if not models:
+        st.warning("No trained models found.")
+        return
+
+    selected_model = st.selectbox(
+        "Select Model",
+        models,
+        format_func=lambda x: x['name'],
+        key="video_visual_model"
+    )
+
+    if not selected_model:
+        return
+
+    model_path = selected_model["best_path"] or selected_model["last_path"]
+
+    # Load model
+    try:
+        from ultralytics import YOLO
+        model = YOLO(model_path)
+    except Exception as e:
+        st.error(f"Failed to load model: {e}")
+        return
+
+    # Confidence threshold
+    conf_threshold = st.slider(
+        "Confidence Threshold",
+        min_value=0.1,
+        max_value=0.9,
+        value=0.25,
+        step=0.05,
+        key="video_conf"
+    )
+
+    st.markdown("---")
+
+    # Video player component
+    render_video_player(path_coordinator, model, conf_threshold)
 
 
 def _render_robustness_test(path_coordinator: PathCoordinator) -> None:
