@@ -23,6 +23,7 @@ Controls:
 """
 
 import argparse
+import shutil
 import sys
 import threading
 import tkinter as tk
@@ -1193,10 +1194,23 @@ class SAM2AnnotationApp:
         label_path = labels_dir / f"{self.current_image_path.stem}.txt"
         write_yolo_label(str(label_path), self.class_id, yolo_bbox)
 
+        # Save mask file to masks subdirectory
+        masks_dir = self.output_dir / "masks"
+        masks_dir.mkdir(parents=True, exist_ok=True)
+        mask_path = masks_dir / f"{self.current_image_path.stem}_mask.png"
+        cv2.imwrite(str(mask_path), self.state.current_mask.astype(np.uint8) * 255)
+
+        # Copy original image to images subdirectory
+        images_dir = self.output_dir / "images"
+        images_dir.mkdir(parents=True, exist_ok=True)
+        dst_image_path = images_dir / self.current_image_path.name
+        if not dst_image_path.exists():
+            shutil.copy2(self.current_image_path, dst_image_path)
+
         # Mark as annotated
         self.annotated_images.add(self.current_image_path)
 
-        self.status_var.set(f"Saved: {label_path.name}")
+        self.status_var.set(f"Saved: {label_path.name} + mask + image")
 
         # Move to next image
         self._on_next_image()
@@ -1798,7 +1812,7 @@ class SAM2AnnotationApp:
                     frame_map=included_frame_map,
                     output_dir=str(self.output_dir),
                     class_id=self.class_id,
-                    copy_images=False,  # Don't copy images, just save labels
+                    copy_images=True,  # Copy images for Copy-Paste augmentation
                 )
 
                 self.root.after(0, lambda: self._on_save_complete(result, excluded_count))
@@ -2217,7 +2231,9 @@ Controls:
     if not model_path.exists():
         # Try relative to project root
         project_root = Path(__file__).parent.parent.parent
-        model_path = project_root / "models" / args.model
+        # Handle both "sam2.1_xxx.pt" and "models/sam2.1_xxx.pt" formats
+        model_name = Path(args.model).name
+        model_path = project_root / "models" / model_name
         if not model_path.exists():
             print(f"Error: Model file not found: {args.model}")
             print(f"Tried: {model_path}")

@@ -640,8 +640,10 @@ def batch_save_yolo_labels(
     output_path = Path(output_dir)
     labels_dir = output_path / "labels"
     images_dir = output_path / "images"
+    masks_dir = output_path / "masks"
 
     labels_dir.mkdir(parents=True, exist_ok=True)
+    masks_dir.mkdir(parents=True, exist_ok=True)
     if copy_images:
         images_dir.mkdir(parents=True, exist_ok=True)
 
@@ -682,6 +684,11 @@ def batch_save_yolo_labels(
             label_filename = f"{original_path.stem}.txt"
             label_path = labels_dir / label_filename
             write_yolo_label(str(label_path), class_id, yolo_bbox)
+
+            # Save mask file
+            mask_filename = f"{original_path.stem}_mask.png"
+            mask_path = masks_dir / mask_filename
+            cv2.imwrite(str(mask_path), mask.astype(np.uint8) * 255)
 
             # Optionally copy image
             if copy_images:

@@ -13,8 +13,13 @@ Modules:
 """
 
 from gui_framework.base_app import BaseApp
-from gui_framework.ros2_app import ROS2App
 from gui_framework.styles.theme import AppTheme
+
+# ROS2App is optional - only available when rclpy is installed
+try:
+    from gui_framework.ros2_app import ROS2App
+except ImportError:
+    ROS2App = None
 
 __all__ = [
     "BaseApp",

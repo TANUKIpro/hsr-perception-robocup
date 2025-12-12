@@ -113,6 +113,73 @@ def _get_active_training_task(task_manager: TaskManager) -> "Task | None":
     return None
 
 
+def _merge_synthetic_images(
+    path_coordinator: PathCoordinator,
+    dataset_path: Path,
+    synthetic_sessions: list[str],
+) -> int:
+    """
+    Merge synthetic images into the training dataset.
+
+    Synthetic images are copied directly to the training set (not validation)
+    because they are generated from real training data.
+
+    Args:
+        path_coordinator: PathCoordinator instance
+        dataset_path: Path to the dataset directory (containing images/train, labels/train)
+        synthetic_sessions: List of synthetic session names to include
+
+    Returns:
+        Number of synthetic images added
+    """
+    import shutil
+
+    synthetic_dir = path_coordinator.get_path("synthetic_dir")
+    train_images_dir = dataset_path / "images" / "train"
+    train_labels_dir = dataset_path / "labels" / "train"
+
+    # Ensure directories exist
+    train_images_dir.mkdir(parents=True, exist_ok=True)
+    train_labels_dir.mkdir(parents=True, exist_ok=True)
+
+    added_count = 0
+
+    for session_name in synthetic_sessions:
+        session_path = synthetic_dir / session_name
+        if not session_path.exists():
+            continue
+
+        images_dir = session_path / "images"
+        labels_dir = session_path / "labels"
+
+        if not images_dir.exists() or not labels_dir.exists():
+            continue
+
+        # Find all image-label pairs
+        images = list(images_dir.glob("*.jpg")) + list(images_dir.glob("*.png"))
+
+        for image_path in images:
+            label_path = labels_dir / f"{image_path.stem}.txt"
+            if not label_path.exists():
+                continue
+
+            # Generate unique filename with synthetic prefix
+            new_name = f"synthetic_{session_name}_{image_path.stem}"
+
+            # Copy image
+            image_dest = train_images_dir / f"{new_name}{image_path.suffix}"
+            if not image_dest.exists():  # Avoid duplicates
+                shutil.copy2(image_path, image_dest)
+
+                # Copy label
+                label_dest = train_labels_dir / f"{new_name}.txt"
+                shutil.copy2(label_path, label_dest)
+
+                added_count += 1
+
+    return added_count
+
+
 def _render_active_training_view(active_task: "Task", task_manager: TaskManager, path_coordinator: PathCoordinator) -> None:
     """Render the active training view with Mission Control aesthetic."""
     task = task_manager.get_task(active_task.task_id)
@@ -401,6 +468,72 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
             st.error(f"Error reading dataset config: {e}")
             return
 
+    # Synthetic images section
+    synthetic_sessions = path_coordinator.get_synthetic_sessions()
+    selected_synthetic = []
+
+    if synthetic_sessions:
+        st.markdown("<div style='height: 16px'></div>", unsafe_allow_html=True)
+
+        st.html(f"""
+        <div style="
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        ">
+            <span>🎨</span>
+            <span>Synthetic Images (Optional)</span>
+        </div>
+        """)
+
+        with st.expander("Add synthetic images to training", expanded=False):
+            st.info("Synthetic images will be added to training set only (not validation).")
+
+            for session in synthetic_sessions:
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    if st.checkbox(
+                        f"{session['name']}",
+                        key=f"synthetic_{session['name']}",
+                        help=f"Created: {session['created'][:10]}"
+                    ):
+                        selected_synthetic.append(session['name'])
+                with col2:
+                    st.html(f"""
+                    <div style="
+                        font-family: 'JetBrains Mono', monospace;
+                        font-size: 0.85rem;
+                        opacity: 0.7;
+                        padding-top: 4px;
+                    ">{session['image_count']} images</div>
+                    """)
+
+            if selected_synthetic:
+                total_synthetic = sum(
+                    s['image_count'] for s in synthetic_sessions
+                    if s['name'] in selected_synthetic
+                )
+                st.html(f"""
+                <div style="
+                    border-radius: 8px;
+                    padding: 12px;
+                    margin-top: 12px;
+                    background: {COLORS["accent_primary"]}15;
+                ">
+                    <span style="
+                        font-family: 'JetBrains Mono', monospace;
+                        font-size: 0.85rem;
+                        color: {COLORS["accent_primary"]};
+                    ">+{total_synthetic} synthetic images will be added to training</span>
+                </div>
+                """)
+
+    # Store selected synthetic sessions in session state for later use
+    st.session_state["selected_synthetic_sessions"] = selected_synthetic
+
     st.markdown("<div style='height: 24px'></div>", unsafe_allow_html=True)
 
     # Hardware detection section
@@ -649,8 +782,25 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if st.button("Start Training", type="primary", use_container_width=True):
+            # Get selected synthetic sessions
+            selected_synthetic = st.session_state.get("selected_synthetic_sessions", [])
+
+            # Merge synthetic images if any are selected
+            final_data_yaml = data_yaml
+            synthetic_added = 0
+
+            if selected_synthetic and data_yaml:
+                with st.spinner("Merging synthetic images into training dataset..."):
+                    synthetic_added = _merge_synthetic_images(
+                        path_coordinator=path_coordinator,
+                        dataset_path=Path(data_yaml).parent,
+                        synthetic_sessions=selected_synthetic,
+                    )
+                    if synthetic_added > 0:
+                        st.success(f"Added {synthetic_added} synthetic images to training set")
+
             task_id = task_manager.start_training(
-                dataset_yaml=str(data_yaml),
+                dataset_yaml=str(final_data_yaml),
                 base_model=base_model,
                 output_dir=str(path_coordinator.get_path("finetuned_dir")),
                 epochs=epochs,
@@ -668,7 +818,7 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
                 <div>
                     <strong>Training started!</strong><br>
                     <span style="font-size: 0.85rem; opacity: 0.9;">
-                        Task ID: {task_id}
+                        Task ID: {task_id}{f" (+{synthetic_added} synthetic)" if synthetic_added > 0 else ""}
                     </span>
                 </div>
             </div>

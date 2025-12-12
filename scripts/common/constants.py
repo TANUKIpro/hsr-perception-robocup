@@ -133,3 +133,27 @@ MAX_OOM_RETRIES: int = 3
 TENSORBOARD_DEFAULT_PORT: int = 6006
 TENSORBOARD_FLUSH_SECS: int = 30
 TENSORBOARD_LOG_FREQUENCY: int = 1  # Log every epoch
+
+
+# =============================================================================
+# Copy-Paste Augmentation Defaults
+# =============================================================================
+# Object extraction settings
+DEFAULT_ALPHA_BLUR_SIGMA: float = 2.0  # Gaussian blur sigma for edge softening
+DEFAULT_EXTRACTION_PADDING: int = 5  # Padding around object when cropping
+DEFAULT_MIN_OBJECT_SIZE: int = 32  # Minimum object size in pixels
+
+# Synthesis ratio settings
+DEFAULT_SYNTHETIC_RATIO_MIN: float = 1.0  # Minimum synthetic:real ratio (1:1)
+DEFAULT_SYNTHETIC_RATIO_MAX: float = 3.0  # Maximum synthetic:real ratio (3:1)
+DEFAULT_SYNTHETIC_RATIO: float = 2.0  # Default synthetic:real ratio (2:1)
+
+# Object transformation settings
+DEFAULT_SCALE_RANGE: Tuple[float, float] = (0.5, 1.5)  # Scale factor range
+DEFAULT_ROTATION_RANGE: Tuple[float, float] = (-15.0, 15.0)  # Rotation in degrees
+
+# Blending settings
+DEFAULT_WHITE_BALANCE_STRENGTH: float = 0.7  # LAB color adjustment strength
+DEFAULT_MAX_OBJECTS_PER_IMAGE: int = 3  # Maximum objects per synthetic image
+DEFAULT_MIN_OBJECTS_PER_IMAGE: int = 1  # Minimum objects per synthetic image
+DEFAULT_OVERLAP_IOU_THRESHOLD: float = 0.1  # Maximum overlap allowed
