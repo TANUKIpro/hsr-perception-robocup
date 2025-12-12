@@ -20,7 +20,7 @@ import streamlit as st
 # Page config must be first Streamlit command
 st.set_page_config(
     page_title="HSR Object Manager",
-    page_icon="🤖",
+    page_icon="app/img/favicon.png",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -41,8 +41,19 @@ def main():
     # Render common sidebar (includes profile selector and stats)
     render_common_sidebar()
 
-    # Home page content
-    st.title("🤖 HSR Object Manager")
+    # Home page content - Title with HSR icon (using HTML for inline display)
+    import base64
+    icon_path = Path(__file__).parent / "img" / "hsr_icon_small.png"
+    if icon_path.exists():
+        icon_b64 = base64.b64encode(icon_path.read_bytes()).decode()
+        st.markdown(
+            f'<h1 style="display: flex; align-items: center; gap: 10px;">'
+            f'<img src="data:image/png;base64,{icon_b64}" width="40" height="40">'
+            f'HSR Object Manager</h1>',
+            unsafe_allow_html=True
+        )
+    else:
+        st.title("🤖 HSR Object Manager")
     st.markdown("Object recognition pipeline manager for RoboCup@Home competitions")
 
     st.subheader("Pipeline Workflow")
