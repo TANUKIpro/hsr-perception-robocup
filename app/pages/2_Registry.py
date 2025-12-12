@@ -62,15 +62,30 @@ def _render_view_tab(registry: ObjectRegistry) -> None:
         if edit_key not in st.session_state:
             st.session_state[edit_key] = False
 
-        with st.expander(f"**{obj.id}. {obj.display_name}** - {obj.category}", expanded=False):
-            if st.session_state[edit_key]:
-                # Edit mode
-                exit_edit = render_object_editor(obj, registry)
-                if exit_edit:
-                    st.rerun()
+        # Thumbnail + expander layout
+        col_thumb, col_content = st.columns([1, 11])
+
+        with col_thumb:
+            thumbnail_path = registry.get_thumbnail_path(obj.id)
+            if thumbnail_path:
+                st.image(thumbnail_path, width=60)
             else:
-                # View mode
-                render_object_viewer(obj, registry)
+                # Gray placeholder
+                st.markdown(
+                    '<div style="width:60px;height:60px;background-color:#e0e0e0;border-radius:4px;"></div>',
+                    unsafe_allow_html=True
+                )
+
+        with col_content:
+            with st.expander(f"**{obj.id}. {obj.display_name}** - {obj.category}", expanded=False):
+                if st.session_state[edit_key]:
+                    # Edit mode
+                    exit_edit = render_object_editor(obj, registry)
+                    if exit_edit:
+                        st.rerun()
+                else:
+                    # View mode
+                    render_object_viewer(obj, registry)
 
 
 # For Streamlit native multipage
