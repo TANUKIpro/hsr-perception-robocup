@@ -16,8 +16,7 @@ app_dir = Path(__file__).parent.parent
 if str(app_dir) not in sys.path:
     sys.path.insert(0, str(app_dir))
 
-from components.common_sidebar import render_common_sidebar, _reinitialize_services
-from components.profile_management import render_profile_management
+from components.common_sidebar import render_common_sidebar
 from object_registry import RegisteredObject
 
 
@@ -27,14 +26,6 @@ def show_dashboard_page() -> None:
     render_common_sidebar()
 
     st.title("📊 Dashboard")
-
-    # Profile Management Section
-    render_profile_management(
-        profile_manager=st.session_state.profile_manager,
-        on_profile_deleted=_reinitialize_services
-    )
-
-    st.markdown("---")
 
     registry = st.session_state.registry
 
