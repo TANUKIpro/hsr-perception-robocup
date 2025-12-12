@@ -20,6 +20,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import torch
 import yaml
 from colorama import Fore, Style, init as colorama_init
 
@@ -43,6 +44,7 @@ from .tensorboard_monitor import (
     check_tensorboard_available,
 )
 from .training_config import TrainingConfig
+from .swa_trainer import SWAConfig, SWACallback, create_swa_callback, register_swa_callbacks
 
 # Competition-optimized training configuration (legacy compatibility)
 # Updated for better generalization based on Tier 1 recommendations
@@ -215,6 +217,9 @@ class CompetitionTrainer:
         self.tensorboard_callback: Optional[CompetitionTensorBoardCallback] = None
         self.tensorboard_url: str = ""
 
+        # SWA setup
+        self.swa_callback: Optional[SWACallback] = None
+
         # Verify CUDA availability
         self._check_cuda()
 
@@ -332,6 +337,31 @@ class CompetitionTrainer:
         # Note: We don't stop the server here so users can view results after training
         pass
 
+    def _setup_swa(self, model: Any) -> None:
+        """Setup SWA (Stochastic Weight Averaging) if enabled."""
+        swa_enabled = self.config.get("swa_enabled", False)
+        if not swa_enabled:
+            return
+
+        swa_start_epoch = self.config.get("swa_start_epoch", 10)
+        swa_lr = self.config.get("swa_lr", 0.0005)
+
+        print(f"{Fore.CYAN}SWA enabled:{Style.RESET_ALL}")
+        print(f"  Start epoch: epochs - {swa_start_epoch}")
+        print(f"  SWA LR: {swa_lr}")
+
+        # Create SWA callback
+        self.swa_callback = create_swa_callback(
+            enabled=True,
+            swa_start_epoch=swa_start_epoch,
+            swa_lr=swa_lr,
+            update_bn=True,  # Always update BN statistics
+        )
+
+        # Register callbacks with model
+        if self.swa_callback is not None:
+            register_swa_callbacks(model, self.swa_callback)
+
     def get_tensorboard_url(self) -> str:
         """Get TensorBoard URL if available."""
         return self.tensorboard_url
@@ -370,6 +400,9 @@ class CompetitionTrainer:
 
         # Setup TensorBoard
         self._setup_tensorboard(model)
+
+        # Setup SWA (Stochastic Weight Averaging)
+        self._setup_swa(model)
 
         # Start training
         print(f"\n{Fore.GREEN}Starting training...{Style.RESET_ALL}")
@@ -429,6 +462,7 @@ class CompetitionTrainer:
                         # Reload model for retry
                         model = YOLO(self.base_model)
                         self._setup_tensorboard(model)
+                        self._setup_swa(model)
                     elif "cuda" in error_msg:
                         # CUDA general error (not OOM) - fail immediately
                         print(f"{Fore.RED}CUDA error detected (not OOM): {e}{Style.RESET_ALL}")

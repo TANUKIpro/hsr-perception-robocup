@@ -66,6 +66,11 @@ class OptimizerConfig:
     llrd_enabled: bool = False  # Enable LLRD for fine-tuning
     llrd_decay_rate: float = 0.9  # LR decay factor per layer depth
 
+    # Stochastic Weight Averaging (SWA)
+    swa_enabled: bool = False  # Enable SWA for fine-tuning
+    swa_start_epoch: int = 10  # Start SWA at (epochs - N)
+    swa_lr: float = 0.0005  # SWA learning rate (~1/2 of base LR)
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for YOLO training."""
         return {
@@ -76,6 +81,9 @@ class OptimizerConfig:
             "weight_decay": self.weight_decay,
             "llrd_enabled": self.llrd_enabled,
             "llrd_decay_rate": self.llrd_decay_rate,
+            "swa_enabled": self.swa_enabled,
+            "swa_start_epoch": self.swa_start_epoch,
+            "swa_lr": self.swa_lr,
         }
 
 
@@ -197,6 +205,9 @@ class TrainingConfig:
             weight_decay=config_dict.get("weight_decay", 0.0005),
             llrd_enabled=config_dict.get("llrd_enabled", False),
             llrd_decay_rate=config_dict.get("llrd_decay_rate", 0.9),
+            swa_enabled=config_dict.get("swa_enabled", False),
+            swa_start_epoch=config_dict.get("swa_start_epoch", 10),
+            swa_lr=config_dict.get("swa_lr", 0.0005),
         )
 
         performance = PerformanceConfig(
