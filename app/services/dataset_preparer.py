@@ -138,6 +138,16 @@ class ClassInfo:
 
 
 @dataclass
+class SyntheticSessionInfo:
+    """Information about a synthetic data session."""
+    name: str
+    path: Path
+    image_count: int
+    label_count: int
+    created: str
+
+
+@dataclass
 class DatasetResult:
     """Result of dataset preparation."""
     success: bool
@@ -145,6 +155,7 @@ class DatasetResult:
     train_count: int
     val_count: int
     class_names: list[str]
+    synthetic_count: int = 0
     error_message: str | None = None
 
 
@@ -222,6 +233,50 @@ class DatasetPreparer:
         """Get only classes that are ready for training."""
         return [c for c in self.get_available_classes() if c.is_ready]
 
+    def get_available_synthetic_sessions(self) -> list[SyntheticSessionInfo]:
+        """
+        Get list of available synthetic data sessions.
+
+        Returns:
+            List of SyntheticSessionInfo objects
+        """
+        sessions = []
+        synthetic_dir = self.path_coordinator.get_path("synthetic_dir")
+
+        if not synthetic_dir.exists():
+            return sessions
+
+        for session_dir in sorted(synthetic_dir.iterdir(), reverse=True):
+            if not session_dir.is_dir():
+                continue
+
+            images_dir = session_dir / "images"
+            labels_dir = session_dir / "labels"
+
+            image_count = 0
+            label_count = 0
+
+            if images_dir.exists():
+                image_count = len(list(images_dir.glob("*.jpg"))) + len(list(images_dir.glob("*.png")))
+
+            if labels_dir.exists():
+                label_count = len(list(labels_dir.glob("*.txt")))
+
+            # Only include sessions with both images and labels
+            if image_count > 0 and label_count > 0:
+                from datetime import datetime
+                created = datetime.fromtimestamp(session_dir.stat().st_ctime).isoformat()
+
+                sessions.append(SyntheticSessionInfo(
+                    name=session_dir.name,
+                    path=session_dir,
+                    image_count=image_count,
+                    label_count=label_count,
+                    created=created,
+                ))
+
+        return sessions
+
     def prepare_dataset(
         self,
         class_names: list[str],
@@ -230,6 +285,7 @@ class DatasetPreparer:
         seed: int = 42,
         group_continuous_frames: bool = True,
         group_interval_sec: float = 2.0,
+        synthetic_sessions: list[str] | None = None,
     ) -> DatasetResult:
         """
         Prepare a YOLO training dataset from selected classes.
@@ -243,6 +299,8 @@ class DatasetPreparer:
                 data leakage from burst captures (default: True)
             group_interval_sec: Maximum seconds between frames in same group
                 (default: 2.0 seconds)
+            synthetic_sessions: List of synthetic session names to include in training.
+                Synthetic images are added to training set only (not validation).
 
         Returns:
             DatasetResult with success status and statistics
@@ -325,6 +383,15 @@ class DatasetPreparer:
             self._process_pairs(train_pairs, output_dir, "train", class_mapping)
             self._process_pairs(val_pairs, output_dir, "val", class_mapping)
 
+            # Process synthetic images (training only)
+            synthetic_count = 0
+            if synthetic_sessions:
+                synthetic_count = self._process_synthetic_sessions(
+                    synthetic_sessions=synthetic_sessions,
+                    output_dir=output_dir,
+                    class_mapping=class_mapping,
+                )
+
             # Generate data.yaml
             data_yaml = {
                 'path': str(output_dir.resolve()),
@@ -341,9 +408,10 @@ class DatasetPreparer:
             return DatasetResult(
                 success=True,
                 output_dir=output_dir,
-                train_count=len(train_pairs),
+                train_count=len(train_pairs) + synthetic_count,
                 val_count=len(val_pairs),
                 class_names=sorted_names,
+                synthetic_count=synthetic_count,
             )
 
         except Exception as e:
@@ -406,3 +474,61 @@ class DatasetPreparer:
                     parts[0] = str(new_class_id)
                     lines.append(' '.join(parts))
         return lines
+
+    def _process_synthetic_sessions(
+        self,
+        synthetic_sessions: list[str],
+        output_dir: Path,
+        class_mapping: dict[str, int],
+    ) -> int:
+        """
+        Process synthetic sessions and add images to training set.
+
+        Synthetic images are added to training only (not validation) because
+        they are generated from real training data and should not be used
+        for evaluation.
+
+        Args:
+            synthetic_sessions: List of synthetic session names
+            output_dir: Dataset output directory
+            class_mapping: Mapping from class name to class ID
+
+        Returns:
+            Number of synthetic images added
+        """
+        synthetic_dir = self.path_coordinator.get_path("synthetic_dir")
+        processed_count = 0
+
+        for session_name in synthetic_sessions:
+            session_path = synthetic_dir / session_name
+            if not session_path.exists():
+                continue
+
+            images_dir = session_path / "images"
+            labels_dir = session_path / "labels"
+
+            if not images_dir.exists() or not labels_dir.exists():
+                continue
+
+            # Find all image-label pairs in the synthetic session
+            images = list(images_dir.glob("*.jpg")) + list(images_dir.glob("*.png"))
+
+            for image_path in images:
+                label_path = labels_dir / f"{image_path.stem}.txt"
+                if not label_path.exists():
+                    continue
+
+                # Generate unique filename with synthetic prefix
+                new_name = f"synthetic_{session_name}_{image_path.stem}"
+
+                # Copy image to training set
+                image_dest = output_dir / "images" / "train" / f"{new_name}{image_path.suffix}"
+                shutil.copy2(image_path, image_dest)
+
+                # Copy label (labels already have correct class IDs from generation)
+                label_dest = output_dir / "labels" / "train" / f"{new_name}.txt"
+                shutil.copy2(label_path, label_dest)
+
+                processed_count += 1
+
+        return processed_count

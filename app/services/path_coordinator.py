@@ -36,6 +36,7 @@ class PathConfig:
     annotated_dir: str = "datasets/annotated"
     backgrounds_dir: str = "datasets/backgrounds"
     videos_dir: str = "datasets/videos"
+    synthetic_dir: str = "datasets/synthetic"
 
     # Model paths - finetuned is profile-specific
     finetuned_dir: str = "models/finetuned"
@@ -134,6 +135,7 @@ class PathCoordinator:
             self.config.annotated_dir,
             self.config.backgrounds_dir,
             self.config.videos_dir,
+            self.config.synthetic_dir,
             self.config.finetuned_dir,
         ]
 
@@ -440,6 +442,58 @@ class PathCoordinator:
 
         return models
 
+    # ========== Copy-Paste Augmentation Paths ==========
+
+    def get_synthetic_session_dir(self, session_name: Optional[str] = None) -> Path:
+        """
+        Get directory for a synthetic data generation session.
+
+        Args:
+            session_name: Optional session name. If None, generates timestamp-based name.
+
+        Returns:
+            Path to synthetic session directory
+        """
+        if session_name is None:
+            session_name = datetime.now().strftime("synthetic_%Y%m%d_%H%M%S")
+
+        session_dir = self.get_path("synthetic_dir") / session_name
+        session_dir.mkdir(parents=True, exist_ok=True)
+        return session_dir
+
+    def get_synthetic_sessions(self) -> List[Dict[str, str]]:
+        """
+        Get list of existing synthetic data sessions.
+
+        Returns:
+            List of session info dictionaries with keys:
+            - name: Session name
+            - path: Session directory path
+            - image_count: Number of images in session
+            - created: Creation timestamp
+        """
+        synthetic_dir = self.get_path("synthetic_dir")
+        sessions = []
+
+        if not synthetic_dir.exists():
+            return sessions
+
+        for session_dir in sorted(synthetic_dir.iterdir(), reverse=True):
+            if session_dir.is_dir():
+                images_dir = session_dir / "images"
+                image_count = 0
+                if images_dir.exists():
+                    image_count = len(list(images_dir.glob("*.jpg"))) + len(list(images_dir.glob("*.png")))
+
+                sessions.append({
+                    "name": session_dir.name,
+                    "path": str(session_dir),
+                    "image_count": image_count,
+                    "created": datetime.fromtimestamp(session_dir.stat().st_ctime).isoformat(),
+                })
+
+        return sessions
+
     # ========== Background Images ==========
 
     def get_background_images(self) -> List[Dict[str, str]]:
@@ -526,7 +580,7 @@ class PathCoordinator:
         output_dir: str,
         class_id: int = 0,
         device: str = "cuda",
-        model_path: str = "models/sam2.1_hiera_base_plus.pt"
+        model_path: str = "sam2.1_hiera_base_plus.pt"
     ) -> bool:
         """
         Launch SAM2 Interactive Annotation Application.
