@@ -48,6 +48,10 @@ PRESETS = {
         # LLRD (Layer-wise Learning Rate Decay)
         "llrd_enabled": False,
         "llrd_decay_rate": 0.9,
+        # SWA (Stochastic Weight Averaging)
+        "swa_enabled": False,
+        "swa_start_epoch": 10,
+        "swa_lr": 0.0005,
         # Overfitting prevention - enabled for better generalization
         "label_smoothing": 0.05,  # Added for overfitting prevention
         "cos_lr": True,  # Enabled for smoother LR decay
@@ -89,6 +93,10 @@ PRESETS = {
         # LLRD (Layer-wise Learning Rate Decay)
         "llrd_enabled": False,
         "llrd_decay_rate": 0.9,
+        # SWA (Stochastic Weight Averaging)
+        "swa_enabled": False,
+        "swa_start_epoch": 10,
+        "swa_lr": 0.0005,
         # Overfitting prevention
         "label_smoothing": 0.0,
         "cos_lr": False,
@@ -131,6 +139,10 @@ PRESETS = {
         # LLRD (Layer-wise Learning Rate Decay)
         "llrd_enabled": False,
         "llrd_decay_rate": 0.9,
+        # SWA (Stochastic Weight Averaging) - enabled for high accuracy
+        "swa_enabled": True,
+        "swa_start_epoch": 15,  # Longer averaging for high accuracy
+        "swa_lr": 0.00025,  # ~1/2 of base lr (0.0005)
         # Overfitting prevention - all enabled for high accuracy
         "label_smoothing": 0.1,
         "cos_lr": True,
@@ -173,6 +185,10 @@ PRESETS = {
         # LLRD (Layer-wise Learning Rate Decay)
         "llrd_enabled": False,
         "llrd_decay_rate": 0.9,
+        # SWA (Stochastic Weight Averaging)
+        "swa_enabled": False,
+        "swa_start_epoch": 10,
+        "swa_lr": 0.00025,
         # Overfitting prevention - all enabled
         "label_smoothing": 0.1,
         "cos_lr": True,
@@ -570,6 +586,56 @@ def _render_optimizer_tab() -> Dict[str, Any]:
             help="LR decay factor per layer depth. 0.9 means each deeper layer "
                  "gets 90% of the previous layer's LR. Lower values = more aggressive decay.",
             key="adv_llrd_decay_rate",
+        )
+
+    st.markdown("<div style='height: 16px'></div>", unsafe_allow_html=True)
+
+    # SWA (Stochastic Weight Averaging)
+    st.html("""
+    <div style="
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.75rem;
+        opacity: 0.6;
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    ">Stochastic Weight Averaging (SWA)</div>
+    """)
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        params["swa_enabled"] = st.checkbox(
+            "Enable SWA",
+            value=_get_param("swa_enabled", False),
+            help="Average model weights during final epochs for better generalization. "
+                 "SWA finds flatter minima that generalize better to unseen data. "
+                 "Recommended for fine-tuning (+1-2% mAP).",
+            key="adv_swa_enabled",
+        )
+    with col2:
+        params["swa_start_epoch"] = st.number_input(
+            "Start (last N epochs)",
+            min_value=5,
+            max_value=30,
+            value=_get_param("swa_start_epoch", 10),
+            step=1,
+            disabled=not _get_param("swa_enabled", False),
+            help="Start averaging weights at (total_epochs - N). "
+                 "Default: 10 (start averaging 10 epochs before training ends).",
+            key="adv_swa_start_epoch",
+        )
+    with col3:
+        params["swa_lr"] = st.number_input(
+            "SWA Learning Rate",
+            min_value=0.0001,
+            max_value=0.01,
+            value=_get_param("swa_lr", 0.0005),
+            step=0.0001,
+            format="%.4f",
+            disabled=not _get_param("swa_enabled", False),
+            help="Learning rate during SWA phase. "
+                 "Typically ~1/2 of base learning rate. Default: 0.0005.",
+            key="adv_swa_lr",
         )
 
     return params
