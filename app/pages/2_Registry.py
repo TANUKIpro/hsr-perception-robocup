@@ -68,13 +68,11 @@ def _render_view_tab(registry: ObjectRegistry) -> None:
         with col_thumb:
             thumbnail_path = registry.get_thumbnail_path(obj.id)
             if thumbnail_path:
-                st.image(thumbnail_path, width=60)
+                st.image(thumbnail_path, width=38)
             else:
-                # Gray placeholder
-                st.markdown(
-                    '<div style="width:60px;height:60px;background-color:#e0e0e0;border-radius:4px;"></div>',
-                    unsafe_allow_html=True
-                )
+                # No image placeholder
+                no_image_path = app_dir / "img" / "icons8-no-image-ios-17-glyph" / "icons8-no-image-60.png"
+                st.image(str(no_image_path), width=38)
 
         with col_content:
             with st.expander(f"**{obj.id}. {obj.display_name}** - {obj.category}", expanded=False):
