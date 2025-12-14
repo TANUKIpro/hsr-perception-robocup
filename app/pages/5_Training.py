@@ -326,8 +326,61 @@ def _render_active_training_view(active_task: "Task", task_manager: TaskManager,
 
 
 def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoordinator) -> None:
-    """Render training configuration with Mission Control aesthetic."""
+    """Render training configuration with Mission Control aesthetic and sub-tabs."""
 
+    # Create sub-tabs for organized configuration
+    dataset_tab, synthetic_tab, hardware_tab, model_tab, advanced_tab, monitoring_tab = st.tabs([
+        "📂 Dataset",
+        "🎨 Synthetic",
+        "⚡ Hardware",
+        "🤖 Model",
+        "⚙️ Advanced",
+        "📡 Monitoring"
+    ])
+
+    with dataset_tab:
+        _render_dataset_section(path_coordinator)
+
+    with synthetic_tab:
+        _render_synthetic_section(path_coordinator)
+
+    with hardware_tab:
+        gpu_available, gpu_name, gpu_memory, gpu_tier, auto_scale = _render_hardware_section()
+
+    with model_tab:
+        base_model, epochs, batch_size, fast_mode = _render_model_section(
+            auto_scale=auto_scale if 'auto_scale' in locals() else False,
+            gpu_available=gpu_available if 'gpu_available' in locals() else False,
+            gpu_tier=gpu_tier if 'gpu_tier' in locals() else "unknown",
+            path_coordinator=path_coordinator
+        )
+
+    with advanced_tab:
+        advanced_params = _render_advanced_section(
+            auto_scale=auto_scale if 'auto_scale' in locals() else False,
+            gpu_tier=gpu_tier if 'gpu_tier' in locals() else "unknown"
+        )
+
+    with monitoring_tab:
+        enable_tensorboard, tensorboard_port = _render_monitoring_section()
+
+    # Start button outside tabs
+    _render_start_button(
+        task_manager=task_manager,
+        path_coordinator=path_coordinator,
+        base_model=base_model if 'base_model' in locals() else None,
+        epochs=epochs if 'epochs' in locals() else 50,
+        batch_size=batch_size if 'batch_size' in locals() else None,
+        fast_mode=fast_mode if 'fast_mode' in locals() else False,
+        auto_scale=auto_scale if 'auto_scale' in locals() else False,
+        enable_tensorboard=enable_tensorboard if 'enable_tensorboard' in locals() else True,
+        tensorboard_port=tensorboard_port if 'tensorboard_port' in locals() else 6006,
+        advanced_params=advanced_params if 'advanced_params' in locals() else {}
+    )
+
+
+def _render_dataset_section(path_coordinator: PathCoordinator) -> None:
+    """Render dataset selection section."""
     # Dataset selection section
     st.html(f"""
     <div style="
@@ -358,6 +411,7 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
             </div>
         </div>
         """)
+        st.session_state["selected_dataset_info"] = None
         return
 
     # Check for pre-selected dataset
@@ -466,15 +520,271 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
 
         except Exception as e:
             st.error(f"Error reading dataset config: {e}")
+            st.session_state["selected_dataset_info"] = None
             return
 
-    # Synthetic images section
+    # Store dataset info in session state for use by other sections
+    st.session_state["selected_dataset_info"] = {
+        "session": selected_session,
+        "data_yaml": str(data_yaml) if data_yaml else None,
+        "train_count": train_count,
+        "val_count": val_count,
+        "class_names": class_names
+    }
+
+
+def _render_synthetic_section(path_coordinator: PathCoordinator) -> None:
+    """Render synthetic image configuration section with dynamic Copy-Paste settings."""
+    st.html(f"""
+    <div style="
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.9rem;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    ">
+        <span>🎨</span>
+        <span>Synthetic Image Generation</span>
+    </div>
+    """)
+
+    st.markdown("""
+    Generate synthetic training images dynamically using Copy-Paste augmentation.
+    Objects are automatically pasted onto background images with edge blending and white balance.
+    """)
+
+    # Enable dynamic synthetic generation
+    enable_dynamic_synthetic = st.checkbox(
+        "Enable Dynamic Synthetic Generation",
+        value=True,
+        help="Generate synthetic images before training starts using Copy-Paste augmentation",
+        key="enable_dynamic_synthetic"
+    )
+
+    if not enable_dynamic_synthetic:
+        st.info("Dynamic generation disabled. You can still use pre-generated synthetic sessions below.")
+        _render_static_synthetic_selection(path_coordinator)
+        return
+
+    # Check prerequisites
+    annotated_dir = path_coordinator.get_path("annotated_dir")
+    backgrounds_dir = path_coordinator.get_path("backgrounds_dir")
+
+    # Check for annotated masks
+    # Import using importlib to handle numeric module name
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "annotation_page",
+        Path(__file__).parent / "4_Annotation.py"
+    )
+    annotation_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(annotation_module)
+    mask_stats = annotation_module._get_mask_stats(path_coordinator)
+
+    if not mask_stats:
+        st.warning("No annotated masks found. Please run annotation first.")
+        st.session_state["synthetic_config"] = {"enabled": False}
+        return
+
+    # Check for backgrounds
+    backgrounds = path_coordinator.get_background_images()
+    if not backgrounds:
+        st.warning("No background images found. Please add backgrounds to generate synthetic images.")
+        st.info(f"Add background images to: `{backgrounds_dir}`")
+        st.session_state["synthetic_config"] = {"enabled": False}
+        return
+
+    st.success(f"Found {len(mask_stats)} annotated classes and {len(backgrounds)} background images")
+
+    st.markdown("---")
+
+    # Generation Settings
+    st.markdown("##### Generation Settings")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        synthetic_ratio = st.slider(
+            "Synthetic:Real Ratio",
+            min_value=1.0,
+            max_value=3.0,
+            value=2.0,
+            step=0.5,
+            help="Ratio of synthetic images to real images (e.g., 2.0 = 2:1)",
+            key="synthetic_ratio"
+        )
+
+    with col2:
+        max_objects = st.slider(
+            "Max Objects per Image",
+            min_value=1,
+            max_value=5,
+            value=3,
+            help="Maximum number of objects to paste per synthetic image",
+            key="synthetic_max_objects"
+        )
+
+    # Scale and Rotation
+    st.markdown("##### Transform Settings")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        scale_min = st.slider(
+            "Min Scale",
+            min_value=0.3,
+            max_value=1.0,
+            value=0.5,
+            step=0.1,
+            key="synthetic_scale_min"
+        )
+
+    with col2:
+        scale_max = st.slider(
+            "Max Scale",
+            min_value=0.5,
+            max_value=2.0,
+            value=1.5,
+            step=0.1,
+            key="synthetic_scale_max"
+        )
+
+    col3, col4 = st.columns(2)
+
+    with col3:
+        rotation_min = st.slider(
+            "Min Rotation (°)",
+            min_value=-180,
+            max_value=0,
+            value=-15,
+            step=5,
+            help="Minimum rotation angle in degrees",
+            key="synthetic_rotation_min"
+        )
+
+    with col4:
+        rotation_max = st.slider(
+            "Max Rotation (°)",
+            min_value=0,
+            max_value=180,
+            value=15,
+            step=5,
+            help="Maximum rotation angle in degrees",
+            key="synthetic_rotation_max"
+        )
+
+    # Appearance Settings
+    st.markdown("##### Appearance Settings")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        enable_white_balance = st.checkbox(
+            "Enable White Balance",
+            value=True,
+            help="Adjust object colors to match background lighting",
+            key="synthetic_enable_wb"
+        )
+
+        if enable_white_balance:
+            white_balance_strength = st.slider(
+                "White Balance Strength",
+                min_value=0.0,
+                max_value=1.0,
+                value=0.7,
+                step=0.1,
+                help="Strength of white balance adjustment (0.0 = none, 1.0 = full)",
+                key="synthetic_wb_strength"
+            )
+        else:
+            white_balance_strength = 0.7
+
+    with col2:
+        edge_blur_sigma = st.slider(
+            "Edge Blur Sigma",
+            min_value=0.0,
+            max_value=5.0,
+            value=2.0,
+            step=0.5,
+            help="Blur strength for object edges (higher = smoother blending)",
+            key="synthetic_edge_blur"
+        )
+
+    st.markdown("---")
+
+    # Preview Section
+    st.markdown("##### Preview")
+
+    # Initialize preview seed in session state
+    if "synth_preview_seed" not in st.session_state:
+        st.session_state["synth_preview_seed"] = 42
+
+    # Generate Preview button
+    if st.button("🔄 Generate Preview", key="synth_preview_btn"):
+        import time
+        st.session_state["synth_preview_seed"] = int(time.time() * 1000) % (2**31)
+
+    # Generate and display preview images
+    try:
+        # Use already loaded annotation module for _generate_preview_images
+        previews = annotation_module._generate_preview_images(
+            path_coordinator=path_coordinator,
+            selected_classes=list(mask_stats.keys()),
+            scale_range=(scale_min, scale_max),
+            enable_white_balance=enable_white_balance,
+            max_objects=max_objects,
+            seed=st.session_state["synth_preview_seed"],
+            num_samples=3,
+            rotation_range=(float(rotation_min), float(rotation_max)),
+            enable_horizontal_flip=True,
+            enable_vertical_flip=False,
+            white_balance_strength=white_balance_strength,
+            edge_blur_sigma=edge_blur_sigma,
+            min_objects=1,
+        )
+
+        if previews:
+            preview_cols = st.columns(3)
+            for idx, (image, class_names_in_img) in enumerate(previews):
+                with preview_cols[idx]:
+                    st.image(image, use_container_width=True)
+                    if class_names_in_img:
+                        st.caption(f"Classes: {', '.join(class_names_in_img)}")
+                    else:
+                        st.caption("No objects placed")
+        else:
+            st.info("Could not generate preview. Check masks and backgrounds.")
+
+    except Exception as e:
+        st.warning(f"Preview generation failed: {str(e)}")
+
+    # Store configuration in session state
+    st.session_state["synthetic_config"] = {
+        "enabled": enable_dynamic_synthetic,
+        "ratio": synthetic_ratio,
+        "scale_range": (scale_min, scale_max),
+        "rotation_range": (float(rotation_min), float(rotation_max)),
+        "enable_white_balance": enable_white_balance,
+        "white_balance_strength": white_balance_strength,
+        "edge_blur_sigma": edge_blur_sigma,
+        "max_objects": max_objects,
+        "backgrounds_dir": str(backgrounds_dir),
+        "annotated_dir": str(annotated_dir),
+    }
+
+    st.markdown("---")
+
+    # Also show static synthetic session selection as fallback
+    _render_static_synthetic_selection(path_coordinator)
+
+
+def _render_static_synthetic_selection(path_coordinator: PathCoordinator) -> None:
+    """Render static synthetic session selection (pre-generated sessions)."""
     synthetic_sessions = path_coordinator.get_synthetic_sessions()
     selected_synthetic = []
 
     if synthetic_sessions:
-        st.markdown("<div style='height: 16px'></div>", unsafe_allow_html=True)
-
         st.html(f"""
         <div style="
             font-family: 'JetBrains Mono', monospace;
@@ -484,12 +794,12 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
             align-items: center;
             gap: 8px;
         ">
-            <span>🎨</span>
-            <span>Synthetic Images</span>
+            <span>📁</span>
+            <span>Pre-generated Synthetic Sessions</span>
         </div>
         """)
 
-        with st.expander("Select synthetic images for training", expanded=True):
+        with st.expander("Select pre-generated synthetic images for training", expanded=False):
             st.info("Synthetic images will be added to training set only (not validation).")
 
             for session in synthetic_sessions:
@@ -497,8 +807,8 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
                 with col1:
                     if st.checkbox(
                         f"{session['name']}",
-                        value=True,
-                        key=f"synthetic_{session['name']}",
+                        value=False,
+                        key=f"static_synthetic_{session['name']}",
                         help=f"Created: {session['created'][:10]}"
                     ):
                         selected_synthetic.append(session['name'])
@@ -528,14 +838,20 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
                         font-family: 'JetBrains Mono', monospace;
                         font-size: 0.85rem;
                         color: {COLORS["accent_primary"]};
-                    ">+{total_synthetic} synthetic images will be added to training</span>
+                    ">+{total_synthetic} pre-generated synthetic images will be added to training</span>
                 </div>
                 """)
 
-    # Store selected synthetic sessions in session state for later use
+    # Store selected static synthetic sessions in session state
     st.session_state["selected_synthetic_sessions"] = selected_synthetic
 
-    st.markdown("<div style='height: 24px'></div>", unsafe_allow_html=True)
+
+def _render_hardware_section() -> tuple:
+    """Render hardware detection and GPU scaling section.
+
+    Returns:
+        tuple: (gpu_available, gpu_name, gpu_memory, gpu_tier, auto_scale)
+    """
 
     # Hardware detection section
     st.html(f"""
@@ -614,7 +930,30 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
             gpu_tier=gpu_tier
         )
 
-    st.markdown("<div style='height: 24px'></div>", unsafe_allow_html=True)
+    return gpu_available, gpu_name, gpu_memory, gpu_tier, auto_scale
+
+
+def _render_model_section(auto_scale: bool, gpu_available: bool, gpu_tier: str, path_coordinator: PathCoordinator) -> tuple:
+    """Render model configuration section.
+
+    Returns:
+        tuple: (base_model, epochs, batch_size, fast_mode)
+    """
+    # Determine recommended values for auto-scale
+    tier_models = {
+        "low": "yolov8s.pt",
+        "medium": "yolov8m.pt",
+        "high": "yolov8l.pt",
+        "workstation": "yolov8x.pt",
+    }
+    tier_batches = {
+        "low": 8,
+        "medium": 16,
+        "high": 32,
+        "workstation": 64,
+    }
+    recommended_model = tier_models.get(gpu_tier, "yolov8m.pt")
+    recommended_batch = tier_batches.get(gpu_tier, 16)
 
     # Model configuration section
     st.html(f"""
@@ -637,6 +976,7 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
         # Base model selection
         if auto_scale and gpu_available:
             base_model = None  # Will be auto-selected
+            st.info(f"Auto-scaling will select: **{recommended_model}**")
         else:
             pretrained_models = path_coordinator.get_pretrained_models()
             model_options = ["yolov8m.pt", "yolov8s.pt", "yolov8n.pt", "yolov8l.pt", "yolov8x.pt"] + [
@@ -663,6 +1003,7 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
     with col2:
         if auto_scale and gpu_available:
             batch_size = None  # Will be auto-selected
+            st.info(f"Auto-scaling will select batch size: **{recommended_batch}**")
         else:
             batch_size = st.slider(
                 "Batch Size",
@@ -679,9 +1020,29 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
             help="Use smaller model and fewer epochs for quick testing."
         )
 
-    st.markdown("<div style='height: 24px'></div>", unsafe_allow_html=True)
+    return base_model, epochs, batch_size, fast_mode
 
-    # Advanced Parameters section
+
+def _render_advanced_section(auto_scale: bool, gpu_tier: str) -> dict:
+    """Render advanced parameters section.
+
+    Returns:
+        dict: Advanced training parameters
+    """
+    st.html(f"""
+    <div style="
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.9rem;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    ">
+        <span>⚙️</span>
+        <span>Advanced Parameters</span>
+    </div>
+    """)
+
     from components.training_advanced_params import render_advanced_parameters_section
 
     advanced_params = render_advanced_parameters_section(
@@ -689,9 +1050,15 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
         gpu_tier=gpu_tier,
     )
 
-    st.markdown("<div style='height: 24px'></div>", unsafe_allow_html=True)
+    return advanced_params
 
-    # Monitoring section
+
+def _render_monitoring_section() -> tuple:
+    """Render monitoring configuration section.
+
+    Returns:
+        tuple: (enable_tensorboard, tensorboard_port)
+    """
     st.html(f"""
     <div style="
         font-family: 'JetBrains Mono', monospace;
@@ -723,23 +1090,93 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
     else:
         tensorboard_port = 6006
 
-    st.markdown("<div style='height: 24px'></div>", unsafe_allow_html=True)
+    return enable_tensorboard, tensorboard_port
+
+
+def _render_start_button(
+    task_manager: TaskManager,
+    path_coordinator: PathCoordinator,
+    base_model: str | None,
+    epochs: int,
+    batch_size: int | None,
+    fast_mode: bool,
+    auto_scale: bool,
+    enable_tensorboard: bool,
+    tensorboard_port: int,
+    advanced_params: dict,
+) -> None:
+    """Render validation summary and start training button."""
+
+    # Get dataset info from session state
+    dataset_info = st.session_state.get("selected_dataset_info")
+
+    if not dataset_info or not dataset_info.get("data_yaml"):
+        st.warning("Please select a dataset in the Dataset tab first.")
+        return
+
+    data_yaml = dataset_info["data_yaml"]
+    train_count = dataset_info.get("train_count", 0)
+    val_count = dataset_info.get("val_count", 0)
+    selected_session = dataset_info.get("session")
+
+    # Get synthetic config from session state
+    synthetic_config = st.session_state.get("synthetic_config", {"enabled": False})
+    selected_synthetic_sessions = st.session_state.get("selected_synthetic_sessions", [])
+
+    # Determine actual model and batch size
+    tier_models = {
+        "low": "yolov8s.pt",
+        "medium": "yolov8m.pt",
+        "high": "yolov8l.pt",
+        "workstation": "yolov8x.pt",
+    }
+    tier_batches = {
+        "low": 8,
+        "medium": 16,
+        "high": 32,
+        "workstation": 64,
+    }
+
+    # Detect GPU for accurate recommendations
+    gpu_available = False
+    gpu_memory = 0.0
+    gpu_tier = "unknown"
+
+    try:
+        import torch
+        if torch.cuda.is_available():
+            gpu_available = True
+            gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1e9
+            if gpu_memory >= 24:
+                gpu_tier = "workstation"
+            elif gpu_memory >= 12:
+                gpu_tier = "high"
+            elif gpu_memory >= 6:
+                gpu_tier = "medium"
+            else:
+                gpu_tier = "low"
+    except ImportError:
+        pass
+
+    recommended_model = tier_models.get(gpu_tier, "yolov8m.pt")
+    recommended_batch = tier_batches.get(gpu_tier, 16)
+
+    current_model = base_model if base_model else (recommended_model if auto_scale and gpu_available else "yolov8m.pt")
+    current_batch = batch_size if batch_size else (recommended_batch if auto_scale and gpu_available else 16)
+
+    st.markdown("---")
 
     # Validation
-    if data_yaml:
-        current_batch = batch_size if batch_size else (recommended_batch if auto_scale and gpu_available else 16)
-        current_model = base_model if base_model else (recommended_model if auto_scale and gpu_available else "yolov8m.pt")
+    validation = validate_training_config(
+        dataset_yaml=str(data_yaml),
+        model=current_model,
+        batch_size=current_batch,
+        epochs=epochs,
+        gpu_memory_gb=gpu_memory,
+        auto_scale=auto_scale
+    )
 
-        validation = validate_training_config(
-            dataset_yaml=str(data_yaml),
-            model=current_model,
-            batch_size=current_batch,
-            epochs=epochs,
-            gpu_memory_gb=gpu_memory,
-            auto_scale=auto_scale
-        )
-
-        render_validation_messages(validation)
+    render_validation_messages(validation)
 
     st.markdown("<div style='height: 16px'></div>", unsafe_allow_html=True)
 
@@ -748,7 +1185,7 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
 
     st.markdown("<div style='height: 16px'></div>", unsafe_allow_html=True)
 
-    # Estimated time and config summary
+    # Estimated time
     if gpu_available:
         tier_multipliers = {
             "low": 2.0,
@@ -764,41 +1201,79 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
     if fast_mode:
         estimated_minutes = estimated_minutes * 0.5
 
-    if data_yaml and selected_session:
+    # Config summary
+    if selected_session:
         render_config_summary(
             dataset_name=selected_session["name"],
             train_count=train_count,
             val_count=val_count,
-            model=base_model if base_model else (recommended_model if auto_scale and gpu_available else "yolov8m.pt"),
-            batch_size=batch_size if batch_size else (recommended_batch if auto_scale and gpu_available else 16),
+            model=current_model,
+            batch_size=current_batch,
             epochs=epochs,
             gpu_tier=gpu_tier,
             estimated_time=estimated_minutes,
             auto_scale=auto_scale
         )
 
+    # Synthetic config summary
+    if synthetic_config.get("enabled"):
+        st.html(f"""
+        <div style="
+            border-radius: 8px;
+            padding: 12px;
+            margin: 12px 0;
+            background: {COLORS["accent_primary"]}15;
+        ">
+            <span style="
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 0.85rem;
+                color: {COLORS["accent_primary"]};
+            ">🎨 Dynamic synthetic generation enabled (ratio: {synthetic_config.get('ratio', 2.0)}x)</span>
+        </div>
+        """)
+
+    if selected_synthetic_sessions:
+        total_static = sum(
+            s['image_count'] for s in path_coordinator.get_synthetic_sessions()
+            if s['name'] in selected_synthetic_sessions
+        )
+        st.info(f"📁 +{total_static} pre-generated synthetic images will be added")
+
     st.markdown("<div style='height: 24px'></div>", unsafe_allow_html=True)
 
     # Start button
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if st.button("Start Training", type="primary", use_container_width=True):
-            # Get selected synthetic sessions
-            selected_synthetic = st.session_state.get("selected_synthetic_sessions", [])
-
-            # Merge synthetic images if any are selected
+        if st.button("🚀 Start Training", type="primary", use_container_width=True):
+            # Merge static synthetic images if any are selected
             final_data_yaml = data_yaml
             synthetic_added = 0
 
-            if selected_synthetic and data_yaml:
+            if selected_synthetic_sessions and data_yaml:
                 with st.spinner("Merging synthetic images into training dataset..."):
                     synthetic_added = _merge_synthetic_images(
                         path_coordinator=path_coordinator,
                         dataset_path=Path(data_yaml).parent,
-                        synthetic_sessions=selected_synthetic,
+                        synthetic_sessions=selected_synthetic_sessions,
                     )
                     if synthetic_added > 0:
-                        st.success(f"Added {synthetic_added} synthetic images to training set")
+                        st.success(f"Added {synthetic_added} static synthetic images to training set")
+
+            # Build synthetic config for dynamic generation
+            synth_config_for_training = None
+            if synthetic_config.get("enabled"):
+                synth_config_for_training = {
+                    "dynamic_synthetic_enabled": True,
+                    "synthetic_ratio": synthetic_config.get("ratio", 2.0),
+                    "synthetic_scale_range": synthetic_config.get("scale_range", (0.5, 1.5)),
+                    "synthetic_rotation_range": synthetic_config.get("rotation_range", (-15.0, 15.0)),
+                    "synthetic_white_balance": synthetic_config.get("enable_white_balance", True),
+                    "synthetic_white_balance_strength": synthetic_config.get("white_balance_strength", 0.7),
+                    "synthetic_edge_blur": synthetic_config.get("edge_blur_sigma", 2.0),
+                    "synthetic_max_objects": synthetic_config.get("max_objects", 3),
+                    "backgrounds_dir": synthetic_config.get("backgrounds_dir"),
+                    "annotated_dir": synthetic_config.get("annotated_dir"),
+                }
 
             task_id = task_manager.start_training(
                 dataset_yaml=str(final_data_yaml),
@@ -811,7 +1286,14 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
                 enable_tensorboard=enable_tensorboard,
                 tensorboard_port=tensorboard_port,
                 advanced_params=advanced_params,
+                synthetic_config=synth_config_for_training,
             )
+
+            synth_msg = ""
+            if synthetic_added > 0:
+                synth_msg += f" (+{synthetic_added} static synthetic)"
+            if synthetic_config.get("enabled"):
+                synth_msg += " (dynamic generation enabled)"
 
             st.html(f"""
             <div class="mc-validation success mc-animate-fade" style="margin-top: 16px;">
@@ -819,7 +1301,7 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
                 <div>
                     <strong>Training started!</strong><br>
                     <span style="font-size: 0.85rem; opacity: 0.9;">
-                        Task ID: {task_id}{f" (+{synthetic_added} synthetic)" if synthetic_added > 0 else ""}
+                        Task ID: {task_id}{synth_msg}
                     </span>
                 </div>
             </div>
