@@ -329,40 +329,44 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
     """Render training configuration with Mission Control aesthetic and sub-tabs."""
 
     # Create sub-tabs for organized configuration
-    dataset_tab, synthetic_tab, hardware_tab, model_tab, advanced_tab, monitoring_tab = st.tabs([
+    dataset_tab, synthetic_tab, model_tab, advanced_tab, others_tab = st.tabs([
         "📂 Dataset",
         "🎨 Synthetic",
-        "⚡ Hardware",
         "🤖 Model",
         "⚙️ Advanced",
-        "📡 Monitoring"
+        "📦 Others"
     ])
 
+    # Others tab processed first to get hardware info for other tabs
+    with others_tab:
+        with st.container(border=True):
+            gpu_available, gpu_name, gpu_memory, gpu_tier, auto_scale = _render_hardware_section()
+            st.markdown("---")
+            enable_tensorboard, tensorboard_port = _render_monitoring_section()
+
     with dataset_tab:
-        _render_dataset_section(path_coordinator)
+        with st.container(border=True):
+            _render_dataset_section(path_coordinator)
 
     with synthetic_tab:
-        _render_synthetic_section(path_coordinator)
-
-    with hardware_tab:
-        gpu_available, gpu_name, gpu_memory, gpu_tier, auto_scale = _render_hardware_section()
+        with st.container(border=True):
+            _render_synthetic_section(path_coordinator)
 
     with model_tab:
-        base_model, epochs, batch_size, fast_mode = _render_model_section(
-            auto_scale=auto_scale if 'auto_scale' in locals() else False,
-            gpu_available=gpu_available if 'gpu_available' in locals() else False,
-            gpu_tier=gpu_tier if 'gpu_tier' in locals() else "unknown",
-            path_coordinator=path_coordinator
-        )
+        with st.container(border=True):
+            base_model, epochs, batch_size, fast_mode = _render_model_section(
+                auto_scale=auto_scale,
+                gpu_available=gpu_available,
+                gpu_tier=gpu_tier,
+                path_coordinator=path_coordinator
+            )
 
     with advanced_tab:
-        advanced_params = _render_advanced_section(
-            auto_scale=auto_scale if 'auto_scale' in locals() else False,
-            gpu_tier=gpu_tier if 'gpu_tier' in locals() else "unknown"
-        )
-
-    with monitoring_tab:
-        enable_tensorboard, tensorboard_port = _render_monitoring_section()
+        with st.container(border=True):
+            advanced_params = _render_advanced_section(
+                auto_scale=auto_scale,
+                gpu_tier=gpu_tier
+            )
 
     # Start button outside tabs
     _render_start_button(
@@ -846,6 +850,33 @@ def _render_static_synthetic_selection(path_coordinator: PathCoordinator) -> Non
     st.session_state["selected_synthetic_sessions"] = selected_synthetic
 
 
+@st.cache_resource
+def _get_gpu_info() -> dict:
+    """Get GPU information (cached to avoid repeated CUDA queries)."""
+    try:
+        import torch
+        if torch.cuda.is_available():
+            memory = torch.cuda.get_device_properties(0).total_memory / 1e9
+            # Determine tier
+            if memory >= 24:
+                tier = "workstation"
+            elif memory >= 12:
+                tier = "high"
+            elif memory >= 6:
+                tier = "medium"
+            else:
+                tier = "low"
+            return {
+                "available": True,
+                "name": torch.cuda.get_device_name(0),
+                "memory": memory,
+                "tier": tier,
+            }
+    except ImportError:
+        pass
+    return {"available": False, "name": "", "memory": 0.0, "tier": "unknown"}
+
+
 def _render_hardware_section() -> tuple:
     """Render hardware detection and GPU scaling section.
 
@@ -868,43 +899,27 @@ def _render_hardware_section() -> tuple:
     </div>
     """)
 
-    gpu_available = False
-    gpu_name = ""
-    gpu_memory = 0.0
-    gpu_tier = "unknown"
+    # Get cached GPU info
+    gpu_info = _get_gpu_info()
+    gpu_available = gpu_info["available"]
+    gpu_name = gpu_info["name"]
+    gpu_memory = gpu_info["memory"]
+    gpu_tier = gpu_info["tier"]
 
-    try:
-        import torch
-        if torch.cuda.is_available():
-            gpu_available = True
-            gpu_name = torch.cuda.get_device_name(0)
-            gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1e9
-
-            # Determine tier
-            if gpu_memory >= 24:
-                gpu_tier = "workstation"
-            elif gpu_memory >= 12:
-                gpu_tier = "high"
-            elif gpu_memory >= 6:
-                gpu_tier = "medium"
-            else:
-                gpu_tier = "low"
-
-            render_gpu_status_card(
-                gpu_name=gpu_name,
-                gpu_memory=gpu_memory,
-                gpu_tier=gpu_tier,
-                auto_scale_enabled=False
-            )
-        else:
-            render_gpu_not_available()
-    except ImportError:
-        st.warning("PyTorch not installed. Cannot check GPU availability.")
+    if gpu_available:
+        render_gpu_status_card(
+            gpu_name=gpu_name,
+            gpu_memory=gpu_memory,
+            gpu_tier=gpu_tier,
+            auto_scale_enabled=False
+        )
+    else:
+        render_gpu_not_available()
 
     # Auto-scaling option
     auto_scale = st.checkbox(
         "Enable GPU Auto-Scaling",
-        value=True,
+        value=False,
         help="Automatically select optimal model, batch size, and settings based on GPU capabilities."
     )
 
@@ -1214,23 +1229,6 @@ def _render_start_button(
             estimated_time=estimated_minutes,
             auto_scale=auto_scale
         )
-
-    # Synthetic config summary
-    if synthetic_config.get("enabled"):
-        st.html(f"""
-        <div style="
-            border-radius: 8px;
-            padding: 12px;
-            margin: 12px 0;
-            background: {COLORS["accent_primary"]}15;
-        ">
-            <span style="
-                font-family: 'JetBrains Mono', monospace;
-                font-size: 0.85rem;
-                color: {COLORS["accent_primary"]};
-            ">🎨 Dynamic synthetic generation enabled (ratio: {synthetic_config.get('ratio', 2.0)}x)</span>
-        </div>
-        """)
 
     if selected_synthetic_sessions:
         total_static = sum(

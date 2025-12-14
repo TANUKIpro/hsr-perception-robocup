@@ -18,7 +18,6 @@ from components.common_sidebar import render_common_sidebar
 from components.object_editor import render_object_editor
 from components.object_viewer import render_object_viewer
 from components.object_form import render_add_object_form
-from components.ihr_import import render_ihr_import
 from object_registry import ObjectRegistry
 
 
@@ -38,7 +37,6 @@ def show_registry_page() -> None:
 
     with tab2:
         render_add_object_form(registry)
-        render_ihr_import(registry)
 
 
 def _render_view_tab(registry: ObjectRegistry) -> None:

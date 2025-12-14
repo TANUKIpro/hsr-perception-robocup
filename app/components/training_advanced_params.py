@@ -237,64 +237,57 @@ def _get_param(key: str, default: Any) -> Any:
 # UI Components
 # =============================================================================
 
-def _render_preset_selector() -> str:
-    """Render preset selection buttons."""
-    st.html(f"""
-    <div style="
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 0.8rem;
-        margin-bottom: 12px;
-        opacity: 0.7;
-    ">Presets</div>
-    """)
+def _on_preset_click(preset_name: str) -> None:
+    """Callback for preset button click - updates session state without full rerun."""
+    _load_preset(preset_name)
+    st.session_state.current_preset = preset_name
 
+
+def _render_preset_selector() -> str:
+    """Render preset selection buttons with callbacks for optimized reruns."""
     col1, col2, col3, col4 = st.columns(4)
 
     current_preset = st.session_state.get("current_preset", "Competition")
 
     with col1:
-        if st.button(
+        st.button(
             "Competition",
             use_container_width=True,
             type="primary" if current_preset == "Competition" else "secondary",
             help="Balanced settings optimized for competition day (~45 min)",
-        ):
-            _load_preset("Competition")
-            st.session_state.current_preset = "Competition"
-            st.rerun()
+            on_click=_on_preset_click,
+            args=("Competition",),
+        )
 
     with col2:
-        if st.button(
+        st.button(
             "Fast Test",
             use_container_width=True,
             type="primary" if current_preset == "Fast Test" else "secondary",
             help="Quick validation with reduced settings (~15 min)",
-        ):
-            _load_preset("Fast Test")
-            st.session_state.current_preset = "Fast Test"
-            st.rerun()
+            on_click=_on_preset_click,
+            args=("Fast Test",),
+        )
 
     with col3:
-        if st.button(
+        st.button(
             "High Accuracy",
             use_container_width=True,
             type="primary" if current_preset == "High Accuracy" else "secondary",
             help="Maximum accuracy with stronger augmentation (~90 min)",
-        ):
-            _load_preset("High Accuracy")
-            st.session_state.current_preset = "High Accuracy"
-            st.rerun()
+            on_click=_on_preset_click,
+            args=("High Accuracy",),
+        )
 
     with col4:
-        if st.button(
+        st.button(
             "Few-Shot",
             use_container_width=True,
             type="primary" if current_preset == "Few-Shot" else "secondary",
             help="Optimized for small datasets (<500 images) with overfitting prevention",
-        ):
-            _load_preset("Few-Shot")
-            st.session_state.current_preset = "Few-Shot"
-            st.rerun()
+            on_click=_on_preset_click,
+            args=("Few-Shot",),
+        )
 
     return current_preset
 
@@ -321,7 +314,6 @@ def _render_augmentation_tab() -> Dict[str, float]:
             "Hue",
             min_value=0.0,
             max_value=0.1,
-            value=_get_param("hsv_h", 0.015),
             step=0.005,
             help="Hue shift range. Helps adapt to lighting changes.",
             key="adv_hsv_h",
@@ -331,7 +323,6 @@ def _render_augmentation_tab() -> Dict[str, float]:
             "Saturation",
             min_value=0.0,
             max_value=1.0,
-            value=_get_param("hsv_s", 0.7),
             step=0.05,
             help="Saturation shift range. Adjusts color vividness.",
             key="adv_hsv_s",
@@ -341,7 +332,6 @@ def _render_augmentation_tab() -> Dict[str, float]:
             "Value",
             min_value=0.0,
             max_value=1.0,
-            value=_get_param("hsv_v", 0.4),
             step=0.05,
             help="Value (brightness) shift range.",
             key="adv_hsv_v",
@@ -367,7 +357,6 @@ def _render_augmentation_tab() -> Dict[str, float]:
             "Rotation",
             min_value=0.0,
             max_value=45.0,
-            value=_get_param("degrees", 10.0),
             step=1.0,
             help="Rotation angle range in degrees.",
             key="adv_degrees",
@@ -377,7 +366,6 @@ def _render_augmentation_tab() -> Dict[str, float]:
             "Translation",
             min_value=0.0,
             max_value=0.5,
-            value=_get_param("translate", 0.1),
             step=0.05,
             help="Translation range as fraction of image size.",
             key="adv_translate",
@@ -387,7 +375,6 @@ def _render_augmentation_tab() -> Dict[str, float]:
             "Scale",
             min_value=0.0,
             max_value=1.0,
-            value=_get_param("scale", 0.5),
             step=0.05,
             help="Scale range (0.5 means 0.5x-1.5x).",
             key="adv_scale",
@@ -397,7 +384,6 @@ def _render_augmentation_tab() -> Dict[str, float]:
             "Shear",
             min_value=0.0,
             max_value=10.0,
-            value=_get_param("shear", 2.0),
             step=0.5,
             help="Shear angle range in degrees.",
             key="adv_shear",
@@ -423,7 +409,6 @@ def _render_augmentation_tab() -> Dict[str, float]:
             "Flip Vertical",
             min_value=0.0,
             max_value=1.0,
-            value=_get_param("flipud", 0.0),
             step=0.1,
             help="Vertical flip probability. Usually 0 for object detection.",
             key="adv_flipud",
@@ -433,7 +418,6 @@ def _render_augmentation_tab() -> Dict[str, float]:
             "Flip Horizontal",
             min_value=0.0,
             max_value=1.0,
-            value=_get_param("fliplr", 0.5),
             step=0.1,
             help="Horizontal flip probability.",
             key="adv_fliplr",
@@ -443,7 +427,6 @@ def _render_augmentation_tab() -> Dict[str, float]:
             "Mosaic",
             min_value=0.0,
             max_value=1.0,
-            value=_get_param("mosaic", 1.0),
             step=0.1,
             help="Mosaic augmentation probability (combines 4 images).",
             key="adv_mosaic",
@@ -453,7 +436,6 @@ def _render_augmentation_tab() -> Dict[str, float]:
             "MixUp",
             min_value=0.0,
             max_value=1.0,
-            value=_get_param("mixup", 0.1),
             step=0.05,
             help="MixUp augmentation probability (blends 2 images).",
             key="adv_mixup",
@@ -483,9 +465,6 @@ def _render_optimizer_tab() -> Dict[str, Any]:
         params["optimizer"] = st.selectbox(
             "Optimizer",
             options=["AdamW", "Adam", "SGD", "RMSProp"],
-            index=["AdamW", "Adam", "SGD", "RMSProp"].index(
-                _get_param("optimizer", "AdamW")
-            ),
             help="Optimization algorithm. AdamW recommended for fine-tuning.",
             key="adv_optimizer",
         )
@@ -494,7 +473,6 @@ def _render_optimizer_tab() -> Dict[str, Any]:
             "Initial LR",
             min_value=0.0001,
             max_value=0.1,
-            value=_get_param("lr0", 0.001),
             step=0.0001,
             format="%.4f",
             help="Initial learning rate. Lower for fine-tuning.",
@@ -505,7 +483,6 @@ def _render_optimizer_tab() -> Dict[str, Any]:
             "Final LR Scale",
             min_value=0.001,
             max_value=1.0,
-            value=_get_param("lrf", 0.01),
             step=0.001,
             format="%.3f",
             help="Final learning rate = lr0 * lrf",
@@ -532,7 +509,6 @@ def _render_optimizer_tab() -> Dict[str, Any]:
             "Momentum",
             min_value=0.8,
             max_value=0.99,
-            value=_get_param("momentum", 0.937),
             step=0.001,
             format="%.3f",
             help="Momentum coefficient for SGD/AdamW.",
@@ -543,7 +519,6 @@ def _render_optimizer_tab() -> Dict[str, Any]:
             "Weight Decay",
             min_value=0.0,
             max_value=0.01,
-            value=_get_param("weight_decay", 0.0005),
             step=0.0001,
             format="%.4f",
             help="L2 regularization strength.",
@@ -568,21 +543,20 @@ def _render_optimizer_tab() -> Dict[str, Any]:
     with col1:
         params["llrd_enabled"] = st.checkbox(
             "Enable LLRD",
-            value=_get_param("llrd_enabled", False),
             help="Apply different learning rates to different network depths. "
                  "Detection head gets the highest LR, backbone gets the lowest. "
                  "Recommended for fine-tuning to improve generalization (+1-3% mAP).",
             key="adv_llrd_enabled",
         )
     with col2:
+        llrd_enabled = st.session_state.get("adv_llrd_enabled", False)
         params["llrd_decay_rate"] = st.slider(
             "Decay Rate",
             min_value=0.7,
             max_value=0.99,
-            value=_get_param("llrd_decay_rate", 0.9),
             step=0.01,
             format="%.2f",
-            disabled=not _get_param("llrd_enabled", False),
+            disabled=not llrd_enabled,
             help="LR decay factor per layer depth. 0.9 means each deeper layer "
                  "gets 90% of the previous layer's LR. Lower values = more aggressive decay.",
             key="adv_llrd_decay_rate",
@@ -606,13 +580,13 @@ def _render_optimizer_tab() -> Dict[str, Any]:
     with col1:
         params["swa_enabled"] = st.checkbox(
             "Enable SWA",
-            value=_get_param("swa_enabled", False),
             help="Average model weights during final epochs for better generalization. "
                  "SWA finds flatter minima that generalize better to unseen data. "
                  "Recommended for fine-tuning (+1-2% mAP).",
             key="adv_swa_enabled",
         )
     with col2:
+        swa_enabled = st.session_state.get("adv_swa_enabled", False)
         # Fix invalid session_state value before rendering widget
         if st.session_state.get("adv_swa_start_epoch", 10) < 5:
             st.session_state["adv_swa_start_epoch"] = 10
@@ -620,9 +594,8 @@ def _render_optimizer_tab() -> Dict[str, Any]:
             "Start (last N epochs)",
             min_value=5,
             max_value=30,
-            value=max(_get_param("swa_start_epoch", 10), 5),
             step=1,
-            disabled=not _get_param("swa_enabled", False),
+            disabled=not swa_enabled,
             help="Start averaging weights at (total_epochs - N). "
                  "Default: 10 (start averaging 10 epochs before training ends).",
             key="adv_swa_start_epoch",
@@ -632,10 +605,9 @@ def _render_optimizer_tab() -> Dict[str, Any]:
             "SWA Learning Rate",
             min_value=0.0001,
             max_value=0.01,
-            value=_get_param("swa_lr", 0.0005),
             step=0.0001,
             format="%.4f",
-            disabled=not _get_param("swa_enabled", False),
+            disabled=not swa_enabled,
             help="Learning rate during SWA phase. "
                  "Typically ~1/2 of base learning rate. Default: 0.0005.",
             key="adv_swa_lr",
@@ -665,7 +637,6 @@ def _render_performance_tab() -> Dict[str, Any]:
             "Dataloader Workers",
             min_value=0,
             max_value=16,
-            value=_get_param("workers", 8),
             step=1,
             help="Number of parallel data loading workers.",
             key="adv_workers",
@@ -673,14 +644,12 @@ def _render_performance_tab() -> Dict[str, Any]:
     with col2:
         params["cache"] = st.checkbox(
             "Cache Images in RAM",
-            value=_get_param("cache", True),
             help="Cache images in memory for faster training.",
             key="adv_cache",
         )
     with col3:
         params["amp"] = st.checkbox(
             "Auto Mixed Precision",
-            value=_get_param("amp", True),
             help="Use FP16+FP32 mixed precision for faster training.",
             key="adv_amp",
         )
@@ -704,9 +673,6 @@ def _render_performance_tab() -> Dict[str, Any]:
         params["imgsz"] = st.selectbox(
             "Image Size",
             options=[320, 416, 480, 512, 640, 800, 1024],
-            index=[320, 416, 480, 512, 640, 800, 1024].index(
-                _get_param("imgsz", 640)
-            ),
             help="Input image size. Larger = more accurate but slower.",
             key="adv_imgsz",
         )
@@ -715,7 +681,6 @@ def _render_performance_tab() -> Dict[str, Any]:
             "Early Stop Patience",
             min_value=1,
             max_value=50,
-            value=_get_param("patience", 10),
             step=1,
             help="Stop training if no improvement for N epochs.",
             key="adv_patience",
@@ -725,7 +690,6 @@ def _render_performance_tab() -> Dict[str, Any]:
             "Close Mosaic",
             min_value=0,
             max_value=30,
-            value=_get_param("close_mosaic", 10),
             step=1,
             help="Disable mosaic for last N epochs.",
             key="adv_close_mosaic",
@@ -735,7 +699,6 @@ def _render_performance_tab() -> Dict[str, Any]:
             "Freeze Layers",
             min_value=0,
             max_value=20,
-            value=_get_param("freeze", 10),
             step=1,
             help="Freeze first N backbone layers. Prevents overfitting on small datasets.",
             key="adv_freeze",
@@ -763,25 +726,24 @@ def _render_checkpoint_tab() -> Dict[str, Any]:
     with col1:
         params["save"] = st.checkbox(
             "Save Checkpoints",
-            value=_get_param("save", True),
             help="Save model checkpoints during training.",
             key="adv_save",
         )
     with col2:
+        # Get save state from session_state for disabled logic
+        save_enabled = st.session_state.get("adv_save", True)
         params["save_period"] = st.number_input(
             "Save Every N Epochs",
             min_value=1,
             max_value=20,
-            value=_get_param("save_period", 5),
             step=1,
-            disabled=not _get_param("save", True),
+            disabled=not save_enabled,
             help="Save checkpoint every N epochs.",
             key="adv_save_period",
         )
     with col3:
         params["exist_ok"] = st.checkbox(
             "Overwrite Existing",
-            value=_get_param("exist_ok", True),
             help="Allow overwriting existing run directory.",
             key="adv_exist_ok",
         )
@@ -811,7 +773,6 @@ def _render_overfitting_prevention_tab() -> Dict[str, Any]:
             "Label Smoothing",
             min_value=0.0,
             max_value=0.2,
-            value=_get_param("label_smoothing", 0.0),
             step=0.01,
             help="Apply label smoothing to prevent overconfident predictions. "
                  "Recommended: 0.05-0.1 for small datasets (<500 images).",
@@ -820,7 +781,6 @@ def _render_overfitting_prevention_tab() -> Dict[str, Any]:
     with col2:
         params["cos_lr"] = st.checkbox(
             "Cosine LR Schedule",
-            value=_get_param("cos_lr", False),
             help="Use cosine annealing learning rate schedule for smoother convergence. "
                  "Helps prevent overfitting by gradually reducing learning rate.",
             key="adv_cos_lr",
@@ -842,7 +802,6 @@ def _render_overfitting_prevention_tab() -> Dict[str, Any]:
 
     params["multi_scale"] = st.checkbox(
         "Multi-scale Training",
-        value=_get_param("multi_scale", False),
         help="Vary image size ±50% during training for better scale invariance. "
              "Warning: Increases VRAM usage significantly. Not recommended for GPUs < 8GB.",
         key="adv_multi_scale",
@@ -866,6 +825,7 @@ def _render_overfitting_prevention_tab() -> Dict[str, Any]:
 # Main Entry Point
 # =============================================================================
 
+@st.fragment
 def render_advanced_parameters_section(
     auto_scale: bool,
     gpu_tier: str,
@@ -883,56 +843,40 @@ def render_advanced_parameters_section(
     # Ensure session state is initialized
     _ensure_session_state()
 
-    # Section header
-    st.html(f"""
-    <div style="
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 0.9rem;
-        margin-bottom: 12px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    ">
-        <span>{"" if "settings" not in ICONS else ICONS.get("settings", "")}</span>
-        <span>Advanced Parameters</span>
-    </div>
-    """)
+    # Note about parameter priority
+    if auto_scale:
+        st.info(
+            "Advanced parameters will override GPU auto-scaling settings."
+        )
 
-    with st.expander("Configure detailed training parameters", expanded=False):
-        # Note about parameter priority
-        if auto_scale:
-            st.info(
-                "Advanced parameters will override GPU auto-scaling settings."
-            )
+    # Preset selector
+    _render_preset_selector()
 
-        # Preset selector
-        _render_preset_selector()
+    st.markdown("<div style='height: 16px'></div>", unsafe_allow_html=True)
 
-        st.markdown("<div style='height: 16px'></div>", unsafe_allow_html=True)
+    # Parameter tabs
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "Data Augmentation",
+        "Optimizer",
+        "Performance",
+        "Checkpoint",
+        "Overfitting Prevention"
+    ])
 
-        # Parameter tabs
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
-            "Data Augmentation",
-            "Optimizer",
-            "Performance",
-            "Checkpoint",
-            "Overfitting Prevention"
-        ])
+    with tab1:
+        aug_params = _render_augmentation_tab()
 
-        with tab1:
-            aug_params = _render_augmentation_tab()
+    with tab2:
+        opt_params = _render_optimizer_tab()
 
-        with tab2:
-            opt_params = _render_optimizer_tab()
+    with tab3:
+        perf_params = _render_performance_tab()
 
-        with tab3:
-            perf_params = _render_performance_tab()
+    with tab4:
+        ckpt_params = _render_checkpoint_tab()
 
-        with tab4:
-            ckpt_params = _render_checkpoint_tab()
-
-        with tab5:
-            overfit_params = _render_overfitting_prevention_tab()
+    with tab5:
+        overfit_params = _render_overfitting_prevention_tab()
 
     # Combine all parameters
     all_params = {
