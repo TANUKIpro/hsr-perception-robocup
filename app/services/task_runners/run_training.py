@@ -128,6 +128,7 @@ def main():
     parser.add_argument("--no-tensorboard", action="store_true", help="Disable TensorBoard")
     parser.add_argument("--tensorboard-port", type=int, default=6006, help="TensorBoard port")
     parser.add_argument("--advanced-params", type=str, default=None, help="Advanced parameters as JSON string")
+    parser.add_argument("--synthetic-config", type=str, default=None, help="Synthetic generation config as JSON string")
     args = parser.parse_args()
 
     task_id = args.task_id
@@ -236,6 +237,39 @@ def main():
                 print(f"Warning: Failed to parse advanced parameters: {e}")
             except Exception as e:
                 print(f"Warning: Error applying advanced parameters: {e}")
+
+        # Apply synthetic config
+        if args.synthetic_config:
+            try:
+                import json
+                synthetic = json.loads(args.synthetic_config)
+
+                # Whitelist validation for security
+                allowed_synthetic_keys = {
+                    "dynamic_synthetic_enabled",
+                    "backgrounds_dir",
+                    "annotated_dir",
+                    "synthetic_ratio",
+                    "synthetic_scale_range",
+                    "synthetic_rotation_range",
+                    "synthetic_white_balance",
+                    "synthetic_white_balance_strength",
+                    "synthetic_edge_blur",
+                    "synthetic_max_objects",
+                }
+
+                # Filter to only allowed keys
+                filtered_synthetic = {k: v for k, v in synthetic.items() if k in allowed_synthetic_keys}
+                config.update(filtered_synthetic)
+
+                print(f"Applied {len(filtered_synthetic)} synthetic generation parameters:")
+                for key, value in filtered_synthetic.items():
+                    print(f"  {key}: {value}")
+
+            except json.JSONDecodeError as e:
+                print(f"Warning: Failed to parse synthetic config: {e}")
+            except Exception as e:
+                print(f"Warning: Error applying synthetic config: {e}")
 
         update_task_status(
             task_id,

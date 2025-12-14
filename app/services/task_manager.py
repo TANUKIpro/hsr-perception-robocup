@@ -383,6 +383,7 @@ class TaskManager:
         enable_tensorboard: bool = True,
         tensorboard_port: int = 6006,
         advanced_params: Optional[Dict[str, Any]] = None,
+        synthetic_config: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Start training task.
@@ -398,6 +399,8 @@ class TaskManager:
             enable_tensorboard: Enable TensorBoard monitoring
             tensorboard_port: Port for TensorBoard server
             advanced_params: Advanced training parameters from UI (overrides auto-scaling)
+            synthetic_config: Dynamic Copy-Paste synthetic generation configuration
+                             (backgrounds_dir, annotated_dir, synthetic_ratio, etc.)
 
         Returns:
             Task ID
@@ -419,6 +422,7 @@ class TaskManager:
                 "auto_scale": auto_scale,
                 "enable_tensorboard": enable_tensorboard,
                 "advanced_params": advanced_params,
+                "synthetic_config": synthetic_config,
             }
         )
         self._save_status(task)
@@ -462,6 +466,10 @@ class TaskManager:
         # Advanced parameters (JSON encoded)
         if advanced_params:
             cmd.extend(["--advanced-params", json.dumps(advanced_params)])
+
+        # Synthetic config (JSON encoded)
+        if synthetic_config:
+            cmd.extend(["--synthetic-config", json.dumps(synthetic_config)])
 
         self._launch_subprocess(cmd, task)
         return task_id
