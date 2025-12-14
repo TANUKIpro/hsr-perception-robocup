@@ -574,6 +574,12 @@ def _generate_preview_images(
     max_objects: int,
     seed: int = 42,
     num_samples: int = 3,
+    rotation_range: tuple = (-15.0, 15.0),
+    enable_horizontal_flip: bool = True,
+    enable_vertical_flip: bool = False,
+    white_balance_strength: float = 0.7,
+    edge_blur_sigma: float = 2.0,
+    min_objects: int = 1,
 ) -> List[tuple]:
     """
     Generate preview synthetic images.
@@ -586,6 +592,12 @@ def _generate_preview_images(
         max_objects: Maximum objects per image
         seed: Random seed for reproducibility
         num_samples: Number of preview images to generate
+        rotation_range: (min_rotation, max_rotation) tuple in degrees
+        enable_horizontal_flip: Whether to enable horizontal flipping
+        enable_vertical_flip: Whether to enable vertical flipping
+        white_balance_strength: Strength of white balance adjustment (0.0-1.0)
+        edge_blur_sigma: Blur sigma for object edges
+        min_objects: Minimum objects per image
 
     Returns:
         List of (image_rgb, class_names) tuples
@@ -596,8 +608,14 @@ def _generate_preview_images(
 
     config = CopyPasteConfig(
         scale_range=scale_range,
+        rotation_range=rotation_range,
+        enable_horizontal_flip=enable_horizontal_flip,
+        enable_vertical_flip=enable_vertical_flip,
         enable_white_balance=enable_white_balance,
+        white_balance_strength=white_balance_strength,
+        edge_blur_sigma=edge_blur_sigma,
         max_objects_per_image=max_objects,
+        min_objects_per_image=min_objects,
         seed=seed,
     )
 
@@ -766,6 +784,126 @@ def _render_generate_synthetic(path_coordinator: PathCoordinator) -> None:
             key="synth_scale_max"
         )
 
+    # Transform Settings
+    st.markdown("##### Transform Settings")
+
+    col5, col6 = st.columns(2)
+
+    with col5:
+        rotation_min = st.slider(
+            "Min Rotation (°)",
+            min_value=-180,
+            max_value=0,
+            value=-15,
+            step=5,
+            help="Minimum rotation angle in degrees",
+            key="synth_rot_min"
+        )
+
+    with col6:
+        rotation_max = st.slider(
+            "Max Rotation (°)",
+            min_value=0,
+            max_value=180,
+            value=15,
+            step=5,
+            help="Maximum rotation angle in degrees",
+            key="synth_rot_max"
+        )
+
+    col7, col8 = st.columns(2)
+
+    with col7:
+        enable_horizontal_flip = st.checkbox(
+            "Enable Horizontal Flip",
+            value=True,
+            help="Randomly flip objects horizontally",
+            key="synth_hflip"
+        )
+
+    with col8:
+        enable_vertical_flip = st.checkbox(
+            "Enable Vertical Flip",
+            value=False,
+            help="Randomly flip objects vertically",
+            key="synth_vflip"
+        )
+
+    # Appearance Settings
+    st.markdown("##### Appearance Settings")
+
+    col9, col10 = st.columns(2)
+
+    with col9:
+        if enable_white_balance:
+            white_balance_strength = st.slider(
+                "White Balance Strength",
+                min_value=0.0,
+                max_value=1.0,
+                value=0.7,
+                step=0.1,
+                help="Strength of white balance adjustment (0.0 = none, 1.0 = full)",
+                key="synth_wb_strength"
+            )
+        else:
+            white_balance_strength = 0.7  # default when WB disabled
+
+    with col10:
+        edge_blur_sigma = st.slider(
+            "Edge Blur Sigma",
+            min_value=0.0,
+            max_value=5.0,
+            value=2.0,
+            step=0.5,
+            help="Blur strength for object edges (higher = smoother blending)",
+            key="synth_edge_blur"
+        )
+
+    # Advanced Settings
+    with st.expander("⚙️ Advanced Settings"):
+        adv_col1, adv_col2 = st.columns(2)
+
+        with adv_col1:
+            min_objects = st.slider(
+                "Min Objects per Image",
+                min_value=1,
+                max_value=max_objects,
+                value=1,
+                help="Minimum number of objects to paste per synthetic image",
+                key="synth_min_obj"
+            )
+
+            allow_overlap = st.checkbox(
+                "Allow Object Overlap",
+                value=False,
+                help="Allow objects to overlap each other",
+                key="synth_overlap"
+            )
+
+        with adv_col2:
+            output_quality = st.slider(
+                "JPEG Quality",
+                min_value=50,
+                max_value=100,
+                value=95,
+                step=5,
+                help="Output JPEG quality (higher = better quality, larger files)",
+                key="synth_jpeg_quality"
+            )
+
+            if allow_overlap:
+                overlap_iou_threshold = st.slider(
+                    "Overlap IoU Threshold",
+                    min_value=0.0,
+                    max_value=0.5,
+                    value=0.1,
+                    step=0.05,
+                    help="Maximum allowed overlap between objects (IoU)",
+                    key="synth_overlap_iou"
+                )
+            else:
+                overlap_iou_threshold = 0.1  # default when overlap disabled
+
     st.markdown("---")
 
     # Background preview
@@ -811,6 +949,12 @@ def _render_generate_synthetic(path_coordinator: PathCoordinator) -> None:
             max_objects=max_objects,
             seed=st.session_state["synth_preview_seed"],
             num_samples=3,
+            rotation_range=(float(rotation_min), float(rotation_max)),
+            enable_horizontal_flip=enable_horizontal_flip,
+            enable_vertical_flip=enable_vertical_flip,
+            white_balance_strength=white_balance_strength,
+            edge_blur_sigma=edge_blur_sigma,
+            min_objects=min_objects,
         )
 
         if previews:
@@ -841,8 +985,17 @@ def _render_generate_synthetic(path_coordinator: PathCoordinator) -> None:
             config = CopyPasteConfig(
                 synthetic_to_real_ratio=synthetic_ratio,
                 scale_range=(scale_min, scale_max),
+                rotation_range=(float(rotation_min), float(rotation_max)),
+                enable_horizontal_flip=enable_horizontal_flip,
+                enable_vertical_flip=enable_vertical_flip,
                 enable_white_balance=enable_white_balance,
+                white_balance_strength=white_balance_strength,
+                edge_blur_sigma=edge_blur_sigma,
                 max_objects_per_image=max_objects,
+                min_objects_per_image=min_objects,
+                allow_overlap=allow_overlap,
+                overlap_iou_threshold=overlap_iou_threshold,
+                output_quality=output_quality,
                 seed=batch_seed,
             )
 

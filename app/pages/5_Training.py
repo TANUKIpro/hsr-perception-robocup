@@ -485,11 +485,11 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
             gap: 8px;
         ">
             <span>🎨</span>
-            <span>Synthetic Images (Optional)</span>
+            <span>Synthetic Images</span>
         </div>
         """)
 
-        with st.expander("Add synthetic images to training", expanded=False):
+        with st.expander("Select synthetic images for training", expanded=True):
             st.info("Synthetic images will be added to training set only (not validation).")
 
             for session in synthetic_sessions:
@@ -497,6 +497,7 @@ def _render_start_training(task_manager: TaskManager, path_coordinator: PathCoor
                 with col1:
                     if st.checkbox(
                         f"{session['name']}",
+                        value=True,
                         key=f"synthetic_{session['name']}",
                         help=f"Created: {session['created'][:10]}"
                     ):
