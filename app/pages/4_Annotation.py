@@ -133,9 +133,9 @@ def show_annotation_page() -> None:
     path_coordinator = st.session_state.path_coordinator
 
     # Tabs for different sections (ordered by workflow)
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    # Note: "Generate Synthetic" has been moved to Training page
+    tab1, tab2, tab3, tab4 = st.tabs([
         "🎯 Run Annotation",
-        "🎨 Generate Synthetic",
         "📦 Prepare Dataset",
         "📁 Sessions",
         "📜 History"
@@ -145,15 +145,12 @@ def show_annotation_page() -> None:
         _render_run_annotation(task_manager, path_coordinator)
 
     with tab2:
-        _render_generate_synthetic(path_coordinator)
-
-    with tab3:
         _render_prepare_dataset(path_coordinator)
 
-    with tab4:
+    with tab3:
         _render_annotation_sessions(path_coordinator)
 
-    with tab5:
+    with tab4:
         _render_annotation_history(task_manager)
 
 
