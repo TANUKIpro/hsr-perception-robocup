@@ -45,6 +45,7 @@ from .tensorboard_monitor import (
 )
 from .training_config import TrainingConfig
 from .swa_trainer import SWAConfig, SWACallback, create_swa_callback, register_swa_callbacks
+from .memory_utils import full_training_cleanup, cleanup_cuda_memory, log_memory_snapshot
 
 # Competition-optimized training configuration (legacy compatibility)
 # Updated for better generalization based on Tier 1 recommendations
@@ -337,6 +338,56 @@ class CompetitionTrainer:
         # Note: We don't stop the server here so users can view results after training
         pass
 
+    def _cleanup_callbacks(self, model: Any) -> None:
+        """
+        Clear all registered callbacks from the model.
+
+        Args:
+            model: YOLO model instance
+        """
+        try:
+            if hasattr(model, 'callbacks'):
+                # Clear all callback dictionaries
+                for callback_name in model.callbacks:
+                    if isinstance(model.callbacks[callback_name], dict):
+                        model.callbacks[callback_name].clear()
+                print(f"{Fore.GREEN}Cleared model callbacks{Style.RESET_ALL}")
+        except Exception as e:
+            print(f"{Fore.YELLOW}Warning: Error clearing callbacks: {e}{Style.RESET_ALL}")
+
+    def _cleanup_all_resources(
+        self,
+        model: Any,
+        trainer: Any = None,
+        stop_tensorboard: bool = False
+    ) -> None:
+        """
+        Comprehensive cleanup of all training resources.
+
+        Args:
+            model: YOLO model to clean up
+            trainer: Optional trainer object to clean up
+            stop_tensorboard: Whether to stop TensorBoard server
+        """
+        print(f"\n{Fore.CYAN}Cleaning up training resources...{Style.RESET_ALL}")
+
+        # Clear model callbacks first
+        self._cleanup_callbacks(model)
+
+        # Use comprehensive cleanup from memory_utils
+        stats = full_training_cleanup(
+            model=model.model if hasattr(model, 'model') else model,
+            optimizer=trainer.optimizer if trainer and hasattr(trainer, 'optimizer') else None,
+            swa_callback=self.swa_callback,
+            tensorboard_callback=self.tensorboard_callback,
+            tensorboard_server=self.tensorboard_server if stop_tensorboard else None,
+            synchronize_cuda=True,
+            num_gc_passes=2
+        )
+
+        print(f"{Fore.GREEN}Cleanup complete. "
+              f"Freed {stats.get('cuda_freed_mb', 0):.1f}MB CUDA memory{Style.RESET_ALL}")
+
     def _setup_swa(self, model: Any) -> None:
         """Setup SWA (Stochastic Weight Averaging) if enabled."""
         swa_enabled = self.config.get("swa_enabled", False)
@@ -398,122 +449,130 @@ class CompetitionTrainer:
         # Prepare output directory
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Setup TensorBoard
-        self._setup_tensorboard(model)
+        # Use try-finally to ensure cleanup happens
+        try:
+            # Setup TensorBoard
+            self._setup_tensorboard(model)
 
-        # Setup SWA (Stochastic Weight Averaging)
-        self._setup_swa(model)
+            # Setup SWA (Stochastic Weight Averaging)
+            self._setup_swa(model)
 
-        # Start training
-        print(f"\n{Fore.GREEN}Starting training...{Style.RESET_ALL}")
-        print(f"Run name: {self.run_name}")
-        print(f"Output: {self.output_dir / self.run_name}")
-        if self.tensorboard_url:
-            print(f"TensorBoard: {self.tensorboard_url}")
+            # Start training
+            print(f"\n{Fore.GREEN}Starting training...{Style.RESET_ALL}")
+            print(f"Run name: {self.run_name}")
+            print(f"Output: {self.output_dir / self.run_name}")
+            if self.tensorboard_url:
+                print(f"TensorBoard: {self.tensorboard_url}")
 
-        # Print configuration summary
-        print(f"\nConfiguration:")
-        print(f"  Model: {self.config.get('model', self.base_model)}")
-        print(f"  Batch Size: {self.config.get('batch', 16)}")
-        print(f"  Image Size: {self.config.get('imgsz', 640)}")
-        print(f"  Epochs: {self.config.get('epochs', 50)}")
+            # Print configuration summary
+            print(f"\nConfiguration:")
+            print(f"  Model: {self.config.get('model', self.base_model)}")
+            print(f"  Batch Size: {self.config.get('batch', 16)}")
+            print(f"  Image Size: {self.config.get('imgsz', 640)}")
+            print(f"  Epochs: {self.config.get('epochs', 50)}")
 
-        start_time = time.time()
-        results = None
+            start_time = time.time()
+            results = None
 
-        # Training with OOM recovery
-        if enable_oom_recovery:
-            oom_recovery = OOMRecoveryStrategy(self.config)
-            current_config = self.config.copy()
+            # Training with OOM recovery
+            if enable_oom_recovery:
+                oom_recovery = OOMRecoveryStrategy(self.config)
+                current_config = self.config.copy()
 
-            while True:
-                try:
-                    results = model.train(
-                        data=dataset_yaml,
-                        project=str(self.output_dir),
-                        name=self.run_name,
-                        resume=resume,
-                        verbose=verbose,
-                        **current_config,
-                    )
-                    break  # Success
+                while True:
+                    try:
+                        results = model.train(
+                            data=dataset_yaml,
+                            project=str(self.output_dir),
+                            name=self.run_name,
+                            resume=resume,
+                            verbose=verbose,
+                            **current_config,
+                        )
+                        break  # Success
 
-                except RuntimeError as e:
-                    error_msg = str(e).lower()
-                    if "out of memory" in error_msg or "oom" in error_msg:
-                        print(f"\n{Fore.YELLOW}OOM detected. Attempting recovery...{Style.RESET_ALL}")
+                    except RuntimeError as e:
+                        error_msg = str(e).lower()
+                        if "out of memory" in error_msg or "oom" in error_msg:
+                            print(f"\n{Fore.YELLOW}OOM detected. Attempting recovery...{Style.RESET_ALL}")
 
-                        recovery_config = oom_recovery.get_recovery_config()
-                        if recovery_config is None:
-                            print(f"{Fore.RED}Max OOM retries exceeded.{Style.RESET_ALL}")
+                            recovery_config = oom_recovery.get_recovery_config()
+                            if recovery_config is None:
+                                print(f"{Fore.RED}Max OOM retries exceeded.{Style.RESET_ALL}")
+                                raise
+
+                            print(f"Recovery attempt {oom_recovery.retry_count}: "
+                                  f"{oom_recovery.get_changes_summary()}")
+                            current_config = recovery_config
+
+                            # Comprehensive cleanup before retry to prevent memory leak
+                            self._cleanup_all_resources(
+                                model=model,
+                                trainer=None,
+                                stop_tensorboard=False  # Keep TensorBoard running
+                            )
+                            del model
+
+                            # Reload model for retry
+                            model = YOLO(self.base_model)
+                            self._setup_tensorboard(model)
+                            self._setup_swa(model)
+                        elif "cuda" in error_msg:
+                            # CUDA general error (not OOM) - fail immediately
+                            print(f"{Fore.RED}CUDA error detected (not OOM): {e}{Style.RESET_ALL}")
                             raise
+                        else:
+                            raise
+            else:
+                results = model.train(
+                    data=dataset_yaml,
+                    project=str(self.output_dir),
+                    name=self.run_name,
+                    resume=resume,
+                    verbose=verbose,
+                    **self.config,
+                )
 
-                        print(f"Recovery attempt {oom_recovery.retry_count}: "
-                              f"{oom_recovery.get_changes_summary()}")
-                        current_config = recovery_config
+            training_time = (time.time() - start_time) / 60  # minutes
 
-                        # Cleanup old model before retry to prevent memory leak
-                        import gc
-                        del model
-                        gc.collect()
-                        torch.cuda.empty_cache()
-                        torch.cuda.synchronize()
+            # Extract metrics
+            metrics = self._extract_metrics(results)
 
-                        # Reload model for retry
-                        model = YOLO(self.base_model)
-                        self._setup_tensorboard(model)
-                        self._setup_swa(model)
-                    elif "cuda" in error_msg:
-                        # CUDA general error (not OOM) - fail immediately
-                        print(f"{Fore.RED}CUDA error detected (not OOM): {e}{Style.RESET_ALL}")
-                        raise
-                    else:
-                        raise
-        else:
-            results = model.train(
-                data=dataset_yaml,
-                project=str(self.output_dir),
-                name=self.run_name,
-                resume=resume,
-                verbose=verbose,
-                **self.config,
+            # Get model paths
+            run_dir = self.output_dir / self.run_name
+            best_path = run_dir / "weights" / "best.pt"
+            last_path = run_dir / "weights" / "last.pt"
+
+            result = TrainingResult(
+                best_model_path=str(best_path),
+                last_model_path=str(last_path),
+                metrics=metrics,
+                training_time_minutes=training_time,
+                epochs_completed=self.config.get("epochs", 0),
+                config=self.config.copy(),
             )
 
-        training_time = (time.time() - start_time) / 60  # minutes
-
-        # Extract metrics
-        metrics = self._extract_metrics(results)
-
-        # Get model paths
-        run_dir = self.output_dir / self.run_name
-        best_path = run_dir / "weights" / "best.pt"
-        last_path = run_dir / "weights" / "last.pt"
-
-        result = TrainingResult(
-            best_model_path=str(best_path),
-            last_model_path=str(last_path),
-            metrics=metrics,
-            training_time_minutes=training_time,
-            epochs_completed=self.config.get("epochs", 0),
-            config=self.config.copy(),
-        )
-
-        # Save result
-        result_path = run_dir / "training_result.json"
-        with open(result_path, "w") as f:
-            json.dump(result.to_dict(), f, indent=2)
-
-        # Add TensorBoard URL to result
-        if self.tensorboard_url:
-            result_data = result.to_dict()
-            result_data["tensorboard_url"] = self.tensorboard_url
+            # Save result
+            result_path = run_dir / "training_result.json"
             with open(result_path, "w") as f:
-                json.dump(result_data, f, indent=2)
+                json.dump(result.to_dict(), f, indent=2)
 
-        # Cleanup
-        self._cleanup_tensorboard()
+            # Add TensorBoard URL to result
+            if self.tensorboard_url:
+                result_data = result.to_dict()
+                result_data["tensorboard_url"] = self.tensorboard_url
+                with open(result_path, "w") as f:
+                    json.dump(result_data, f, indent=2)
 
-        return result
+            # Cleanup
+            self._cleanup_tensorboard()
+
+            return result
+
+        finally:
+            # Guaranteed cleanup on success or failure
+            # This ensures resources are freed even if an exception occurs
+            log_memory_snapshot("Before final cleanup")
 
     def _extract_metrics(self, results) -> Dict:
         """Extract relevant metrics from training results."""

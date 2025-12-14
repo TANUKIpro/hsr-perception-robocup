@@ -102,6 +102,8 @@ TIER_CONFIGS = {
         "cache": False,
         "epochs": 40,
         "patience": 8,
+        "swa_enabled": True,
+        "swa_start_epoch": 0,  # Auto-calculate
     },
     GPUTier.MEDIUM: {
         "model": "yolov8m.pt",
@@ -111,6 +113,8 @@ TIER_CONFIGS = {
         "cache": True,
         "epochs": 50,
         "patience": 10,
+        "swa_enabled": True,
+        "swa_start_epoch": 0,  # Auto-calculate
     },
     GPUTier.HIGH: {
         "model": "yolov8l.pt",
@@ -120,6 +124,8 @@ TIER_CONFIGS = {
         "cache": True,
         "epochs": 50,
         "patience": 10,
+        "swa_enabled": True,
+        "swa_start_epoch": 0,  # Auto-calculate
     },
     GPUTier.WORKSTATION: {
         "model": "yolov8x.pt",
@@ -129,6 +135,8 @@ TIER_CONFIGS = {
         "cache": True,
         "epochs": 50,
         "patience": 10,
+        "swa_enabled": True,
+        "swa_start_epoch": 0,  # Auto-calculate
     },
     GPUTier.CPU_ONLY: {
         "model": "yolov8n.pt",
@@ -138,6 +146,7 @@ TIER_CONFIGS = {
         "cache": False,
         "epochs": 30,
         "patience": 5,
+        "swa_enabled": False,  # Too slow for SWA
     },
 }
 
@@ -499,13 +508,21 @@ class OOMRecoveryStrategy:
             new_config["batch"] = new_batch
             self.changes.append(f"Batch: {old_batch} -> {new_batch}")
 
-        # Clear CUDA cache before retry
+        # Clear CUDA cache before retry with thorough cleanup
         try:
+            import gc
             import torch
 
             if torch.cuda.is_available():
+                # Run garbage collection before CUDA cleanup
+                gc.collect()
+
+                # Clear CUDA cache
                 torch.cuda.empty_cache()
                 torch.cuda.synchronize()
+
+                # Double GC pass for thorough cleanup
+                gc.collect()
         except Exception:
             pass
 

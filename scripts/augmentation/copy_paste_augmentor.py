@@ -10,14 +10,17 @@ Features:
 """
 
 import json
+import logging
 import sys
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 # Add scripts directory to path for imports
 _scripts_dir = Path(__file__).parent.parent
@@ -56,6 +59,9 @@ class CopyPasteConfig:
     allow_overlap: bool = False
     overlap_iou_threshold: float = 0.1
 
+    # Placement settings
+    max_placement_attempts: int = 100
+
     # Output settings
     output_image_format: str = "jpg"
     output_quality: int = 95
@@ -73,6 +79,7 @@ class PasteResult:
     bbox_pixel: Tuple[int, int, int, int]  # (x_min, y_min, x_max, y_max)
     scale_applied: float
     flipped: bool
+    rotation_applied: float = 0.0
 
 
 @dataclass
@@ -82,7 +89,8 @@ class SyntheticImageResult:
     image: np.ndarray  # BGR image
     paste_results: List[PasteResult]
     background_path: str
-    source_objects: List[str]  # Paths to source NPZ files
+    object_paths: List[str]  # Paths to source NPZ files (renamed from source_objects for consistency)
+    yolo_labels: List[str] = field(default_factory=list)  # YOLO format labels (optional)
 
 
 class CopyPasteAugmentor:
@@ -103,6 +111,52 @@ class CopyPasteAugmentor:
         self.config = config or CopyPasteConfig()
         self.rng = np.random.RandomState(self.config.seed)
 
+    def _rotate_with_alpha(
+        self,
+        rgba_image: np.ndarray,
+        angle_degrees: float,
+    ) -> np.ndarray:
+        """
+        Rotate RGBA image preserving alpha channel.
+
+        Args:
+            rgba_image: RGBA image (H, W, 4)
+            angle_degrees: Rotation angle in degrees (positive = counter-clockwise)
+
+        Returns:
+            Rotated RGBA image with expanded canvas to fit rotated content
+        """
+        if angle_degrees == 0.0:
+            return rgba_image
+
+        h, w = rgba_image.shape[:2]
+        center = (w // 2, h // 2)
+
+        # Get rotation matrix
+        rotation_matrix = cv2.getRotationMatrix2D(center, angle_degrees, 1.0)
+
+        # Calculate new bounding box size to fit rotated image
+        cos_val = abs(rotation_matrix[0, 0])
+        sin_val = abs(rotation_matrix[0, 1])
+        new_w = int(h * sin_val + w * cos_val)
+        new_h = int(h * cos_val + w * sin_val)
+
+        # Adjust rotation matrix for new canvas center
+        rotation_matrix[0, 2] += (new_w - w) / 2
+        rotation_matrix[1, 2] += (new_h - h) / 2
+
+        # Rotate with transparent border
+        rotated = cv2.warpAffine(
+            rgba_image,
+            rotation_matrix,
+            (new_w, new_h),
+            flags=cv2.INTER_LINEAR,
+            borderMode=cv2.BORDER_CONSTANT,
+            borderValue=(0, 0, 0, 0),  # Transparent border
+        )
+
+        return rotated
+
     def blend_object(
         self,
         background: np.ndarray,
@@ -110,6 +164,7 @@ class CopyPasteAugmentor:
         position: Tuple[int, int],
         scale: float = 1.0,
         flip_horizontal: bool = False,
+        rotation_degrees: float = 0.0,
     ) -> Tuple[np.ndarray, Tuple[int, int, int, int]]:
         """
         Blend an object onto a background image.
@@ -120,6 +175,7 @@ class CopyPasteAugmentor:
             position: (x, y) paste position (top-left corner)
             scale: Scale factor for object
             flip_horizontal: Whether to flip horizontally
+            rotation_degrees: Rotation angle in degrees
 
         Returns:
             Tuple of (blended_image, actual_bbox)
@@ -133,6 +189,10 @@ class CopyPasteAugmentor:
         # Flip if requested
         if flip_horizontal:
             obj_rgba = cv2.flip(obj_rgba, 1)
+
+        # Apply rotation
+        if rotation_degrees != 0.0:
+            obj_rgba = self._rotate_with_alpha(obj_rgba, rotation_degrees)
 
         # Scale if needed
         if scale != 1.0:
@@ -225,6 +285,10 @@ class CopyPasteAugmentor:
         # Create mask for object pixels
         mask_bool = mask > 128
         if not np.any(mask_bool):
+            logger.warning(
+                "White balance adjustment skipped: empty mask provided. "
+                f"Mask shape: {mask.shape}, max value: {mask.max()}"
+            )
             return obj_bgr
 
         # Calculate mean colors
@@ -247,7 +311,7 @@ class CopyPasteAugmentor:
         obj_shape: Tuple[int, int],
         existing_boxes: List[Tuple[int, int, int, int]],
         margin: int = 10,
-        max_attempts: int = 50,
+        max_attempts: Optional[int] = None,
     ) -> Optional[Tuple[int, int]]:
         """
         Find a valid paste position avoiding overlaps.
@@ -257,11 +321,15 @@ class CopyPasteAugmentor:
             obj_shape: Object (height, width)
             existing_boxes: List of existing bounding boxes
             margin: Margin from image edges
-            max_attempts: Maximum attempts to find valid position
+            max_attempts: Maximum attempts to find valid position.
+                          If None, uses config.max_placement_attempts.
 
         Returns:
             (x, y) position or None if no valid position found
         """
+        if max_attempts is None:
+            max_attempts = self.config.max_placement_attempts
+
         bg_h, bg_w = bg_shape
         obj_h, obj_w = obj_shape
 
@@ -294,6 +362,10 @@ class CopyPasteAugmentor:
             if not overlap_found:
                 return (x, y)
 
+        logger.debug(
+            f"Failed to find valid paste position after {max_attempts} attempts. "
+            f"Object size: {obj_shape}, existing boxes: {len(existing_boxes)}"
+        )
         return None
 
     def _compute_iou(
@@ -356,6 +428,7 @@ class CopyPasteAugmentor:
 
             # Random transformations
             scale = self.rng.uniform(*self.config.scale_range)
+            rotation = self.rng.uniform(*self.config.rotation_range)
             flip = (
                 self.config.enable_horizontal_flip
                 and self.rng.random() > 0.5
@@ -365,10 +438,21 @@ class CopyPasteAugmentor:
             scaled_h = int(obj.rgba.shape[0] * scale)
             scaled_w = int(obj.rgba.shape[1] * scale)
 
+            # Calculate rotated object size for position finding
+            if rotation != 0.0:
+                angle_rad = abs(np.radians(rotation))
+                cos_val = abs(np.cos(angle_rad))
+                sin_val = abs(np.sin(angle_rad))
+                rotated_h = int(scaled_h * cos_val + scaled_w * sin_val)
+                rotated_w = int(scaled_h * sin_val + scaled_w * cos_val)
+            else:
+                rotated_h = scaled_h
+                rotated_w = scaled_w
+
             # Find paste position
             position = self.find_paste_position(
                 bg_shape=result_image.shape[:2],
-                obj_shape=(scaled_h, scaled_w),
+                obj_shape=(rotated_h, rotated_w),
                 existing_boxes=existing_boxes,
             )
 
@@ -382,6 +466,7 @@ class CopyPasteAugmentor:
                 position=position,
                 scale=scale,
                 flip_horizontal=flip,
+                rotation_degrees=rotation,
             )
 
             # Skip if bbox is invalid
@@ -398,6 +483,7 @@ class CopyPasteAugmentor:
                     bbox_pixel=actual_bbox,
                     scale_applied=scale,
                     flipped=flip,
+                    rotation_applied=rotation,
                 )
             )
 
@@ -405,7 +491,7 @@ class CopyPasteAugmentor:
             image=result_image,
             paste_results=paste_results,
             background_path=background_path,
-            source_objects=source_objects,
+            object_paths=source_objects,
         )
 
     def generate_yolo_labels(
@@ -448,6 +534,59 @@ class CopyPasteAugmentor:
             )
 
         return lines
+
+    def validate_synthetic_image(
+        self,
+        result: "SyntheticImageResult",
+        min_paste_count: int = 1,
+        min_bbox_area_ratio: float = 0.001,
+    ) -> Tuple[bool, List[str]]:
+        """
+        Validate a generated synthetic image for quality.
+
+        Args:
+            result: SyntheticImageResult to validate
+            min_paste_count: Minimum number of successfully pasted objects
+            min_bbox_area_ratio: Minimum ratio of total bbox area to image area
+
+        Returns:
+            Tuple of (is_valid, list_of_issues)
+        """
+        issues = []
+
+        # Check paste count
+        if len(result.paste_results) < min_paste_count:
+            issues.append(
+                f"Insufficient objects: {len(result.paste_results)} < {min_paste_count}"
+            )
+
+        # Check image validity
+        if result.image is None or result.image.size == 0:
+            issues.append("Image is empty or None")
+            return False, issues
+
+        # Check total bbox area
+        img_h, img_w = result.image.shape[:2]
+        img_area = img_h * img_w
+        total_bbox_area = 0
+
+        for pr in result.paste_results:
+            x1, y1, x2, y2 = pr.bbox_pixel
+
+            # Check for invalid bboxes
+            if x2 <= x1 or y2 <= y1:
+                issues.append(f"Invalid bbox for {pr.class_name}: {pr.bbox_pixel}")
+                continue
+
+            bbox_area = (x2 - x1) * (y2 - y1)
+            total_bbox_area += bbox_area
+
+        if img_area > 0 and total_bbox_area / img_area < min_bbox_area_ratio:
+            issues.append(
+                f"Total bbox area too small: {total_bbox_area/img_area:.6f} < {min_bbox_area_ratio}"
+            )
+
+        return len(issues) == 0, issues
 
     def generate_batch(
         self,
@@ -504,6 +643,10 @@ class CopyPasteAugmentor:
             "generated": 0,
             "failed": 0,
             "per_class": {name: 0 for name in class_names},
+            "placement_failures": 0,
+            "validation_failures": 0,
+            "total_objects_placed": 0,
+            "generation_time_sec": 0.0,
         }
 
         for i in range(num_synthetic):
@@ -532,9 +675,16 @@ class CopyPasteAugmentor:
                     background_path=str(bg_path),
                 )
 
-                if not result.paste_results:
+                # Validate result
+                is_valid, issues = self.validate_synthetic_image(result)
+                if not is_valid:
+                    logger.warning(f"Skipping invalid synthetic image: {issues}")
+                    stats["validation_failures"] += 1
                     stats["failed"] += 1
                     continue
+
+                # Track successful generation
+                stats["total_objects_placed"] += len(result.paste_results)
 
                 # Generate filename
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:18]
@@ -573,7 +723,42 @@ class CopyPasteAugmentor:
                         i + 1, num_synthetic, f"Error: {str(e)}"
                     )
 
+        # Calculate average objects per image
+        if stats["generated"] > 0:
+            stats["avg_objects_per_image"] = stats["total_objects_placed"] / stats["generated"]
+        else:
+            stats["avg_objects_per_image"] = 0.0
+
         return stats
+
+    def save_generation_config(
+        self,
+        output_dir: Path,
+        additional_info: Optional[Dict] = None,
+    ) -> Path:
+        """
+        Save generation configuration as JSON for reproducibility.
+
+        Args:
+            output_dir: Directory to save the configuration file
+            additional_info: Optional additional information to include
+                             (e.g., class_names, real_image_count)
+
+        Returns:
+            Path to the saved configuration file
+        """
+        config_dict = asdict(self.config)
+        config_dict["generation_timestamp"] = datetime.now().isoformat()
+
+        if additional_info:
+            config_dict.update(additional_info)
+
+        config_path = output_dir / "generation_config.json"
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump(config_dict, f, indent=2, ensure_ascii=False)
+
+        logger.info(f"Generation config saved to: {config_path}")
+        return config_path
 
     def _load_images(self, directory: Path) -> List[Path]:
         """Load all image paths from a directory."""

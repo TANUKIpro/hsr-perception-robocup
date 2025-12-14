@@ -835,11 +835,15 @@ def _render_generate_synthetic(path_coordinator: PathCoordinator) -> None:
         try:
             from augmentation.copy_paste_augmentor import CopyPasteAugmentor, CopyPasteConfig
 
+            # Use the same seed from preview for reproducibility
+            batch_seed = st.session_state.get("synth_preview_seed", 42)
+
             config = CopyPasteConfig(
                 synthetic_to_real_ratio=synthetic_ratio,
                 scale_range=(scale_min, scale_max),
                 enable_white_balance=enable_white_balance,
                 max_objects_per_image=max_objects,
+                seed=batch_seed,
             )
 
             augmentor = CopyPasteAugmentor(config)
@@ -873,11 +877,24 @@ def _render_generate_synthetic(path_coordinator: PathCoordinator) -> None:
             if "error" in stats:
                 st.error(stats["error"])
             else:
+                # Save generation config for reproducibility
+                config_path = augmentor.save_generation_config(
+                    output_dir=output_dir,
+                    additional_info={
+                        "class_names": selected_classes,
+                        "real_image_count": real_count,
+                        "backgrounds_dir": str(backgrounds_dir),
+                        "annotated_dir": str(annotated_dir),
+                        "stats": stats,
+                    },
+                )
+
                 st.success(
                     f"Generated {stats['generated']} synthetic images. "
                     f"Failed: {stats.get('failed', 0)}"
                 )
                 st.info(f"Output saved to: `{output_dir}`")
+                st.caption(f"Config saved: `{config_path.name}`")
 
                 # Per-class stats
                 if stats.get("per_class"):

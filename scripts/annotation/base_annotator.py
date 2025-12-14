@@ -20,8 +20,8 @@ if str(_scripts_dir) not in sys.path:
     sys.path.insert(0, str(_scripts_dir))
 
 from common.constants import IMAGE_EXTENSIONS
-from annotation_utils import AnnotationResult, write_yolo_label
-from visualization import visualize_annotation_result
+from annotation.annotation_utils import AnnotationResult, write_yolo_label
+from annotation.visualization import visualize_annotation_result
 
 
 class BaseAnnotator(ABC):
