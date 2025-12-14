@@ -31,13 +31,16 @@ def render_profile_management_tabs(
     tab1, tab2, tab3 = st.tabs(["Profile List", "Create New", "Import/Export"])
 
     with tab1:
-        _render_profile_list_tab(profile_manager, on_profile_deleted)
+        with st.container(border=True):
+            _render_profile_list_tab(profile_manager, on_profile_deleted)
 
     with tab2:
-        _render_create_profile_tab(profile_manager)
+        with st.container(border=True):
+            _render_create_profile_tab(profile_manager)
 
     with tab3:
-        _render_import_export_tab(profile_manager)
+        with st.container(border=True):
+            _render_import_export_tab(profile_manager)
 
 
 def _render_profile_list_tab(

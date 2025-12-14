@@ -70,9 +70,6 @@ Register and manage objects.
 - Target sample count
 - Properties (heavy/tiny/has liquid/size)
 
-**Quick Import:**
-- "Import iHR Standard Objects" to bulk register iHR standard objects
-
 ### 📸 Collection
 
 Collect image data. Four methods are available.
@@ -249,7 +246,7 @@ System settings and status check.
 ### Preparation (Before Competition)
 
 1. Start the app: `./run_app.sh`
-2. Registry → Quick Import to register standard objects
+2. Register objects in Registry
 3. Prepare background image (white sheet, etc.)
 
 ### Phase 1: Data Collection (40 min)

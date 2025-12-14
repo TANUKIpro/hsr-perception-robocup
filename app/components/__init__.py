@@ -15,7 +15,6 @@ from components.thumbnail_upload import (
 from components.object_editor import render_object_editor
 from components.object_viewer import render_object_viewer
 from components.object_form import render_add_object_form
-from components.ihr_import import render_ihr_import, IHR_OBJECTS
 from components.ros2_collection import render_ros2_collection
 from components.captured_images_tree import render_captured_images_tree
 from components.video_extractor import render_video_extractor
@@ -40,8 +39,6 @@ __all__ = [
     "render_object_editor",
     "render_object_viewer",
     "render_add_object_form",
-    "render_ihr_import",
-    "IHR_OBJECTS",
     # Collection
     "render_ros2_collection",
     "render_captured_images_tree",

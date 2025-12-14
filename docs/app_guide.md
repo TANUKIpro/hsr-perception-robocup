@@ -70,9 +70,6 @@ streamlit run app/main.py --server.port 8502
 - 目標サンプル数
 - プロパティ（重い/小さい/液体含む/サイズ）
 
-**Quick Import:**
-- 「Import iHR Standard Objects」でiHR標準オブジェクトを一括登録
-
 ### 📸 Collection
 
 画像データの収集を行います。4つの方法が利用可能です。
@@ -249,7 +246,7 @@ YOLOv8 fine-tuningを実行します。
 ### 準備（競技開始前）
 
 1. アプリを起動: `./run_app.sh`
-2. Registry → Quick Import で標準オブジェクトを登録
+2. Registry でオブジェクトを登録
 3. 背景画像を準備（白いシートなど）
 
 ### Phase 1: データ収集（40分）
