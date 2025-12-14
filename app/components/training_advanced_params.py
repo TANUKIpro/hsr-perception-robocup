@@ -613,11 +613,14 @@ def _render_optimizer_tab() -> Dict[str, Any]:
             key="adv_swa_enabled",
         )
     with col2:
+        # Fix invalid session_state value before rendering widget
+        if st.session_state.get("adv_swa_start_epoch", 10) < 5:
+            st.session_state["adv_swa_start_epoch"] = 10
         params["swa_start_epoch"] = st.number_input(
             "Start (last N epochs)",
             min_value=5,
             max_value=30,
-            value=_get_param("swa_start_epoch", 10),
+            value=max(_get_param("swa_start_epoch", 10), 5),
             step=1,
             disabled=not _get_param("swa_enabled", False),
             help="Start averaging weights at (total_epochs - N). "

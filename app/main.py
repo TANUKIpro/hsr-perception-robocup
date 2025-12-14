@@ -48,7 +48,7 @@ def main():
         icon_b64 = base64.b64encode(icon_path.read_bytes()).decode()
         st.markdown(
             f'<h1 style="display: flex; align-items: center; gap: 10px;">'
-            f'<img src="data:image/png;base64,{icon_b64}" width="40" height="40">'
+            f'<img src="data:image/png;base64,{icon_b64}" width="44" height="44">'
             f'HSR Object Manager</h1>',
             unsafe_allow_html=True
         )
