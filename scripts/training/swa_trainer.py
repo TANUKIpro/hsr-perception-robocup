@@ -14,6 +14,7 @@ Reference:
 """
 
 import copy
+import gc
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
@@ -22,6 +23,37 @@ import torch
 from torch import nn
 from torch.optim.swa_utils import AveragedModel, SWALR, update_bn
 from ultralytics.utils import LOGGER, colorstr
+
+
+def calculate_adaptive_swa_start_epoch(
+    total_epochs: int,
+    swa_fraction: float = 0.2,
+    min_swa_epochs: int = 5,
+    max_swa_epochs: int = 15,
+) -> int:
+    """
+    Calculate adaptive SWA start epoch based on total epochs.
+
+    SWA runs for approximately the last 20% of training,
+    clamped between min_swa_epochs and max_swa_epochs.
+
+    Args:
+        total_epochs: Total training epochs
+        swa_fraction: Fraction of epochs for SWA (default: 0.2 = 20%)
+        min_swa_epochs: Minimum epochs for SWA phase
+        max_swa_epochs: Maximum epochs for SWA phase
+
+    Returns:
+        Number of final epochs to apply SWA (the swa_start_epoch value)
+
+    Examples:
+        - 30 epochs -> 6 SWA epochs (20%)
+        - 50 epochs -> 10 SWA epochs (20%)
+        - 100 epochs -> 15 SWA epochs (capped at max)
+        - 20 epochs -> 5 SWA epochs (minimum)
+    """
+    calculated = int(total_epochs * swa_fraction)
+    return max(min_swa_epochs, min(calculated, max_swa_epochs))
 
 
 @dataclass
@@ -33,23 +65,42 @@ class SWAConfig:
         enabled: Whether SWA is enabled
         swa_start_epoch: Number of final epochs to apply SWA
                         SWA starts at (total_epochs - swa_start_epoch)
+                        Set to 0 for auto-calculation based on total epochs
         swa_lr: Learning rate during SWA phase (typically ~1/2 of base LR)
         update_bn: Whether to update batch normalization statistics after SWA
+        min_total_epochs: Minimum total epochs required to enable SWA
     """
 
     enabled: bool = False
-    swa_start_epoch: int = 10  # Last N epochs for SWA
+    swa_start_epoch: int = 10  # Last N epochs for SWA (0 = auto-calculate)
     swa_lr: float = 0.0005
     update_bn: bool = True  # Auto update BN statistics
+    min_total_epochs: int = 15  # Minimum epochs needed for SWA
 
     def __post_init__(self):
         """Validate configuration values."""
-        if self.swa_start_epoch < 1:
+        if self.swa_start_epoch < 0:
             raise ValueError(
-                f"swa_start_epoch must be >= 1, got {self.swa_start_epoch}"
+                f"swa_start_epoch must be >= 0, got {self.swa_start_epoch}"
             )
         if self.swa_lr <= 0:
             raise ValueError(f"swa_lr must be > 0, got {self.swa_lr}")
+
+    def should_enable_for_epochs(self, total_epochs: int) -> bool:
+        """
+        Check if SWA should be enabled for the given total epochs.
+
+        Args:
+            total_epochs: Total training epochs
+
+        Returns:
+            True if SWA should be enabled, False otherwise
+        """
+        if not self.enabled:
+            return False
+        if total_epochs < self.min_total_epochs:
+            return False
+        return True
 
 
 class SWACallback:
@@ -107,16 +158,34 @@ class SWACallback:
         # Calculate SWA start epoch
         total_epochs = trainer.epochs
 
-        # Validate swa_start_epoch against total epochs
-        if self.config.swa_start_epoch >= total_epochs:
+        # Check if SWA should be enabled for this number of epochs
+        if not self.config.should_enable_for_epochs(total_epochs):
             LOGGER.warning(
-                f"{colorstr('SWA:')} swa_start_epoch ({self.config.swa_start_epoch}) "
+                f"{colorstr('SWA:')} Total epochs ({total_epochs}) is less than "
+                f"minimum required ({self.config.min_total_epochs}). SWA will not be applied."
+            )
+            self.config.enabled = False
+            return
+
+        # Auto-calculate swa_start_epoch if set to 0
+        swa_start_epoch = self.config.swa_start_epoch
+        if swa_start_epoch == 0:
+            swa_start_epoch = calculate_adaptive_swa_start_epoch(total_epochs)
+            LOGGER.info(
+                f"{colorstr('SWA:')} Auto-calculated swa_start_epoch = {swa_start_epoch} "
+                f"for {total_epochs} total epochs (20% of training)"
+            )
+
+        # Validate swa_start_epoch against total epochs
+        if swa_start_epoch >= total_epochs:
+            LOGGER.warning(
+                f"{colorstr('SWA:')} swa_start_epoch ({swa_start_epoch}) "
                 f">= total_epochs ({total_epochs}). SWA will not be applied."
             )
             self.config.enabled = False
             return
 
-        self.swa_start = total_epochs - self.config.swa_start_epoch
+        self.swa_start = total_epochs - swa_start_epoch
         self.save_dir = trainer.save_dir
 
         LOGGER.info(
@@ -268,20 +337,59 @@ class SWACallback:
         swa_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Create checkpoint dict similar to Ultralytics format
-        ckpt = {
-            "epoch": trainer.epoch,
-            "model": copy.deepcopy(trainer.model).half(),
-            "swa_n_averaged": self.swa_n_averaged,
-            "swa_config": {
-                "enabled": self.config.enabled,
-                "swa_start_epoch": self.config.swa_start_epoch,
-                "swa_lr": self.config.swa_lr,
-                "update_bn": self.config.update_bn,
-            },
-        }
+        # Use try-finally to ensure deep copied model is cleaned up
+        model_copy = None
+        try:
+            model_copy = copy.deepcopy(trainer.model).half()
+            ckpt = {
+                "epoch": trainer.epoch,
+                "model": model_copy,
+                "swa_n_averaged": self.swa_n_averaged,
+                "swa_config": {
+                    "enabled": self.config.enabled,
+                    "swa_start_epoch": self.config.swa_start_epoch,
+                    "swa_lr": self.config.swa_lr,
+                    "update_bn": self.config.update_bn,
+                },
+            }
 
-        torch.save(ckpt, swa_path)
-        LOGGER.info(f"{colorstr('SWA:')} Saved SWA model to {swa_path}")
+            torch.save(ckpt, swa_path)
+            LOGGER.info(f"{colorstr('SWA:')} Saved SWA model to {swa_path}")
+        finally:
+            # Clean up the deep copied model to prevent memory leak
+            if model_copy is not None:
+                del model_copy
+                gc.collect()
+
+    def cleanup(self) -> None:
+        """
+        Clean up SWA resources.
+
+        Moves swa_model to CPU and clears references to prevent memory leaks.
+        Safe to call multiple times.
+        """
+        if self.swa_model is not None:
+            try:
+                # Move to CPU to free GPU memory
+                if hasattr(self.swa_model, 'cpu'):
+                    self.swa_model.cpu()
+
+                # Clear the module reference
+                if hasattr(self.swa_model, 'module'):
+                    self.swa_model.module = None
+
+                # Delete the swa_model
+                self.swa_model = None
+
+                LOGGER.info(f"{colorstr('SWA:')} Cleaned up SWA model resources")
+            except Exception as e:
+                LOGGER.warning(f"{colorstr('SWA:')} Error during cleanup: {e}")
+
+        # Clear scheduler reference
+        self.swa_scheduler = None
+
+        # Run garbage collection
+        gc.collect()
 
 
 def create_swa_callback(

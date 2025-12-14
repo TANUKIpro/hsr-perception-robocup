@@ -67,8 +67,8 @@ class OptimizerConfig:
     llrd_decay_rate: float = 0.9  # LR decay factor per layer depth
 
     # Stochastic Weight Averaging (SWA)
-    swa_enabled: bool = False  # Enable SWA for fine-tuning
-    swa_start_epoch: int = 10  # Start SWA at (epochs - N)
+    swa_enabled: bool = True  # Enable SWA for fine-tuning
+    swa_start_epoch: int = 0  # Start SWA at (epochs - N), 0 = auto-calculate (20% of training)
     swa_lr: float = 0.0005  # SWA learning rate (~1/2 of base LR)
 
     def to_dict(self) -> Dict[str, Any]:

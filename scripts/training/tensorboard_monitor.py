@@ -153,6 +153,16 @@ class TensorBoardServer:
         """Get TensorBoard URL."""
         return self.url
 
+    def __enter__(self):
+        """Context manager entry."""
+        self.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit."""
+        self.stop()
+        return False
+
     @classmethod
     def find_running_instance(cls, port: int = 6006) -> Optional[str]:
         """
@@ -340,7 +350,26 @@ class CompetitionTensorBoardCallback:
         self.writer.add_text("summary/final", summary_text, 0)
 
         # Close writer
-        self.writer.close()
+        self.cleanup()
+
+    def cleanup(self) -> None:
+        """
+        Clean up TensorBoard writer resources.
+
+        Safe to call multiple times.
+        """
+        if self.writer is not None:
+            try:
+                self.writer.flush()
+                self.writer.close()
+            except Exception as e:
+                print(f"{Fore.YELLOW}Warning: Error closing TensorBoard writer: {e}{Style.RESET_ALL}")
+            finally:
+                self.writer = None
+
+    def __del__(self):
+        """Destructor for garbage collection safety."""
+        self.cleanup()
 
 
 class GPUMonitorCallback:

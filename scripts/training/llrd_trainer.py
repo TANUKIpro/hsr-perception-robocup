@@ -93,6 +93,16 @@ class LLRDDetectionTrainer(DetectionTrainer):
         # Call parent with Ultralytics standard pattern
         super().__init__(cfg, overrides, _callbacks)
 
+        # Check for freeze + LLRD conflict
+        freeze_layers = self.args.freeze if hasattr(self.args, 'freeze') else 0
+        if self.llrd_config.enabled and freeze_layers > 0:
+            LOGGER.warning(
+                f"{colorstr('LLRD:')} Both LLRD and layer freezing are enabled. "
+                f"Frozen layers (0-{freeze_layers - 1}) will have requires_grad=False "
+                f"and will not receive LLRD learning rates. "
+                f"LLRD will only apply to layers {freeze_layers}-{self.HEAD_LAYER}."
+            )
+
         if self.llrd_config.enabled:
             LOGGER.info(
                 f"{colorstr('LLRD:')} Enabled with decay_rate={self.llrd_config.decay_rate}"
@@ -190,8 +200,13 @@ class LLRDDetectionTrainer(DetectionTrainer):
         elif name == "SGD":
             optimizer = optim.SGD(param_groups, momentum=momentum, nesterov=True)
         else:
+            supported_opts = ', '.join(sorted(optimizers - {'auto'}))
             raise NotImplementedError(
-                f"Optimizer '{name}' not found in list of available optimizers {optimizers}."
+                f"Optimizer '{name}' is not supported with LLRD.\n"
+                f"Supported optimizers: {supported_opts}\n"
+                f"To use a different optimizer, either:\n"
+                f"  1. Choose one of the supported optimizers above\n"
+                f"  2. Disable LLRD (llrd_enabled=False) to use any Ultralytics optimizer"
             )
 
         # Log parameter groups summary

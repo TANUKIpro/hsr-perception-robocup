@@ -49,8 +49,8 @@ PRESETS = {
         "llrd_enabled": False,
         "llrd_decay_rate": 0.9,
         # SWA (Stochastic Weight Averaging)
-        "swa_enabled": False,
-        "swa_start_epoch": 10,
+        "swa_enabled": True,
+        "swa_start_epoch": 0,  # Auto-calculate (20% of training)
         "swa_lr": 0.0005,
         # Overfitting prevention - enabled for better generalization
         "label_smoothing": 0.05,  # Added for overfitting prevention
@@ -141,7 +141,7 @@ PRESETS = {
         "llrd_decay_rate": 0.9,
         # SWA (Stochastic Weight Averaging) - enabled for high accuracy
         "swa_enabled": True,
-        "swa_start_epoch": 15,  # Longer averaging for high accuracy
+        "swa_start_epoch": 0,  # Auto-calculate (20% of training)
         "swa_lr": 0.00025,  # ~1/2 of base lr (0.0005)
         # Overfitting prevention - all enabled for high accuracy
         "label_smoothing": 0.1,
@@ -183,11 +183,11 @@ PRESETS = {
         "momentum": 0.9,
         "weight_decay": 0.002,  # Higher weight decay for regularization
         # LLRD (Layer-wise Learning Rate Decay)
-        "llrd_enabled": False,
-        "llrd_decay_rate": 0.9,
+        "llrd_enabled": True,
+        "llrd_decay_rate": 0.85,  # More aggressive decay for few-shot
         # SWA (Stochastic Weight Averaging)
-        "swa_enabled": False,
-        "swa_start_epoch": 10,
+        "swa_enabled": True,
+        "swa_start_epoch": 0,  # Auto-calculate (20% of training)
         "swa_lr": 0.00025,
         # Overfitting prevention - all enabled
         "label_smoothing": 0.1,
