@@ -169,6 +169,18 @@ case "${1:-streamlit}" in
         ;;
 
     # -------------------------------------------------------------------------
+    # Run Tests (pytest)
+    # -------------------------------------------------------------------------
+    test)
+        shift
+        print_info
+        echo ""
+        echo "Running pytest..."
+        cd /workspace
+        exec python3 -m pytest "$@"
+        ;;
+
+    # -------------------------------------------------------------------------
     # TensorBoard
     # -------------------------------------------------------------------------
     tensorboard)
@@ -224,6 +236,7 @@ case "${1:-streamlit}" in
         echo "  annotate      Run auto-annotation"
         echo "  evaluate      Run model evaluation"
         echo "  verify        Run visual verification"
+        echo "  test          Run pytest tests"
         echo "  tensorboard   Start TensorBoard server"
         echo "  bash          Start interactive shell"
         echo "  ros2 [cmd]    Run ROS2 command"

@@ -15,7 +15,7 @@
 
 ## 1. Common モジュール (`scripts/common/`)
 
-### 1.1 test_config_utils.py ⬜
+### 1.1 test_config_utils.py ✅
 
 **ソースファイル**: `scripts/common/config_utils.py`
 
@@ -23,31 +23,33 @@
 
 **優先度**: 🔶 高
 
+**状態**: 実装済み - `tests/backend/common/test_config_utils.py` (36テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestAnnotatorConfig` | `test_default_values()` | デフォルト値の確認 |
-| ⬜ | `TestAnnotatorConfig` | `test_custom_values()` | カスタム値の設定 |
-| ⬜ | `TestBackgroundSubtractionConfig` | `test_default_values()` | デフォルト値の確認 |
-| ⬜ | `TestBackgroundSubtractionConfig` | `test_blur_kernel_validation_odd()` | カーネルサイズが奇数であること |
-| ⬜ | `TestBackgroundSubtractionConfig` | `test_threshold_method_validation()` | 有効な閾値手法 |
-| ⬜ | `TestBackgroundSubtractionConfig` | `test_invalid_threshold_method_raises()` | 無効な手法でエラー |
-| ⬜ | `TestSAM2Config` | `test_default_values()` | デフォルト値の確認 |
-| ⬜ | `TestSAM2Config` | `test_custom_device()` | カスタムデバイス設定 |
-| ⬜ | `TestSAM2Config` | `test_model_type_validation()` | モデルタイプの検証 |
-| ⬜ | `TestGetSam2ModelConfig` | `test_sam21_base_model()` | SAM2.1 Baseの設定取得 |
-| ⬜ | `TestGetSam2ModelConfig` | `test_sam21_large_model()` | SAM2.1 Largeの設定取得 |
-| ⬜ | `TestGetSam2ModelConfig` | `test_sam2_fallback_to_sam21()` | SAM2→SAM2.1フォールバック |
-| ⬜ | `TestGetSam2ModelConfig` | `test_unknown_model_defaults_to_base()` | 不明モデルはbaseにフォールバック |
-| ⬜ | `TestTrainingConfig` | `test_default_configuration()` | デフォルト設定の確認 |
-| ⬜ | `TestTrainingConfig` | `test_to_dict_serialization()` | 辞書へのシリアライズ |
-| ⬜ | `TestTrainingConfig` | `test_competition_preset()` | 競技会プリセット |
-| ⬜ | `TestTrainingConfig` | `test_fast_preset()` | 高速テストプリセット |
-| ⬜ | `TestEvaluationConfig` | `test_default_values()` | デフォルト値の確認 |
-| ⬜ | `TestLoadClassConfig` | `test_load_existing_config()` | 既存設定ファイルの読み込み |
-| ⬜ | `TestLoadClassConfig` | `test_file_not_found_raises()` | ファイル未発見時のエラー |
-| ⬜ | `TestGetClassNames` | `test_extract_class_names()` | クラス名の抽出 |
-| ⬜ | `TestGetClassNames` | `test_empty_objects_list()` | 空のオブジェクトリスト |
-| ⬜ | `TestGetClassIdMap` | `test_create_mapping()` | ID→名前マッピングの作成 |
+| ✅ | `TestAnnotatorConfig` | `test_default_values()` | デフォルト値の確認 |
+| ✅ | `TestAnnotatorConfig` | `test_custom_values()` | カスタム値の設定 |
+| ✅ | `TestBackgroundSubtractionConfig` | `test_default_values()` | デフォルト値の確認 |
+| ✅ | `TestBackgroundSubtractionConfig` | `test_blur_kernel_validation_odd()` | カーネルサイズが奇数であること |
+| ✅ | `TestBackgroundSubtractionConfig` | `test_threshold_method_validation()` | 有効な閾値手法 |
+| ✅ | `TestBackgroundSubtractionConfig` | `test_invalid_threshold_method_raises()` | 無効な手法でエラー |
+| ✅ | `TestSAM2Config` | `test_default_values()` | デフォルト値の確認 |
+| ✅ | `TestSAM2Config` | `test_custom_device()` | カスタムデバイス設定 |
+| ✅ | `TestSAM2Config` | `test_model_type_validation()` | モデルタイプの検証 |
+| ✅ | `TestGetSam2ModelConfig` | `test_sam21_base_model()` | SAM2.1 Baseの設定取得 |
+| ✅ | `TestGetSam2ModelConfig` | `test_sam21_large_model()` | SAM2.1 Largeの設定取得 |
+| ✅ | `TestGetSam2ModelConfig` | `test_sam2_fallback_to_sam21()` | SAM2→SAM2.1フォールバック |
+| ✅ | `TestGetSam2ModelConfig` | `test_unknown_model_defaults_to_base()` | 不明モデルはbaseにフォールバック |
+| ✅ | `TestTrainingConfig` | `test_default_configuration()` | デフォルト設定の確認 |
+| ✅ | `TestTrainingConfig` | `test_to_dict_serialization()` | 辞書へのシリアライズ |
+| ✅ | `TestTrainingConfig` | `test_competition_preset()` | 競技会プリセット |
+| ✅ | `TestTrainingConfig` | `test_fast_preset()` | 高速テストプリセット |
+| ✅ | `TestEvaluationConfig` | `test_default_values()` | デフォルト値の確認 |
+| ✅ | `TestLoadClassConfig` | `test_load_existing_config()` | 既存設定ファイルの読み込み |
+| ✅ | `TestLoadClassConfig` | `test_file_not_found_raises()` | ファイル未発見時のエラー |
+| ✅ | `TestGetClassNames` | `test_extract_class_names()` | クラス名の抽出 |
+| ✅ | `TestGetClassNames` | `test_empty_objects_list()` | 空のオブジェクトリスト |
+| ✅ | `TestGetClassIdMap` | `test_create_mapping()` | ID→名前マッピングの作成 |
 
 ---
 
@@ -72,7 +74,7 @@
 
 ---
 
-### 1.3 test_validation.py ⬜
+### 1.3 test_validation.py ✅
 
 **ソースファイル**: `scripts/common/validation.py`
 
@@ -80,36 +82,38 @@
 
 **優先度**: 🔶 高
 
+**状態**: 実装済み - `tests/backend/common/test_validation.py` (46テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestErrorSeverity` | `test_enum_values()` | Enumの値確認 |
-| ⬜ | `TestPipelineError` | `test_creation()` | エラーオブジェクト作成 |
-| ⬜ | `TestPipelineError` | `test_format_with_color()` | カラー付きフォーマット |
-| ⬜ | `TestPipelineError` | `test_format_without_color()` | カラーなしフォーマット |
-| ⬜ | `TestValidationResult` | `test_default_is_valid()` | デフォルトは有効 |
-| ⬜ | `TestValidationResult` | `test_add_error_invalidates()` | エラー追加で無効化 |
-| ⬜ | `TestValidationResult` | `test_add_warning_keeps_valid()` | 警告追加は有効維持 |
-| ⬜ | `TestValidationResult` | `test_merge_results()` | 結果のマージ |
-| ⬜ | `TestValidationResult` | `test_format_all()` | 全エラーのフォーマット |
-| ⬜ | `TestValidateDatasetYaml` | `test_file_not_found()` | ファイル未発見 |
-| ⬜ | `TestValidateDatasetYaml` | `test_invalid_yaml_format()` | 不正なYAML形式 |
-| ⬜ | `TestValidateDatasetYaml` | `test_missing_required_fields()` | 必須フィールド欠落 |
-| ⬜ | `TestValidateDatasetYaml` | `test_train_path_not_found()` | 訓練パス未発見 |
-| ⬜ | `TestValidateDatasetYaml` | `test_no_classes_defined()` | クラス未定義 |
-| ⬜ | `TestValidateDatasetYaml` | `test_warning_single_class()` | 単一クラス警告 |
-| ⬜ | `TestValidateDatasetYaml` | `test_warning_few_images()` | 画像不足警告 |
-| ⬜ | `TestValidateDatasetYaml` | `test_valid_dataset()` | 有効なデータセット |
-| ⬜ | `TestValidateYoloAnnotation` | `test_file_not_found()` | ファイル未発見 |
-| ⬜ | `TestValidateYoloAnnotation` | `test_empty_file_is_valid()` | 空ファイルは有効 |
-| ⬜ | `TestValidateYoloAnnotation` | `test_wrong_number_of_values()` | 値の数が不正 |
-| ⬜ | `TestValidateYoloAnnotation` | `test_invalid_number_format()` | 数値形式が不正 |
-| ⬜ | `TestValidateYoloAnnotation` | `test_negative_class_id()` | 負のクラスID |
-| ⬜ | `TestValidateYoloAnnotation` | `test_out_of_range_coordinates()` | 座標が範囲外 |
-| ⬜ | `TestValidateYoloAnnotation` | `test_valid_annotation()` | 有効なアノテーション |
-| ⬜ | `TestValidateModelPath` | `test_model_not_found()` | モデル未発見 |
-| ⬜ | `TestValidateModelPath` | `test_yolo_model_auto_download_info()` | YOLO自動DL情報 |
-| ⬜ | `TestValidateModelPath` | `test_unexpected_extension_warning()` | 予期しない拡張子警告 |
-| ⬜ | `TestValidateModelPath` | `test_valid_model()` | 有効なモデル |
+| ✅ | `TestErrorSeverity` | `test_enum_values()` | Enumの値確認 |
+| ✅ | `TestPipelineError` | `test_creation()` | エラーオブジェクト作成 |
+| ✅ | `TestPipelineError` | `test_format_with_color()` | カラー付きフォーマット |
+| ✅ | `TestPipelineError` | `test_format_without_color()` | カラーなしフォーマット |
+| ✅ | `TestValidationResult` | `test_default_is_valid()` | デフォルトは有効 |
+| ✅ | `TestValidationResult` | `test_add_error_invalidates()` | エラー追加で無効化 |
+| ✅ | `TestValidationResult` | `test_add_warning_keeps_valid()` | 警告追加は有効維持 |
+| ✅ | `TestValidationResult` | `test_merge_results()` | 結果のマージ |
+| ✅ | `TestValidationResult` | `test_format_all()` | 全エラーのフォーマット |
+| ✅ | `TestValidateDatasetYaml` | `test_file_not_found()` | ファイル未発見 |
+| ✅ | `TestValidateDatasetYaml` | `test_invalid_yaml_format()` | 不正なYAML形式 |
+| ✅ | `TestValidateDatasetYaml` | `test_missing_required_fields()` | 必須フィールド欠落 |
+| ✅ | `TestValidateDatasetYaml` | `test_train_path_not_found()` | 訓練パス未発見 |
+| ✅ | `TestValidateDatasetYaml` | `test_no_classes_defined()` | クラス未定義 |
+| ✅ | `TestValidateDatasetYaml` | `test_warning_single_class()` | 単一クラス警告 |
+| ✅ | `TestValidateDatasetYaml` | `test_warning_few_images()` | 画像不足警告 |
+| ✅ | `TestValidateDatasetYaml` | `test_valid_dataset()` | 有効なデータセット |
+| ✅ | `TestValidateYoloAnnotation` | `test_file_not_found()` | ファイル未発見 |
+| ✅ | `TestValidateYoloAnnotation` | `test_empty_file_is_valid()` | 空ファイルは有効 |
+| ✅ | `TestValidateYoloAnnotation` | `test_wrong_number_of_values()` | 値の数が不正 |
+| ✅ | `TestValidateYoloAnnotation` | `test_invalid_number_format()` | 数値形式が不正 |
+| ✅ | `TestValidateYoloAnnotation` | `test_negative_class_id()` | 負のクラスID |
+| ✅ | `TestValidateYoloAnnotation` | `test_out_of_range_coordinates()` | 座標が範囲外 |
+| ✅ | `TestValidateYoloAnnotation` | `test_valid_annotation()` | 有効なアノテーション |
+| ✅ | `TestValidateModelPath` | `test_model_not_found()` | モデル未発見 |
+| ✅ | `TestValidateModelPath` | `test_yolo_model_auto_download_info()` | YOLO自動DL情報 |
+| ✅ | `TestValidateModelPath` | `test_unexpected_extension_warning()` | 予期しない拡張子警告 |
+| ✅ | `TestValidateModelPath` | `test_valid_model()` | 有効なモデル |
 
 ---
 
@@ -292,7 +296,7 @@
 
 ---
 
-### 2.5 test_gpu_scaler.py ⬜
+### 2.5 test_gpu_scaler.py ✅
 
 **ソースファイル**: `scripts/training/gpu_scaler.py`
 
@@ -300,26 +304,28 @@
 
 **優先度**: 🔶 高
 
+**状態**: 実装済み - `tests/backend/training/test_gpu_scaler.py` (42テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestGPUTier` | `test_enum_values()` | Enum値の確認 |
-| ⬜ | `TestGPUProfile` | `test_dataclass_creation()` | データクラス作成 |
-| ⬜ | `TestGPUProfile` | `test_to_dict()` | 辞書変換 |
-| ⬜ | `TestGPUScaler` | `test_initialization()` | 初期化 |
-| ⬜ | `TestGPUScaler` | `test_detect_gpu_no_cuda()` | CUDA無し検出 |
-| ⬜ | `TestGPUScaler` | `test_detect_gpu_with_cuda()` | CUDA有り検出 |
-| ⬜ | `TestGPUScaler` | `test_get_optimal_config_low_tier()` | Low Tier設定取得 |
-| ⬜ | `TestGPUScaler` | `test_get_optimal_config_medium_tier()` | Medium Tier設定取得 |
-| ⬜ | `TestGPUScaler` | `test_get_optimal_config_high_tier()` | High Tier設定取得 |
-| ⬜ | `TestGPUScaler` | `test_get_optimal_config_workstation()` | Workstation設定取得 |
-| ⬜ | `TestGPUScaler` | `test_calculate_batch_size_8gb()` | 8GB VRAMバッチサイズ |
-| ⬜ | `TestGPUScaler` | `test_calculate_batch_size_12gb()` | 12GB VRAMバッチサイズ |
-| ⬜ | `TestGPUScaler` | `test_calculate_batch_size_24gb()` | 24GB VRAMバッチサイズ |
-| ⬜ | `TestGPUScaler` | `test_estimate_training_time()` | 訓練時間推定 |
-| ⬜ | `TestOOMRecoveryStrategy` | `test_get_recovery_config_attempt1()` | リカバリー試行1 |
-| ⬜ | `TestOOMRecoveryStrategy` | `test_get_recovery_config_attempt2()` | リカバリー試行2 |
-| ⬜ | `TestOOMRecoveryStrategy` | `test_get_recovery_config_attempt3()` | リカバリー試行3 |
-| ⬜ | `TestOOMRecoveryStrategy` | `test_max_attempts_exceeded()` | 最大試行回数超過 |
+| ✅ | `TestGPUTier` | `test_enum_values()` | Enum値の確認 |
+| ✅ | `TestGPUProfile` | `test_dataclass_creation()` | データクラス作成 |
+| ✅ | `TestGPUProfile` | `test_to_dict()` | 辞書変換 |
+| ✅ | `TestGPUScaler` | `test_initialization()` | 初期化 |
+| ✅ | `TestGPUScaler` | `test_detect_gpu_no_cuda()` | CUDA無し検出 |
+| ✅ | `TestGPUScaler` | `test_detect_gpu_with_cuda()` | CUDA有り検出 |
+| ✅ | `TestGPUScaler` | `test_get_optimal_config_low_tier()` | Low Tier設定取得 |
+| ✅ | `TestGPUScaler` | `test_get_optimal_config_medium_tier()` | Medium Tier設定取得 |
+| ✅ | `TestGPUScaler` | `test_get_optimal_config_high_tier()` | High Tier設定取得 |
+| ✅ | `TestGPUScaler` | `test_get_optimal_config_workstation()` | Workstation設定取得 |
+| ✅ | `TestGPUScaler` | `test_calculate_batch_size_8gb()` | 8GB VRAMバッチサイズ |
+| ✅ | `TestGPUScaler` | `test_calculate_batch_size_12gb()` | 12GB VRAMバッチサイズ |
+| ✅ | `TestGPUScaler` | `test_calculate_batch_size_24gb()` | 24GB VRAMバッチサイズ |
+| ✅ | `TestGPUScaler` | `test_estimate_training_time()` | 訓練時間推定 |
+| ✅ | `TestOOMRecoveryStrategy` | `test_get_recovery_config_attempt1()` | リカバリー試行1 |
+| ✅ | `TestOOMRecoveryStrategy` | `test_get_recovery_config_attempt2()` | リカバリー試行2 |
+| ✅ | `TestOOMRecoveryStrategy` | `test_get_recovery_config_attempt3()` | リカバリー試行3 |
+| ✅ | `TestOOMRecoveryStrategy` | `test_max_attempts_exceeded()` | 最大試行回数超過 |
 
 ---
 
@@ -366,7 +372,7 @@
 
 ## 3. Annotation モジュール (`scripts/annotation/`)
 
-### 3.1 test_annotation_utils.py ⬜
+### 3.1 test_annotation_utils.py ✅
 
 **ソースファイル**: `scripts/annotation/annotation_utils.py`
 
@@ -374,39 +380,41 @@
 
 **優先度**: 🔶 高
 
+**状態**: 実装済み - `tests/backend/annotation/test_annotation_utils.py` (53テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestAnnotationResult` | `test_default_values()` | デフォルト値 |
-| ⬜ | `TestAnnotationResult` | `test_success_rate_calculation()` | 成功率計算 |
-| ⬜ | `TestAnnotationResult` | `test_summary_format()` | サマリフォーマット |
-| ⬜ | `TestBboxToYolo` | `test_basic_conversion()` | 基本変換 |
-| ⬜ | `TestBboxToYolo` | `test_clamp_values()` | 値のクランプ |
-| ⬜ | `TestBboxToYolo` | `test_edge_cases()` | エッジケース |
-| ⬜ | `TestYoloToBbox` | `test_basic_conversion()` | 基本変換 |
-| ⬜ | `TestYoloToBbox` | `test_roundtrip_conversion()` | 往復変換 |
-| ⬜ | `TestYoloToBbox` | `test_clamp_to_image()` | 画像サイズにクランプ |
-| ⬜ | `TestWriteYoloLabel` | `test_write_single_label()` | 単一ラベル書き込み |
-| ⬜ | `TestWriteYoloLabel` | `test_append_mode()` | 追記モード |
-| ⬜ | `TestWriteYoloLabel` | `test_precision()` | 精度確認 |
-| ⬜ | `TestReadYoloLabel` | `test_read_valid_labels()` | 有効ラベル読み込み |
-| ⬜ | `TestReadYoloLabel` | `test_empty_file()` | 空ファイル |
-| ⬜ | `TestReadYoloLabel` | `test_file_not_found()` | ファイル未発見 |
-| ⬜ | `TestValidateYoloAnnotation` | `test_valid_annotation()` | 有効アノテーション |
-| ⬜ | `TestValidateYoloAnnotation` | `test_invalid_field_count()` | フィールド数不正 |
-| ⬜ | `TestValidateYoloAnnotation` | `test_out_of_range_values()` | 範囲外の値 |
-| ⬜ | `TestCreateDatasetYaml` | `test_create_yaml()` | YAML作成 |
-| ⬜ | `TestCreateDatasetYaml` | `test_with_test_path()` | テストパス付き |
-| ⬜ | `TestSplitDataset` | `test_basic_split()` | 基本分割 |
-| ⬜ | `TestSplitDataset` | `test_group_continuous_frames()` | 連続フレームグルーピング |
-| ⬜ | `TestSplitDataset` | `test_symlink_mode()` | シンボリックリンクモード |
-| ⬜ | `TestSplitDataset` | `test_seed_reproducibility()` | シード再現性 |
-| ⬜ | `TestExtractTimestamp` | `test_valid_timestamp_format()` | 有効タイムスタンプ |
-| ⬜ | `TestExtractTimestamp` | `test_invalid_format()` | 無効フォーマット |
-| ⬜ | `TestGroupByTimestamp` | `test_group_nearby_frames()` | 近接フレームグルーピング |
-| ⬜ | `TestGroupByTimestamp` | `test_separate_distant_frames()` | 離れたフレームの分離 |
-| ⬜ | `TestMaskToBbox` | `test_numpy_detection()` | NumPy検出 |
-| ⬜ | `TestMaskToBbox` | `test_contour_detection()` | 輪郭検出 |
-| ⬜ | `TestMaskToBbox` | `test_margin_expansion()` | マージン拡張 |
+| ✅ | `TestAnnotationResult` | `test_default_values()` | デフォルト値 |
+| ✅ | `TestAnnotationResult` | `test_success_rate_calculation()` | 成功率計算 |
+| ✅ | `TestAnnotationResult` | `test_summary_format()` | サマリフォーマット |
+| ✅ | `TestBboxToYolo` | `test_basic_conversion()` | 基本変換 |
+| ✅ | `TestBboxToYolo` | `test_clamp_values()` | 値のクランプ |
+| ✅ | `TestBboxToYolo` | `test_edge_cases()` | エッジケース |
+| ✅ | `TestYoloToBbox` | `test_basic_conversion()` | 基本変換 |
+| ✅ | `TestYoloToBbox` | `test_roundtrip_conversion()` | 往復変換 |
+| ✅ | `TestYoloToBbox` | `test_clamp_to_image()` | 画像サイズにクランプ |
+| ✅ | `TestWriteYoloLabel` | `test_write_single_label()` | 単一ラベル書き込み |
+| ✅ | `TestWriteYoloLabel` | `test_append_mode()` | 追記モード |
+| ✅ | `TestWriteYoloLabel` | `test_precision()` | 精度確認 |
+| ✅ | `TestReadYoloLabel` | `test_read_valid_labels()` | 有効ラベル読み込み |
+| ✅ | `TestReadYoloLabel` | `test_empty_file()` | 空ファイル |
+| ✅ | `TestReadYoloLabel` | `test_file_not_found()` | ファイル未発見 |
+| ✅ | `TestValidateYoloAnnotation` | `test_valid_annotation()` | 有効アノテーション |
+| ✅ | `TestValidateYoloAnnotation` | `test_invalid_field_count()` | フィールド数不正 |
+| ✅ | `TestValidateYoloAnnotation` | `test_out_of_range_values()` | 範囲外の値 |
+| ✅ | `TestCreateDatasetYaml` | `test_create_yaml()` | YAML作成 |
+| ✅ | `TestCreateDatasetYaml` | `test_with_test_path()` | テストパス付き |
+| ✅ | `TestSplitDataset` | `test_basic_split()` | 基本分割 |
+| ✅ | `TestSplitDataset` | `test_group_continuous_frames()` | 連続フレームグルーピング |
+| ✅ | `TestSplitDataset` | `test_symlink_mode()` | シンボリックリンクモード |
+| ✅ | `TestSplitDataset` | `test_seed_reproducibility()` | シード再現性 |
+| ✅ | `TestExtractTimestamp` | `test_valid_timestamp_format()` | 有効タイムスタンプ |
+| ✅ | `TestExtractTimestamp` | `test_invalid_format()` | 無効フォーマット |
+| ✅ | `TestGroupByTimestamp` | `test_group_nearby_frames()` | 近接フレームグルーピング |
+| ✅ | `TestGroupByTimestamp` | `test_separate_distant_frames()` | 離れたフレームの分離 |
+| ✅ | `TestMaskToBbox` | `test_numpy_detection()` | NumPy検出 |
+| ✅ | `TestMaskToBbox` | `test_contour_detection()` | 輪郭検出 |
+| ✅ | `TestMaskToBbox` | `test_margin_expansion()` | マージン拡張 |
 
 ---
 
@@ -428,7 +436,7 @@
 
 ---
 
-### 3.3 test_background_subtraction.py ⬜
+### 3.3 test_background_subtraction.py ✅
 
 **ソースファイル**: `scripts/annotation/background_subtraction.py`
 
@@ -436,19 +444,21 @@
 
 **優先度**: 🔶 高
 
+**状態**: 実装済み - `tests/backend/annotation/test_background_subtraction.py` (28テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestBackgroundSubtractionAnnotator` | `test_init_with_config()` | 設定付き初期化 |
-| ⬜ | `TestBackgroundSubtractionAnnotator` | `test_init_with_background_image()` | 背景画像付き初期化 |
-| ⬜ | `TestBackgroundSubtractionAnnotator` | `test_annotate_single_image()` | 単一画像アノテーション |
-| ⬜ | `TestBackgroundSubtractionAnnotator` | `test_no_object_detected()` | オブジェクト未検出 |
-| ⬜ | `TestBackgroundSubtractionAnnotator` | `test_threshold_method_otsu()` | Otsu閾値法 |
-| ⬜ | `TestBackgroundSubtractionAnnotator` | `test_threshold_method_adaptive()` | 適応的閾値法 |
-| ⬜ | `TestBackgroundSubtractionAnnotator` | `test_threshold_method_fixed()` | 固定閾値法 |
-| ⬜ | `TestBackgroundSubtractionAnnotator` | `test_morphological_operations()` | モルフォロジー演算 |
-| ⬜ | `TestBackgroundSubtractionAnnotator` | `test_batch_annotation()` | バッチアノテーション |
-| ⬜ | `TestBackgroundSubtractionAnnotator` | `test_min_contour_area_filter()` | 最小輪郭面積フィルタ |
-| ⬜ | `TestBackgroundSubtractionAnnotator` | `test_max_area_ratio_filter()` | 最大面積比フィルタ |
+| ✅ | `TestBackgroundSubtractionAnnotator` | `test_init_with_config()` | 設定付き初期化 |
+| ✅ | `TestBackgroundSubtractionAnnotator` | `test_init_with_background_image()` | 背景画像付き初期化 |
+| ✅ | `TestBackgroundSubtractionAnnotator` | `test_annotate_single_image()` | 単一画像アノテーション |
+| ✅ | `TestBackgroundSubtractionAnnotator` | `test_no_object_detected()` | オブジェクト未検出 |
+| ✅ | `TestBackgroundSubtractionAnnotator` | `test_threshold_method_otsu()` | Otsu閾値法 |
+| ✅ | `TestBackgroundSubtractionAnnotator` | `test_threshold_method_adaptive()` | 適応的閾値法 |
+| ✅ | `TestBackgroundSubtractionAnnotator` | `test_threshold_method_fixed()` | 固定閾値法 |
+| ✅ | `TestBackgroundSubtractionAnnotator` | `test_morphological_operations()` | モルフォロジー演算 |
+| ✅ | `TestBackgroundSubtractionAnnotator` | `test_batch_annotation()` | バッチアノテーション |
+| ✅ | `TestBackgroundSubtractionAnnotator` | `test_min_contour_area_filter()` | 最小輪郭面積フィルタ |
+| ✅ | `TestBackgroundSubtractionAnnotator` | `test_max_area_ratio_filter()` | 最大面積比フィルタ |
 
 ---
 
@@ -711,15 +721,15 @@ pytest tests/backend/ -v -m "not slow"
 
 | カテゴリ | 実装済み | 未実装 | 合計 |
 |---------|---------|--------|------|
-| Common | 0 | 5 | 5 |
-| Training | 3 | 4 | 7 |
-| Annotation | 0 | 5 | 5 |
+| Common | 2 | 3 | 5 |
+| Training | 4 | 3 | 7 |
+| Annotation | 2 | 3 | 5 |
 | Augmentation | 2 | 0 | 2 |
 | Evaluation | 0 | 2 | 2 |
 | Capture | 0 | 2 | 2 |
 | GUI Framework | 0 | 2 | 2 |
 | ROS2 | 0 | 1 | 1 |
-| **合計** | **5** | **21** | **26** |
+| **合計** | **10** | **16** | **26** |
 
 ---
 

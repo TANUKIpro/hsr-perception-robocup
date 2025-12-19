@@ -150,6 +150,8 @@ COPY app/ /workspace/app/
 COPY scripts/ /workspace/scripts/
 COPY config/ /workspace/config/
 COPY run_app.sh /workspace/run_app.sh
+COPY tests/ /workspace/tests/
+COPY pytest.ini /workspace/pytest.ini
 
 # Copy entrypoint script
 COPY docker/entrypoint.sh /entrypoint.sh
