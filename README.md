@@ -339,6 +339,72 @@ hsr-perception-robocup/
 
 ---
 
+## テスト
+
+### テスト構成
+
+| カテゴリ | フレームワーク | 対象 |
+|---------|--------------|------|
+| Backend Unit | pytest | scripts/, src/hsr_perception/ |
+| Frontend Unit | pytest + mock | app/services/, app/components/ |
+| Frontend E2E | Playwright | ブラウザUIテスト |
+
+### テスト実行
+
+```bash
+# 全テスト（Unit）
+pytest tests/ -v
+
+# Backendテスト
+pytest tests/backend/ -v
+
+# Frontendユニットテスト
+pytest tests/frontend/ -v
+
+# E2Eテスト（要Docker起動）
+cd tests/e2e && npm test
+
+# カバレッジレポート
+pytest tests/ --cov=app --cov=scripts --cov-report=html
+```
+
+### E2Eテスト（Playwright）
+
+Playwright を使用したブラウザUIテストです。Streamlit UIの動作を自動検証します。
+
+**前提条件:**
+- Node.js 18+
+- Docker起動済み（`docker compose up -d`）
+
+**セットアップ:**
+```bash
+cd tests/e2e
+npm install
+npx playwright install chromium
+```
+
+**実行:**
+```bash
+# ヘッドレスモード（CI向け）
+npm test
+
+# UIモード（デバッグ用）
+npm run test:ui
+
+# 特定テストのみ
+npx playwright test dashboard.spec.ts
+
+# テストレポート表示
+npx playwright show-report
+```
+
+**テスト構成:**
+- `specs/smoke/` - 起動確認・ページ遷移
+- `specs/pages/` - 各ページの機能テスト
+- `page-objects/` - Page Objectパターン実装
+
+---
+
 ## ドキュメント
 
 - [アプリガイド（日本語）](docs/app_guide.md)
