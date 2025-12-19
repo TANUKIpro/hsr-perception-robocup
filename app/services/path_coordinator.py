@@ -13,9 +13,137 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Union, TYPE_CHECKING
 import json
+import streamlit as st
 
 if TYPE_CHECKING:
     from .profile_manager import ProfileManager
+
+
+# ========== Cached Filesystem Functions ==========
+# These functions cache expensive filesystem operations to avoid
+# re-scanning directories on every Streamlit rerender.
+
+@st.cache_data(ttl=30, show_spinner=False)
+def _cached_get_annotation_sessions(annotated_dir: str) -> List[Dict[str, str]]:
+    """Cached version of annotation session scanning."""
+    annotated_path = Path(annotated_dir)
+    sessions = []
+
+    if not annotated_path.exists():
+        return sessions
+
+    for session_dir in sorted(annotated_path.iterdir(), reverse=True):
+        if session_dir.is_dir():
+            data_yaml = session_dir / "data.yaml"
+            sessions.append({
+                "name": session_dir.name,
+                "path": str(session_dir),
+                "has_data_yaml": data_yaml.exists(),
+                "created": datetime.fromtimestamp(session_dir.stat().st_ctime).isoformat(),
+            })
+
+    return sessions
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def _cached_get_trained_models(finetuned_dir: str) -> List[Dict[str, str]]:
+    """Cached version of trained model scanning."""
+    finetuned_path = Path(finetuned_dir)
+    models = []
+
+    if not finetuned_path.exists():
+        return models
+
+    for model_dir in sorted(finetuned_path.iterdir(), reverse=True):
+        if model_dir.is_dir():
+            weights_dir = model_dir / "weights"
+            best_pt = weights_dir / "best.pt"
+            last_pt = weights_dir / "last.pt"
+
+            if best_pt.exists() or last_pt.exists():
+                models.append({
+                    "name": model_dir.name,
+                    "best_path": str(best_pt) if best_pt.exists() else None,
+                    "last_path": str(last_pt) if last_pt.exists() else None,
+                    "created": datetime.fromtimestamp(model_dir.stat().st_ctime).isoformat(),
+                })
+
+    return models
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def _cached_get_synthetic_sessions(synthetic_dir: str) -> List[Dict[str, str]]:
+    """Cached version of synthetic session scanning."""
+    synthetic_path = Path(synthetic_dir)
+    sessions = []
+
+    if not synthetic_path.exists():
+        return sessions
+
+    for session_dir in sorted(synthetic_path.iterdir(), reverse=True):
+        if session_dir.is_dir():
+            images_dir = session_dir / "images"
+            image_count = 0
+            if images_dir.exists():
+                image_count = len(list(images_dir.glob("*.jpg"))) + len(list(images_dir.glob("*.png")))
+
+            sessions.append({
+                "name": session_dir.name,
+                "path": str(session_dir),
+                "image_count": image_count,
+                "created": datetime.fromtimestamp(session_dir.stat().st_ctime).isoformat(),
+            })
+
+    return sessions
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def _cached_get_background_images(backgrounds_dir: str) -> List[Dict[str, str]]:
+    """Cached version of background image scanning."""
+    backgrounds_path = Path(backgrounds_dir)
+    images = []
+
+    if not backgrounds_path.exists():
+        return images
+
+    extensions = [".jpg", ".jpeg", ".png", ".bmp"]
+    for img_file in backgrounds_path.iterdir():
+        if img_file.suffix.lower() in extensions:
+            images.append({
+                "name": img_file.name,
+                "path": str(img_file),
+            })
+
+    return images
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def _cached_get_mask_stats(annotated_dir: str) -> Dict[str, int]:
+    """
+    Get mask statistics for annotated classes (cached).
+
+    Returns:
+        Dictionary mapping class name to mask count
+    """
+    stats = {}
+    annotated_path = Path(annotated_dir)
+
+    if not annotated_path.exists():
+        return stats
+
+    for class_dir in annotated_path.iterdir():
+        if not class_dir.is_dir():
+            continue
+        masks_dir = class_dir / "masks"
+        if masks_dir.exists():
+            # Check both naming conventions
+            mask_count = len(list(masks_dir.glob("*_mask.png")))
+            if mask_count == 0:
+                mask_count = len(list(masks_dir.glob("*.png")))
+            if mask_count > 0:
+                stats[class_dir.name] = mask_count
+
+    return stats
 
 
 @dataclass
@@ -339,22 +467,7 @@ class PathCoordinator:
             - created: Creation timestamp
         """
         annotated_dir = self.get_path("annotated_dir")
-        sessions = []
-
-        if not annotated_dir.exists():
-            return sessions
-
-        for session_dir in sorted(annotated_dir.iterdir(), reverse=True):
-            if session_dir.is_dir():
-                data_yaml = session_dir / "data.yaml"
-                sessions.append({
-                    "name": session_dir.name,
-                    "path": str(session_dir),
-                    "has_data_yaml": data_yaml.exists(),
-                    "created": datetime.fromtimestamp(session_dir.stat().st_ctime).isoformat(),
-                })
-
-        return sessions
+        return _cached_get_annotation_sessions(str(annotated_dir))
 
     def get_training_paths(self, annotation_session: str) -> Dict[str, str]:
         """
@@ -399,26 +512,7 @@ class PathCoordinator:
             - created: Creation timestamp
         """
         finetuned_dir = self.get_path("finetuned_dir")
-        models = []
-
-        if not finetuned_dir.exists():
-            return models
-
-        for model_dir in sorted(finetuned_dir.iterdir(), reverse=True):
-            if model_dir.is_dir():
-                weights_dir = model_dir / "weights"
-                best_pt = weights_dir / "best.pt"
-                last_pt = weights_dir / "last.pt"
-
-                if best_pt.exists() or last_pt.exists():
-                    models.append({
-                        "name": model_dir.name,
-                        "best_path": str(best_pt) if best_pt.exists() else None,
-                        "last_path": str(last_pt) if last_pt.exists() else None,
-                        "created": datetime.fromtimestamp(model_dir.stat().st_ctime).isoformat(),
-                    })
-
-        return models
+        return _cached_get_trained_models(str(finetuned_dir))
 
     def get_pretrained_models(self) -> List[str]:
         """
@@ -473,26 +567,7 @@ class PathCoordinator:
             - created: Creation timestamp
         """
         synthetic_dir = self.get_path("synthetic_dir")
-        sessions = []
-
-        if not synthetic_dir.exists():
-            return sessions
-
-        for session_dir in sorted(synthetic_dir.iterdir(), reverse=True):
-            if session_dir.is_dir():
-                images_dir = session_dir / "images"
-                image_count = 0
-                if images_dir.exists():
-                    image_count = len(list(images_dir.glob("*.jpg"))) + len(list(images_dir.glob("*.png")))
-
-                sessions.append({
-                    "name": session_dir.name,
-                    "path": str(session_dir),
-                    "image_count": image_count,
-                    "created": datetime.fromtimestamp(session_dir.stat().st_ctime).isoformat(),
-                })
-
-        return sessions
+        return _cached_get_synthetic_sessions(str(synthetic_dir))
 
     # ========== Background Images ==========
 
@@ -506,20 +581,17 @@ class PathCoordinator:
             - path: Full path
         """
         backgrounds_dir = self.get_path("backgrounds_dir")
-        images = []
+        return _cached_get_background_images(str(backgrounds_dir))
 
-        if not backgrounds_dir.exists():
-            return images
+    def get_mask_stats(self) -> Dict[str, int]:
+        """
+        Get mask statistics for annotated classes.
 
-        extensions = [".jpg", ".jpeg", ".png", ".bmp"]
-        for img_file in backgrounds_dir.iterdir():
-            if img_file.suffix.lower() in extensions:
-                images.append({
-                    "name": img_file.name,
-                    "path": str(img_file),
-                })
-
-        return images
+        Returns:
+            Dictionary mapping class name to mask count
+        """
+        annotated_dir = self.get_path("annotated_dir")
+        return _cached_get_mask_stats(str(annotated_dir))
 
     def add_background_image(self, source_path: Union[str, Path], name: Optional[str] = None) -> str:
         """

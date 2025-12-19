@@ -534,35 +534,6 @@ def _render_annotation_history(task_manager: TaskManager) -> None:
 # =============================================================================
 
 
-def _get_mask_stats(path_coordinator: PathCoordinator) -> Dict[str, int]:
-    """
-    Get mask counts per class for synthetic generation.
-
-    Returns:
-        Dictionary mapping class_name to mask count
-    """
-    annotated_dir = path_coordinator.get_path("annotated_dir")
-    stats = {}
-
-    if not annotated_dir.exists():
-        return stats
-
-    for class_dir in annotated_dir.iterdir():
-        if not class_dir.is_dir():
-            continue
-
-        masks_dir = class_dir / "masks"
-        if masks_dir.exists():
-            # Count both naming conventions
-            mask_count = len(list(masks_dir.glob("*_mask.png")))
-            if mask_count == 0:
-                mask_count = len(list(masks_dir.glob("*.png")))
-            if mask_count > 0:
-                stats[class_dir.name] = mask_count
-
-    return stats
-
-
 def _generate_preview_images(
     path_coordinator: PathCoordinator,
     selected_classes: List[str],
@@ -675,8 +646,8 @@ def _render_generate_synthetic(path_coordinator: PathCoordinator) -> None:
     Uses masks from SAM2 annotation directly with edge blending and white balance adjustment.
     """)
 
-    # Check for masks from annotation
-    mask_stats = _get_mask_stats(path_coordinator)
+    # Check for masks from annotation (uses cached function)
+    mask_stats = path_coordinator.get_mask_stats()
 
     if not mask_stats:
         st.warning(

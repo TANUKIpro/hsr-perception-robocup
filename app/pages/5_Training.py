@@ -575,16 +575,8 @@ def _render_synthetic_section(path_coordinator: PathCoordinator) -> None:
     annotated_dir = path_coordinator.get_path("annotated_dir")
     backgrounds_dir = path_coordinator.get_path("backgrounds_dir")
 
-    # Check for annotated masks
-    # Import using importlib to handle numeric module name
-    import importlib.util
-    spec = importlib.util.spec_from_file_location(
-        "annotation_page",
-        Path(__file__).parent / "4_Annotation.py"
-    )
-    annotation_module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(annotation_module)
-    mask_stats = annotation_module._get_mask_stats(path_coordinator)
+    # Check for annotated masks (uses cached function)
+    mask_stats = path_coordinator.get_mask_stats()
 
     if not mask_stats:
         st.warning("No annotated masks found. Please run annotation first.")
