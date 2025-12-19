@@ -89,28 +89,28 @@ export class CollectionPage extends BasePage {
    * Click ROS2 Camera tab
    */
   async clickRos2CameraTab(): Promise<void> {
-    await this.clickTab('ROS2 Camera');
+    await this.clickTabExact('🤖 ROS2 Camera');
   }
 
   /**
    * Click Local Camera tab
    */
   async clickLocalCameraTab(): Promise<void> {
-    await this.clickTab('Local Camera');
+    await this.clickTabExact('📷 Local Camera');
   }
 
   /**
    * Click File Upload tab
    */
   async clickFileUploadTab(): Promise<void> {
-    await this.clickTab('File Upload');
+    await this.clickTabExact('📁 File Upload');
   }
 
   /**
    * Click Folder Import tab
    */
   async clickFolderImportTab(): Promise<void> {
-    await this.clickTab('Folder Import');
+    await this.clickTabExact('📂 Folder Import');
   }
 
   // ============================================
@@ -222,10 +222,10 @@ export class CollectionPage extends BasePage {
    * Assert collection tabs are visible
    */
   async expectCollectionTabsVisible(): Promise<void> {
-    await expect(this.selectors.tab('ROS2 Camera')).toBeVisible();
-    await expect(this.selectors.tab('Local Camera')).toBeVisible();
-    await expect(this.selectors.tab('File Upload')).toBeVisible();
-    await expect(this.selectors.tab('Folder Import')).toBeVisible();
+    await expect(this.page.getByRole('tab', { name: /ROS2 Camera/i })).toBeVisible();
+    await expect(this.page.getByRole('tab', { name: /Local Camera/i })).toBeVisible();
+    await expect(this.page.getByRole('tab', { name: /File Upload/i })).toBeVisible();
+    await expect(this.page.getByRole('tab', { name: /Folder Import/i })).toBeVisible();
   }
 
   /**

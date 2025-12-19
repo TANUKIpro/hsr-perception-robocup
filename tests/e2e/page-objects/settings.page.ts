@@ -34,31 +34,41 @@ export class SettingsPage extends BasePage {
   // ============================================
 
   /**
-   * Click Switch tab
+   * Click Profile List tab
    */
+  async clickProfileListTab(): Promise<void> {
+    await this.clickTabExact('Profile List');
+  }
+
+  /**
+   * Click Create New tab
+   */
+  async clickCreateNewTab(): Promise<void> {
+    await this.clickTabExact('Create New');
+  }
+
+  /**
+   * Click Import/Export tab
+   */
+  async clickImportExportTab(): Promise<void> {
+    await this.clickTabExact('Import/Export');
+  }
+
+  // Aliases for backward compatibility
   async clickSwitchTab(): Promise<void> {
-    await this.clickTab('Switch');
+    await this.clickProfileListTab();
   }
 
-  /**
-   * Click Create tab
-   */
   async clickCreateTab(): Promise<void> {
-    await this.clickTab('Create');
+    await this.clickCreateNewTab();
   }
 
-  /**
-   * Click Export tab
-   */
   async clickExportTab(): Promise<void> {
-    await this.clickTab('Export');
+    await this.clickImportExportTab();
   }
 
-  /**
-   * Click Import tab
-   */
   async clickImportTab(): Promise<void> {
-    await this.clickTab('Import');
+    await this.clickImportExportTab();
   }
 
   // ============================================
@@ -259,10 +269,9 @@ export class SettingsPage extends BasePage {
    * Assert profile creation tabs are visible
    */
   async expectProfileTabsVisible(): Promise<void> {
-    await expect(this.selectors.tab('Switch')).toBeVisible();
-    await expect(this.selectors.tab('Create')).toBeVisible();
-    await expect(this.selectors.tab('Export')).toBeVisible();
-    await expect(this.selectors.tab('Import')).toBeVisible();
+    await expect(this.page.getByRole('tab', { name: /Profile List/i })).toBeVisible();
+    await expect(this.page.getByRole('tab', { name: /Create New/i })).toBeVisible();
+    await expect(this.page.getByRole('tab', { name: /Import\/Export/i })).toBeVisible();
   }
 
   /**

@@ -129,10 +129,20 @@ export class StreamlitSelectors {
   }
 
   /**
-   * Tab by text
+   * Tab by text (partial match, case-insensitive)
    */
   tab(text: string): Locator {
-    return this.page.locator(`[data-baseweb="tab"]:has-text("${text}")`);
+    // Use getByRole for more reliable tab selection
+    // Escape special regex characters in the text
+    const escapedText = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return this.page.getByRole('tab', { name: new RegExp(escapedText, 'i') });
+  }
+
+  /**
+   * Tab by exact text (including emojis)
+   */
+  tabExact(text: string): Locator {
+    return this.page.getByRole('tab', { name: text });
   }
 
   /**

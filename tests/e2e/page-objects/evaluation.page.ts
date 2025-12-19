@@ -276,10 +276,10 @@ export class EvaluationPage extends BasePage {
    * Assert evaluation tabs are visible
    */
   async expectEvaluationTabsVisible(): Promise<void> {
-    await expect(this.selectors.tab('Run Evaluation')).toBeVisible();
-    await expect(this.selectors.tab('Results')).toBeVisible();
-    await expect(this.selectors.tab('Visual Test')).toBeVisible();
-    await expect(this.selectors.tab('Robustness Test')).toBeVisible();
+    await expect(this.page.getByRole('tab', { name: /Run Evaluation/i })).toBeVisible();
+    await expect(this.page.getByRole('tab', { name: /Results/i })).toBeVisible();
+    await expect(this.page.getByRole('tab', { name: /Visual Test/i })).toBeVisible();
+    await expect(this.page.getByRole('tab', { name: /Robustness Test/i })).toBeVisible();
   }
 
   /**

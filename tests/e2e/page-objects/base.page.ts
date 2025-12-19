@@ -105,10 +105,19 @@ export class BasePage {
   }
 
   /**
-   * Click a tab
+   * Click a tab (partial match, case-insensitive)
    */
   async clickTab(tabName: string): Promise<void> {
     const tab = this.selectors.tab(tabName);
+    await tab.click();
+    await this.wait.waitForRerun();
+  }
+
+  /**
+   * Click a tab by exact text (including emojis)
+   */
+  async clickTabExact(tabName: string): Promise<void> {
+    const tab = this.selectors.tabExact(tabName);
     await tab.click();
     await this.wait.waitForRerun();
   }

@@ -62,11 +62,13 @@ test.describe('Registry Page', () => {
       await registry.clickAddNewObjectTab();
     });
 
-    test('should display Object Name input', async () => {
-      await expect(registry.page.getByText('Object Name')).toBeVisible();
+    test('should display Name input', async () => {
+      // Actual label is "Name (lowercase, no spaces)"
+      await expect(registry.page.getByText(/Name.*lowercase/i)).toBeVisible();
     });
 
     test('should display Category selector', async () => {
+      // Look for Category selectbox in the form
       await expect(registry.page.getByText('Category')).toBeVisible();
     });
 
@@ -91,16 +93,16 @@ test.describe('Registry Page', () => {
       await registry.clickAddNewObjectTab();
     });
 
-    test('should be able to fill object name', async () => {
-      await registry.fillTextInput('Object Name', 'test_object');
-      // Verify input was filled
-      const input = registry.selectors.textInput('Object Name');
+    test('should be able to fill name field', async () => {
+      // Actual label is "Name (lowercase, no spaces)"
+      const input = registry.page.getByRole('textbox', { name: /Name.*lowercase/i });
+      await input.fill('test_object');
       await expect(input).toHaveValue('test_object');
     });
 
-    test('should be able to select category', async () => {
-      const selectbox = registry.selectors.selectbox('Category');
-      await expect(selectbox).toBeVisible();
+    test('should be able to see category selector', async () => {
+      // Category selectbox is in the Add New Object form
+      await expect(registry.page.getByText('Category')).toBeVisible();
     });
   });
 

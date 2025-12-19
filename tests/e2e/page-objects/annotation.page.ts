@@ -36,28 +36,28 @@ export class AnnotationPage extends BasePage {
    * Click Run Annotation tab
    */
   async clickRunAnnotationTab(): Promise<void> {
-    await this.clickTab('Run Annotation');
+    await this.clickTabExact('🎯 Run Annotation');
   }
 
   /**
    * Click Prepare Dataset tab
    */
   async clickPrepareDatasetTab(): Promise<void> {
-    await this.clickTab('Prepare Dataset');
+    await this.clickTabExact('📦 Prepare Dataset');
   }
 
   /**
    * Click Sessions tab
    */
   async clickSessionsTab(): Promise<void> {
-    await this.clickTab('Sessions');
+    await this.clickTabExact('📁 Sessions');
   }
 
   /**
    * Click History tab
    */
   async clickHistoryTab(): Promise<void> {
-    await this.clickTab('History');
+    await this.clickTabExact('📜 History');
   }
 
   // ============================================
@@ -202,10 +202,10 @@ export class AnnotationPage extends BasePage {
    * Assert annotation tabs are visible
    */
   async expectAnnotationTabsVisible(): Promise<void> {
-    await expect(this.selectors.tab('Run Annotation')).toBeVisible();
-    await expect(this.selectors.tab('Prepare Dataset')).toBeVisible();
-    await expect(this.selectors.tab('Sessions')).toBeVisible();
-    await expect(this.selectors.tab('History')).toBeVisible();
+    await expect(this.page.getByRole('tab', { name: /Run Annotation/i })).toBeVisible();
+    await expect(this.page.getByRole('tab', { name: /Prepare Dataset/i })).toBeVisible();
+    await expect(this.page.getByRole('tab', { name: /Sessions/i })).toBeVisible();
+    await expect(this.page.getByRole('tab', { name: /History/i })).toBeVisible();
   }
 
   /**

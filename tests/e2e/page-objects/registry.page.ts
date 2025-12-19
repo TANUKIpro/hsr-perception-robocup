@@ -131,7 +131,8 @@ export class RegistryPage extends BasePage {
     isTiny?: boolean;
     isLiquid?: boolean;
   }): Promise<void> {
-    await this.fillTextInput('Object Name', data.name);
+    // Actual label is "Name (lowercase, no spaces)"
+    await this.fillTextInput('Name', data.name);
 
     if (data.displayName) {
       await this.fillTextInput('Display Name', data.displayName);
@@ -218,7 +219,8 @@ export class RegistryPage extends BasePage {
    * Assert Add New Object tab content is visible
    */
   async expectAddNewObjectTabVisible(): Promise<void> {
-    await expect(this.page.getByText('Object Name')).toBeVisible();
+    // Actual label is "Name (lowercase, no spaces)"
+    await expect(this.page.getByText(/Name.*lowercase/i)).toBeVisible();
     await expect(this.page.getByRole('button', { name: 'Add Object' })).toBeVisible();
   }
 

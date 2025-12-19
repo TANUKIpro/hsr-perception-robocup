@@ -37,21 +37,21 @@ export class TrainingPage extends BasePage {
    * Click Start Training tab
    */
   async clickStartTrainingTab(): Promise<void> {
-    await this.clickTab('Start Training');
+    await this.clickTabExact('⊞ Start Training');
   }
 
   /**
    * Click Models tab
    */
   async clickModelsTab(): Promise<void> {
-    await this.clickTab('Models');
+    await this.clickTabExact('◎ Models');
   }
 
   /**
    * Click History tab
    */
   async clickHistoryTab(): Promise<void> {
-    await this.clickTab('History');
+    await this.clickTabExact('📜 History');
   }
 
   // ============================================
@@ -62,35 +62,35 @@ export class TrainingPage extends BasePage {
    * Click Dataset sub-tab
    */
   async clickDatasetSubTab(): Promise<void> {
-    await this.clickTab('Dataset');
+    await this.clickTabExact('📂 Dataset');
   }
 
   /**
    * Click Synthetic sub-tab
    */
   async clickSyntheticSubTab(): Promise<void> {
-    await this.clickTab('Synthetic');
+    await this.clickTabExact('🎨 Synthetic');
   }
 
   /**
    * Click Model sub-tab
    */
   async clickModelSubTab(): Promise<void> {
-    await this.clickTab('Model');
+    await this.clickTabExact('🤖 Model');
   }
 
   /**
    * Click Advanced sub-tab
    */
   async clickAdvancedSubTab(): Promise<void> {
-    await this.clickTab('Advanced');
+    await this.clickTabExact('⚙️ Advanced');
   }
 
   /**
    * Click Others sub-tab
    */
   async clickOthersSubTab(): Promise<void> {
-    await this.clickTab('Others');
+    await this.clickTabExact('📦 Others');
   }
 
   // ============================================
@@ -318,9 +318,9 @@ export class TrainingPage extends BasePage {
    * Assert training tabs are visible
    */
   async expectTrainingTabsVisible(): Promise<void> {
-    await expect(this.selectors.tab('Start Training')).toBeVisible();
-    await expect(this.selectors.tab('Models')).toBeVisible();
-    await expect(this.selectors.tab('History')).toBeVisible();
+    await expect(this.page.getByRole('tab', { name: /Start Training/i })).toBeVisible();
+    await expect(this.page.getByRole('tab', { name: /Models/i })).toBeVisible();
+    await expect(this.page.getByRole('tab', { name: /History/i })).toBeVisible();
   }
 
   /**
@@ -328,8 +328,8 @@ export class TrainingPage extends BasePage {
    */
   async expectConfigSubTabsVisible(): Promise<void> {
     await this.clickStartTrainingTab();
-    await expect(this.selectors.tab('Dataset')).toBeVisible();
-    await expect(this.selectors.tab('Model')).toBeVisible();
+    await expect(this.page.getByRole('tab', { name: /Dataset/i })).toBeVisible();
+    await expect(this.page.getByRole('tab', { name: /Model/i })).toBeVisible();
   }
 
   /**
