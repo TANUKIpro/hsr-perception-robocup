@@ -1,0 +1,93 @@
+{
+  "version": "1.0.0",
+  "updated_at": "2025-01-01T00:00:00.000000",
+  "current_preset": "Competition",
+  "training": {
+    "advanced_params": {
+      "hsv_h": 0.0,
+      "hsv_s": 0.0,
+      "hsv_v": 0.0,
+      "degrees": 0.0,
+      "translate": 0.0,
+      "scale": 0.0,
+      "shear": 0.0,
+      "flipud": 0.0,
+      "fliplr": 0.0,
+      "mosaic": 0.0,
+      "mixup": 0.0,
+      "optimizer": "AdamW",
+      "lr0": 0.0001,
+      "lrf": 0.001,
+      "momentum": 0.8,
+      "weight_decay": 0.0,
+      "llrd_enabled": false,
+      "llrd_decay_rate": 0.7,
+      "swa_enabled": false,
+      "swa_start_epoch": 5,
+      "swa_lr": 0.0001,
+      "label_smoothing": 0.0,
+      "cos_lr": false,
+      "multi_scale": false,
+      "workers": 0,
+      "cache": false,
+      "amp": false,
+      "imgsz": 320,
+      "patience": 1,
+      "close_mosaic": 0,
+      "freeze": 0,
+      "warmup_epochs": 3,
+      "save": false,
+      "save_period": 1,
+      "exist_ok": false
+    },
+    "synthetic": {
+      "enabled": true,
+      "ratio": 2.0,
+      "max_objects": 3,
+      "min_objects": 1,
+      "scale_min": 0.5,
+      "scale_max": 1.5,
+      "rotation_min": -15,
+      "rotation_max": 15,
+      "enable_horizontal_flip": true,
+      "enable_vertical_flip": false,
+      "enable_white_balance": true,
+      "white_balance_strength": 0.7,
+      "edge_blur_sigma": 2.0,
+      "allow_overlap": false,
+      "overlap_iou_threshold": 0.1,
+      "output_quality": 95
+    }
+  },
+  "annotation": {
+    "synthetic_generation": {
+      "enabled": true,
+      "ratio": 2.0,
+      "max_objects": 3,
+      "min_objects": 1,
+      "scale_min": 0.5,
+      "scale_max": 1.5,
+      "rotation_min": -15,
+      "rotation_max": 15,
+      "enable_horizontal_flip": true,
+      "enable_vertical_flip": false,
+      "enable_white_balance": true,
+      "white_balance_strength": 0.7,
+      "edge_blur_sigma": 2.0,
+      "allow_overlap": false,
+      "overlap_iou_threshold": 0.1,
+      "output_quality": 95
+    },
+    "dataset_preparation": {
+      "validation_ratio": 0.2,
+      "group_continuous_frames": true,
+      "group_interval_sec": 2.0
+    }
+  },
+  "evaluation": {
+    "visual_conf": 0.25,
+    "video_conf": 0.25,
+    "robustness_conf": 0.25,
+    "xtion_conf": 0.25
+  }
+}

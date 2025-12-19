@@ -517,3 +517,116 @@ def sample_registry_data():
         ]
     }
 ```
+
+---
+
+## 5. E2Eテスト（Playwright）
+
+E2EテストはPlaywright（TypeScript）で実装され、`tests/e2e/`に配置されています。
+
+### 5.1 テスト構成
+
+```
+tests/e2e/
+├── playwright.config.ts    # Playwright設定
+├── package.json            # Node.js依存
+├── utils/
+│   ├── streamlit-selectors.ts  # Streamlit用セレクタ
+│   └── wait-helpers.ts         # 待機ユーティリティ
+├── page-objects/           # Page Objectパターン
+│   ├── base.page.ts
+│   ├── sidebar.component.ts
+│   ├── dashboard.page.ts
+│   ├── registry.page.ts
+│   ├── collection.page.ts
+│   ├── annotation.page.ts
+│   ├── training.page.ts
+│   ├── evaluation.page.ts
+│   └── settings.page.ts
+└── specs/
+    ├── smoke/              # 起動確認テスト
+    │   ├── app-launch.spec.ts
+    │   └── navigation.spec.ts
+    └── pages/              # ページ別テスト
+        ├── dashboard.spec.ts
+        ├── registry.spec.ts
+        ├── collection.spec.ts
+        ├── annotation.spec.ts
+        ├── training.spec.ts
+        ├── evaluation.spec.ts
+        └── settings.spec.ts
+```
+
+### 5.2 Smokeテスト
+
+| テストファイル | テストケース | 説明 |
+|--------------|-------------|------|
+| app-launch.spec.ts | `should load the home page successfully` | ホームページ読み込み |
+| app-launch.spec.ts | `should display the application title` | タイトル表示 |
+| app-launch.spec.ts | `should display the sidebar` | サイドバー表示 |
+| app-launch.spec.ts | `should display navigation links` | ナビゲーションリンク |
+| app-launch.spec.ts | `should display profile selector` | プロファイル選択 |
+| app-launch.spec.ts | `should have no console errors` | コンソールエラーなし |
+| app-launch.spec.ts | `should respond within acceptable time` | 応答時間確認 |
+| navigation.spec.ts | `should navigate to Dashboard page` | Dashboard遷移 |
+| navigation.spec.ts | `should navigate to Registry page` | Registry遷移 |
+| navigation.spec.ts | `should navigate to Collection page` | Collection遷移 |
+| navigation.spec.ts | `should navigate to Annotation page` | Annotation遷移 |
+| navigation.spec.ts | `should navigate to Training page` | Training遷移 |
+| navigation.spec.ts | `should navigate to Evaluation page` | Evaluation遷移 |
+| navigation.spec.ts | `should navigate to Settings page` | Settings遷移 |
+| navigation.spec.ts | `should navigate between pages using sidebar` | サイドバーナビゲーション |
+| navigation.spec.ts | `should handle browser back/forward` | ブラウザ履歴操作 |
+
+### 5.3 ページ別テスト概要
+
+| ページ | テスト数 | 主なテスト内容 |
+|-------|---------|--------------|
+| Dashboard | 13 | 統計表示、パイプラインステータス、カテゴリ進捗 |
+| Registry | 15 | タブ切り替え、オブジェクト追加フォーム、フィルタリング |
+| Collection | 12 | オブジェクト選択、収集方法タブ、ファイルアップロード |
+| Annotation | 13 | タブ切り替え、クラス選択、デバイス選択、セッション管理 |
+| Training | 20 | 設定タブ、データセット選択、GPU状態、モデル管理 |
+| Evaluation | 16 | 評価実行、競技要件表示、ビジュアルテスト、ロバスト性テスト |
+| Settings | 17 | プロファイル管理、データ管理、カテゴリ追加、システム状態 |
+
+### 5.4 E2Eテスト実行方法
+
+```bash
+# セットアップ
+cd tests/e2e
+npm install
+npx playwright install chromium
+
+# Docker起動（別ターミナル）
+docker compose up -d
+
+# テスト実行
+npm test                                    # 全テスト
+npm run test:ui                             # UIモード
+npx playwright test smoke/                  # Smokeテストのみ
+npx playwright test pages/dashboard.spec.ts # 特定ページのみ
+
+# レポート表示
+npx playwright show-report
+```
+
+### 5.5 Streamlit E2Eテストの注意点
+
+1. **セレクタ戦略**: Streamlitの`data-testid`属性を活用
+   - `[data-testid="stAppViewContainer"]` - アプリコンテナ
+   - `[data-testid="stSidebar"]` - サイドバー
+   - `[data-testid="stSelectbox"]` - セレクトボックス
+   - `[data-testid="stButton"]` - ボタン
+
+2. **待機戦略**: Streamlitのrerun処理に対応
+   - `waitForAppLoad()` - 初期読み込み待機
+   - `waitForRerun()` - 状態変更後の再描画待機
+   - `waitForSpinnerClear()` - ローディング完了待機
+
+3. **並列実行**: Streamlitのセッション状態の都合上、単一ワーカーで順次実行
+
+4. **タイムアウト設定**: Streamlitの応答に合わせて拡張
+   - `actionTimeout: 15000` (15秒)
+   - `navigationTimeout: 30000` (30秒)
+   - `testTimeout: 60000` (60秒)
