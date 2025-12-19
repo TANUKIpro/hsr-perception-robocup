@@ -114,73 +114,6 @@ def _get_active_training_task(task_manager: TaskManager) -> "Task | None":
     return None
 
 
-def _merge_synthetic_images(
-    path_coordinator: PathCoordinator,
-    dataset_path: Path,
-    synthetic_sessions: list[str],
-) -> int:
-    """
-    Merge synthetic images into the training dataset.
-
-    Synthetic images are copied directly to the training set (not validation)
-    because they are generated from real training data.
-
-    Args:
-        path_coordinator: PathCoordinator instance
-        dataset_path: Path to the dataset directory (containing images/train, labels/train)
-        synthetic_sessions: List of synthetic session names to include
-
-    Returns:
-        Number of synthetic images added
-    """
-    import shutil
-
-    synthetic_dir = path_coordinator.get_path("synthetic_dir")
-    train_images_dir = dataset_path / "images" / "train"
-    train_labels_dir = dataset_path / "labels" / "train"
-
-    # Ensure directories exist
-    train_images_dir.mkdir(parents=True, exist_ok=True)
-    train_labels_dir.mkdir(parents=True, exist_ok=True)
-
-    added_count = 0
-
-    for session_name in synthetic_sessions:
-        session_path = synthetic_dir / session_name
-        if not session_path.exists():
-            continue
-
-        images_dir = session_path / "images"
-        labels_dir = session_path / "labels"
-
-        if not images_dir.exists() or not labels_dir.exists():
-            continue
-
-        # Find all image-label pairs
-        images = list(images_dir.glob("*.jpg")) + list(images_dir.glob("*.png"))
-
-        for image_path in images:
-            label_path = labels_dir / f"{image_path.stem}.txt"
-            if not label_path.exists():
-                continue
-
-            # Generate unique filename with synthetic prefix
-            new_name = f"synthetic_{session_name}_{image_path.stem}"
-
-            # Copy image
-            image_dest = train_images_dir / f"{new_name}{image_path.suffix}"
-            if not image_dest.exists():  # Avoid duplicates
-                shutil.copy2(image_path, image_dest)
-
-                # Copy label
-                label_dest = train_labels_dir / f"{new_name}.txt"
-                shutil.copy2(label_path, label_dest)
-
-                added_count += 1
-
-    return added_count
-
-
 def _render_active_training_view(active_task: "Task", task_manager: TaskManager, path_coordinator: PathCoordinator) -> None:
     """Render the active training view with Mission Control aesthetic."""
     task = task_manager.get_task(active_task.task_id)
@@ -568,8 +501,8 @@ def _render_synthetic_section(path_coordinator: PathCoordinator) -> None:
     )
 
     if not enable_dynamic_synthetic:
-        st.info("Dynamic generation disabled. You can still use pre-generated synthetic sessions below.")
-        _render_static_synthetic_selection(path_coordinator)
+        st.info("Dynamic generation disabled.")
+        st.session_state["synthetic_config"] = {"enabled": False}
         return
 
     # Check prerequisites
@@ -778,78 +711,6 @@ def _render_synthetic_section(path_coordinator: PathCoordinator) -> None:
     # Auto-save UI settings when synthetic config changes
     if "ui_settings_manager" in st.session_state:
         st.session_state.ui_settings_manager.save_from_session_state()
-
-    st.markdown("---")
-
-    # Also show static synthetic session selection as fallback
-    _render_static_synthetic_selection(path_coordinator)
-
-
-def _render_static_synthetic_selection(path_coordinator: PathCoordinator) -> None:
-    """Render static synthetic session selection (pre-generated sessions)."""
-    synthetic_sessions = path_coordinator.get_synthetic_sessions()
-    selected_synthetic = []
-
-    if synthetic_sessions:
-        st.html(f"""
-        <div style="
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.9rem;
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        ">
-            <span>📁</span>
-            <span>Pre-generated Synthetic Sessions</span>
-        </div>
-        """)
-
-        with st.expander("Select pre-generated synthetic images for training", expanded=False):
-            st.info("Synthetic images will be added to training set only (not validation).")
-
-            for session in synthetic_sessions:
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    if st.checkbox(
-                        f"{session['name']}",
-                        value=False,
-                        key=f"static_synthetic_{session['name']}",
-                        help=f"Created: {session['created'][:10]}"
-                    ):
-                        selected_synthetic.append(session['name'])
-                with col2:
-                    st.html(f"""
-                    <div style="
-                        font-family: 'JetBrains Mono', monospace;
-                        font-size: 0.85rem;
-                        opacity: 0.7;
-                        padding-top: 4px;
-                    ">{session['image_count']} images</div>
-                    """)
-
-            if selected_synthetic:
-                total_synthetic = sum(
-                    s['image_count'] for s in synthetic_sessions
-                    if s['name'] in selected_synthetic
-                )
-                st.html(f"""
-                <div style="
-                    border-radius: 8px;
-                    padding: 12px;
-                    margin-top: 12px;
-                    background: {COLORS["accent_primary"]}15;
-                ">
-                    <span style="
-                        font-family: 'JetBrains Mono', monospace;
-                        font-size: 0.85rem;
-                        color: {COLORS["accent_primary"]};
-                    ">+{total_synthetic} pre-generated synthetic images will be added to training</span>
-                </div>
-                """)
-
-    # Store selected static synthetic sessions in session state
-    st.session_state["selected_synthetic_sessions"] = selected_synthetic
 
 
 @st.cache_resource
@@ -1138,7 +999,6 @@ def _render_start_button(
 
     # Get synthetic config from session state
     synthetic_config = st.session_state.get("synthetic_config", {"enabled": False})
-    selected_synthetic_sessions = st.session_state.get("selected_synthetic_sessions", [])
 
     # Determine actual model and batch size
     tier_models = {
@@ -1232,33 +1092,12 @@ def _render_start_button(
             auto_scale=auto_scale
         )
 
-    if selected_synthetic_sessions:
-        total_static = sum(
-            s['image_count'] for s in path_coordinator.get_synthetic_sessions()
-            if s['name'] in selected_synthetic_sessions
-        )
-        st.info(f"📁 +{total_static} pre-generated synthetic images will be added")
-
     st.markdown("<div style='height: 24px'></div>", unsafe_allow_html=True)
 
     # Start button
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if st.button("🚀 Start Training", type="primary", use_container_width=True):
-            # Merge static synthetic images if any are selected
-            final_data_yaml = data_yaml
-            synthetic_added = 0
-
-            if selected_synthetic_sessions and data_yaml:
-                with st.spinner("Merging synthetic images into training dataset..."):
-                    synthetic_added = _merge_synthetic_images(
-                        path_coordinator=path_coordinator,
-                        dataset_path=Path(data_yaml).parent,
-                        synthetic_sessions=selected_synthetic_sessions,
-                    )
-                    if synthetic_added > 0:
-                        st.success(f"Added {synthetic_added} static synthetic images to training set")
-
             # Build synthetic config for dynamic generation
             synth_config_for_training = None
             if synthetic_config.get("enabled"):
@@ -1276,7 +1115,7 @@ def _render_start_button(
                 }
 
             task_id = task_manager.start_training(
-                dataset_yaml=str(final_data_yaml),
+                dataset_yaml=str(data_yaml),
                 base_model=base_model,
                 output_dir=str(path_coordinator.get_path("finetuned_dir")),
                 epochs=epochs,
@@ -1290,10 +1129,8 @@ def _render_start_button(
             )
 
             synth_msg = ""
-            if synthetic_added > 0:
-                synth_msg += f" (+{synthetic_added} static synthetic)"
             if synthetic_config.get("enabled"):
-                synth_msg += " (dynamic generation enabled)"
+                synth_msg = " (dynamic generation enabled)"
 
             st.html(f"""
             <div class="mc-validation success mc-animate-fade" style="margin-top: 16px;">

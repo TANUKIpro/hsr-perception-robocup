@@ -51,7 +51,6 @@ class ProfileManager:
     PROFILE_SUBDIRS = [
         "app_data",
         "app_data/thumbnails",
-        "app_data/collected_images",
         "app_data/reference_images",
         "app_data/tasks",
         "datasets",

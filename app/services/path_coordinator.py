@@ -6,13 +6,12 @@ Handles path translation, symlink creation, and directory management.
 Supports profile-based data isolation.
 """
 
-import os
 import shutil
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Union, TYPE_CHECKING
-import json
+
 import streamlit as st
 
 if TYPE_CHECKING:
@@ -72,32 +71,6 @@ def _cached_get_trained_models(finetuned_dir: str) -> List[Dict[str, str]]:
 
 
 @st.cache_data(ttl=30, show_spinner=False)
-def _cached_get_synthetic_sessions(synthetic_dir: str) -> List[Dict[str, str]]:
-    """Cached version of synthetic session scanning."""
-    synthetic_path = Path(synthetic_dir)
-    sessions = []
-
-    if not synthetic_path.exists():
-        return sessions
-
-    for session_dir in sorted(synthetic_path.iterdir(), reverse=True):
-        if session_dir.is_dir():
-            images_dir = session_dir / "images"
-            image_count = 0
-            if images_dir.exists():
-                image_count = len(list(images_dir.glob("*.jpg"))) + len(list(images_dir.glob("*.png")))
-
-            sessions.append({
-                "name": session_dir.name,
-                "path": str(session_dir),
-                "image_count": image_count,
-                "created": datetime.fromtimestamp(session_dir.stat().st_ctime).isoformat(),
-            })
-
-    return sessions
-
-
-@st.cache_data(ttl=30, show_spinner=False)
 def _cached_get_background_images(backgrounds_dir: str) -> List[Dict[str, str]]:
     """Cached version of background image scanning."""
     backgrounds_path = Path(backgrounds_dir)
@@ -152,7 +125,6 @@ class PathConfig:
 
     # App data paths (relative to profile root)
     app_data_dir: str = "app_data"
-    app_collected_dir: str = "app_data/collected_images"
     app_reference_dir: str = "app_data/reference_images"
     app_tasks_dir: str = "app_data/tasks"
     app_registry_file: str = "app_data/object_registry.json"
@@ -164,7 +136,6 @@ class PathConfig:
     annotated_dir: str = "datasets/annotated"
     backgrounds_dir: str = "datasets/backgrounds"
     videos_dir: str = "datasets/videos"
-    synthetic_dir: str = "datasets/synthetic"
 
     # Model paths - finetuned is profile-specific
     finetuned_dir: str = "models/finetuned"
@@ -183,7 +154,6 @@ class PathCoordinator:
     Provides:
     - Profile-aware path resolution
     - Path resolution relative to project root for shared resources
-    - Symlink management for data migration
     - Session-based output directory creation
     - Path validation utilities
 
@@ -198,9 +168,6 @@ class PathCoordinator:
 
         # Prepare paths for annotation
         paths = coordinator.prepare_annotation_paths()
-
-        # Sync app data to datasets directory
-        coordinator.sync_app_to_datasets("apple")
     """
 
     # Paths that are shared across all profiles (resolved from project root)
@@ -254,7 +221,6 @@ class PathCoordinator:
         # Profile-specific directories
         profile_directories = [
             self.config.app_data_dir,
-            self.config.app_collected_dir,
             self.config.app_reference_dir,
             self.config.app_tasks_dir,
             self.config.app_thumbnails_dir,
@@ -263,7 +229,6 @@ class PathCoordinator:
             self.config.annotated_dir,
             self.config.backgrounds_dir,
             self.config.videos_dir,
-            self.config.synthetic_dir,
             self.config.finetuned_dir,
         ]
 
@@ -347,82 +312,6 @@ class PathCoordinator:
     def get_profile_manager(self) -> "ProfileManager":
         """Get the profile manager instance."""
         return self._profile_manager
-
-    # ========== Data Synchronization ==========
-
-    def sync_app_to_datasets(self, object_name: str, force: bool = False) -> Path:
-        """
-        Sync collected images from app directory to datasets directory.
-
-        Creates a symlink from datasets/raw_captures/{object_name} to
-        app_data/collected_images/{object_name}.
-
-        Args:
-            object_name: Name of the object (used as directory name)
-            force: If True, overwrite existing link/directory
-
-        Returns:
-            Path to the synced directory in datasets/
-
-        Raises:
-            FileNotFoundError: If source directory doesn't exist
-        """
-        app_dir = self.get_path("app_collected_dir") / object_name
-        dataset_dir = self.get_path("raw_captures_dir") / object_name
-
-        if not app_dir.exists():
-            raise FileNotFoundError(f"No collected images for: {object_name} at {app_dir}")
-
-        # Handle existing target
-        if dataset_dir.exists() or dataset_dir.is_symlink():
-            if not force:
-                # If it's already a symlink to the right place, return
-                if dataset_dir.is_symlink() and dataset_dir.resolve() == app_dir.resolve():
-                    return dataset_dir
-                # If real directory exists with data, return it
-                if dataset_dir.is_dir() and not dataset_dir.is_symlink():
-                    return dataset_dir
-
-            # Remove existing link or empty directory
-            if dataset_dir.is_symlink():
-                dataset_dir.unlink()
-            elif dataset_dir.is_dir() and not any(dataset_dir.iterdir()):
-                dataset_dir.rmdir()
-            else:
-                # Non-empty directory, don't overwrite
-                return dataset_dir
-
-        # Create symlink
-        if os.name == 'nt':
-            # Windows: use directory junction
-            import subprocess
-            subprocess.run(
-                ['cmd', '/c', 'mklink', '/J', str(dataset_dir), str(app_dir)],
-                check=True, capture_output=True
-            )
-        else:
-            # Unix: create symlink
-            dataset_dir.symlink_to(app_dir.absolute())
-
-        return dataset_dir
-
-    def sync_all_objects(self, object_names: List[str]) -> Dict[str, Path]:
-        """
-        Sync all registered objects to datasets directory.
-
-        Args:
-            object_names: List of object names to sync
-
-        Returns:
-            Dictionary mapping object name to synced path
-        """
-        synced = {}
-        for name in object_names:
-            try:
-                synced[name] = self.sync_app_to_datasets(name)
-            except FileNotFoundError:
-                pass  # Skip objects without collected images
-        return synced
 
     # ========== Session Management ==========
 
@@ -535,39 +424,6 @@ class PathCoordinator:
                 models.append(model)
 
         return models
-
-    # ========== Copy-Paste Augmentation Paths ==========
-
-    def get_synthetic_session_dir(self, session_name: Optional[str] = None) -> Path:
-        """
-        Get directory for a synthetic data generation session.
-
-        Args:
-            session_name: Optional session name. If None, generates timestamp-based name.
-
-        Returns:
-            Path to synthetic session directory
-        """
-        if session_name is None:
-            session_name = datetime.now().strftime("synthetic_%Y%m%d_%H%M%S")
-
-        session_dir = self.get_path("synthetic_dir") / session_name
-        session_dir.mkdir(parents=True, exist_ok=True)
-        return session_dir
-
-    def get_synthetic_sessions(self) -> List[Dict[str, str]]:
-        """
-        Get list of existing synthetic data sessions.
-
-        Returns:
-            List of session info dictionaries with keys:
-            - name: Session name
-            - path: Session directory path
-            - image_count: Number of images in session
-            - created: Creation timestamp
-        """
-        synthetic_dir = self.get_path("synthetic_dir")
-        return _cached_get_synthetic_sessions(str(synthetic_dir))
 
     # ========== Background Images ==========
 
