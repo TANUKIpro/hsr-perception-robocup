@@ -246,36 +246,48 @@ def render_dataset_preparation_panel(
         )
 
     with col2:
+        # Use saved value from session state if available
+        default_val_ratio = st.session_state.get("val_ratio", 0.2)
         val_ratio = st.slider(
             "Validation Ratio",
             min_value=0.1,
             max_value=0.4,
-            value=0.2,
+            value=default_val_ratio,
             step=0.05,
-            help="Proportion of data to use for validation"
+            help="Proportion of data to use for validation",
+            key="val_ratio"
         )
 
     # Frame grouping settings (to prevent data leakage)
     with st.expander("🔧 Advanced Split Settings", expanded=False):
+        # Use saved values from session state if available
+        default_group_continuous = st.session_state.get("group_continuous", True)
         group_frames = st.checkbox(
             "Group continuous frames",
-            value=True,
+            value=default_group_continuous,
             help="Group frames captured in quick succession to prevent data leakage. "
-                 "Ensures similar images from burst captures stay in the same split."
+                 "Ensures similar images from burst captures stay in the same split.",
+            key="group_continuous"
         )
 
         if group_frames:
+            default_group_interval = st.session_state.get("group_interval", 2.0)
             group_interval = st.slider(
                 "Group interval (seconds)",
                 min_value=0.5,
                 max_value=5.0,
-                value=2.0,
+                value=default_group_interval,
                 step=0.5,
                 help="Maximum time between frames to be grouped together. "
-                     "Frames within this interval will be kept in the same train/val split."
+                     "Frames within this interval will be kept in the same train/val split.",
+                key="group_interval"
             )
         else:
             group_interval = 2.0
+
+    # Auto-save UI settings when dataset preparation parameters change
+    if "ui_settings_manager" in st.session_state:
+        st.session_state.ui_settings_manager.save_from_session_state()
 
     st.markdown("<div style='height: 16px'></div>", unsafe_allow_html=True)
 

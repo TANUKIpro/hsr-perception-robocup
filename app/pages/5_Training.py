@@ -15,6 +15,7 @@ Integrates with scripts/training/quick_finetune.py via TaskManager.
 import streamlit as st
 from pathlib import Path
 import sys
+import importlib
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -720,40 +721,45 @@ def _render_synthetic_section(path_coordinator: PathCoordinator) -> None:
     if st.button("🔄 Generate Preview", key="synth_preview_btn"):
         import time
         st.session_state["synth_preview_seed"] = int(time.time() * 1000) % (2**31)
+        st.session_state["synth_preview_generated"] = True
 
-    # Generate and display preview images
-    try:
-        # Use already loaded annotation module for _generate_preview_images
-        previews = annotation_module._generate_preview_images(
-            path_coordinator=path_coordinator,
-            selected_classes=list(mask_stats.keys()),
-            scale_range=(scale_min, scale_max),
-            enable_white_balance=enable_white_balance,
-            max_objects=max_objects,
-            seed=st.session_state["synth_preview_seed"],
-            num_samples=3,
-            rotation_range=(float(rotation_min), float(rotation_max)),
-            enable_horizontal_flip=True,
-            enable_vertical_flip=False,
-            white_balance_strength=white_balance_strength,
-            edge_blur_sigma=edge_blur_sigma,
-            min_objects=1,
-        )
+    # Generate and display preview images only when button is clicked
+    if st.session_state.get("synth_preview_generated", False):
+        try:
+            # Import annotation page module dynamically (filename starts with number)
+            annotation_page = importlib.import_module("pages.4_Annotation")
+            previews = annotation_page._generate_preview_images(
+                path_coordinator=path_coordinator,
+                selected_classes=list(mask_stats.keys()),
+                scale_range=(scale_min, scale_max),
+                enable_white_balance=enable_white_balance,
+                max_objects=max_objects,
+                seed=st.session_state["synth_preview_seed"],
+                num_samples=3,
+                rotation_range=(float(rotation_min), float(rotation_max)),
+                enable_horizontal_flip=True,
+                enable_vertical_flip=False,
+                white_balance_strength=white_balance_strength,
+                edge_blur_sigma=edge_blur_sigma,
+                min_objects=1,
+            )
 
-        if previews:
-            preview_cols = st.columns(3)
-            for idx, (image, class_names_in_img) in enumerate(previews):
-                with preview_cols[idx]:
-                    st.image(image, use_container_width=True)
-                    if class_names_in_img:
-                        st.caption(f"Classes: {', '.join(class_names_in_img)}")
-                    else:
-                        st.caption("No objects placed")
-        else:
-            st.info("Could not generate preview. Check masks and backgrounds.")
+            if previews:
+                preview_cols = st.columns(3)
+                for idx, (image, class_names_in_img) in enumerate(previews):
+                    with preview_cols[idx]:
+                        st.image(image, use_container_width=True)
+                        if class_names_in_img:
+                            st.caption(f"Classes: {', '.join(class_names_in_img)}")
+                        else:
+                            st.caption("No objects placed")
+            else:
+                st.info("Could not generate preview. Check masks and backgrounds.")
 
-    except Exception as e:
-        st.warning(f"Preview generation failed: {str(e)}")
+        except Exception as e:
+            st.warning(f"Preview generation failed: {str(e)}")
+    else:
+        st.info("Click 'Generate Preview' to see sample synthetic images.")
 
     # Store configuration in session state
     st.session_state["synthetic_config"] = {
@@ -768,6 +774,10 @@ def _render_synthetic_section(path_coordinator: PathCoordinator) -> None:
         "backgrounds_dir": str(backgrounds_dir),
         "annotated_dir": str(annotated_dir),
     }
+
+    # Auto-save UI settings when synthetic config changes
+    if "ui_settings_manager" in st.session_state:
+        st.session_state.ui_settings_manager.save_from_session_state()
 
     st.markdown("---")
 

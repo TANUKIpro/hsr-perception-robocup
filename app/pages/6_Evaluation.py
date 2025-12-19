@@ -88,6 +88,10 @@ def show_evaluation_page() -> None:
     with tab5:
         _render_xtion_live_test(path_coordinator)
 
+    # Auto-save UI settings when evaluation parameters change
+    if "ui_settings_manager" in st.session_state:
+        st.session_state.ui_settings_manager.save_from_session_state()
+
 
 def _render_run_evaluation(task_manager: TaskManager, path_coordinator: PathCoordinator) -> None:
     """Render evaluation configuration and run section."""
