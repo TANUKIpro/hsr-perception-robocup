@@ -112,14 +112,13 @@ class ObjectRegistry:
         self.data_dir = self._path_coordinator.get_path("app_data_dir")
         self.registry_file = self._path_coordinator.get_path("app_registry_file")
         self.reference_images_dir = self._path_coordinator.get_path("app_reference_dir")
-        self.collected_images_dir = self._path_coordinator.get_path("app_collected_dir")
         self.raw_captures_dir = self._path_coordinator.get_path("raw_captures_dir")
         self.thumbnails_dir = self._path_coordinator.get_path("app_thumbnails_dir")
 
         # Create directories
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.reference_images_dir.mkdir(exist_ok=True)
-        self.collected_images_dir.mkdir(exist_ok=True)
+        self.raw_captures_dir.mkdir(exist_ok=True)
         self.thumbnails_dir.mkdir(exist_ok=True)
 
         # Load or initialize registry
@@ -159,7 +158,7 @@ class ObjectRegistry:
         self.objects[obj.id] = obj
 
         # Create directory for collected images
-        obj_dir = self.collected_images_dir / obj.name
+        obj_dir = self.raw_captures_dir / obj.name
         obj_dir.mkdir(exist_ok=True)
 
         self._save()
@@ -219,11 +218,11 @@ class ObjectRegistry:
         # Handle name change (requires renaming directories)
         if 'name' in updates and updates['name'] != old_name:
             new_name = updates['name']
-            # Rename collected images directory
-            old_collected_dir = self.collected_images_dir / old_name
-            new_collected_dir = self.collected_images_dir / new_name
-            if old_collected_dir.exists():
-                old_collected_dir.rename(new_collected_dir)
+            # Rename raw captures directory
+            old_captures_dir = self.raw_captures_dir / old_name
+            new_captures_dir = self.raw_captures_dir / new_name
+            if old_captures_dir.exists():
+                old_captures_dir.rename(new_captures_dir)
             # Rename reference images directory
             old_ref_dir = self.reference_images_dir / old_name
             new_ref_dir = self.reference_images_dir / new_name
@@ -333,7 +332,7 @@ class ObjectRegistry:
     # Collection Management
     def get_collected_images_dir(self, obj_name: str) -> Path:
         """Get directory for collected images of an object."""
-        obj_dir = self.collected_images_dir / obj_name
+        obj_dir = self.raw_captures_dir / obj_name
         obj_dir.mkdir(exist_ok=True)
         return obj_dir
 
@@ -380,13 +379,11 @@ class ObjectRegistry:
         extensions = [".jpg", ".jpeg", ".png", ".bmp"]
         images = []
 
-        # Check both collected_images_dir and raw_captures_dir
-        for base_dir in [self.collected_images_dir, self.raw_captures_dir]:
-            obj_dir = base_dir / obj.name
-            if obj_dir.exists():
-                for f in sorted(obj_dir.iterdir()):
-                    if f.suffix.lower() in extensions:
-                        images.append(str(f))
+        obj_dir = self.raw_captures_dir / obj.name
+        if obj_dir.exists():
+            for f in sorted(obj_dir.iterdir()):
+                if f.suffix.lower() in extensions:
+                    images.append(str(f))
 
         return images
 
