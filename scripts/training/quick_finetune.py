@@ -52,6 +52,20 @@ from .memory_utils import full_training_cleanup, cleanup_cuda_memory, log_memory
 sys.path.insert(0, str(_scripts_dir / "augmentation"))
 from augmentation.copy_paste_augmentor import CopyPasteAugmentor, CopyPasteConfig
 
+# Keys that should NOT be passed to YOLO's train() method
+SYNTHETIC_CONFIG_KEYS = {
+    "dynamic_synthetic_enabled",
+    "backgrounds_dir",
+    "annotated_dir",
+    "synthetic_ratio",
+    "synthetic_scale_range",
+    "synthetic_rotation_range",
+    "synthetic_white_balance",
+    "synthetic_white_balance_strength",
+    "synthetic_edge_blur",
+    "synthetic_max_objects",
+}
+
 # Competition-optimized training configuration (legacy compatibility)
 # Updated for better generalization based on Tier 1 recommendations
 COMPETITION_CONFIG = {
@@ -589,9 +603,10 @@ class CompetitionTrainer:
         )
 
         # Build overrides for LLRDDetectionTrainer
-        # Remove LLRD-specific keys from config
+        # Remove LLRD-specific keys and synthetic keys from config
+        excluded_keys = {"llrd_enabled", "llrd_decay_rate"} | SYNTHETIC_CONFIG_KEYS
         trainer_config = {k: v for k, v in self.config.items()
-                         if k not in ("llrd_enabled", "llrd_decay_rate")}
+                         if k not in excluded_keys}
 
         overrides = {
             "data": dataset_yaml,
@@ -699,13 +714,15 @@ class CompetitionTrainer:
 
                     while True:
                         try:
+                            # Filter out synthetic keys before passing to YOLO
+                            yolo_config = {k: v for k, v in current_config.items() if k not in SYNTHETIC_CONFIG_KEYS}
                             results = model.train(
                                 data=dataset_yaml,
                                 project=str(self.output_dir),
                                 name=self.run_name,
                                 resume=resume,
                                 verbose=verbose,
-                                **current_config,
+                                **yolo_config,
                             )
                             break  # Success
 
@@ -742,13 +759,15 @@ class CompetitionTrainer:
                             else:
                                 raise
                 else:
+                    # Filter out synthetic keys before passing to YOLO
+                    yolo_config = {k: v for k, v in self.config.items() if k not in SYNTHETIC_CONFIG_KEYS}
                     results = model.train(
                         data=dataset_yaml,
                         project=str(self.output_dir),
                         name=self.run_name,
                         resume=resume,
                         verbose=verbose,
-                        **self.config,
+                        **yolo_config,
                     )
 
             training_time = (time.time() - start_time) / 60  # minutes

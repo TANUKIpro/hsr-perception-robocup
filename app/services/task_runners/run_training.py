@@ -238,32 +238,32 @@ def main():
             except Exception as e:
                 print(f"Warning: Error applying advanced parameters: {e}")
 
-        # Apply synthetic config
+        # Keys that should NOT be passed to YOLO's train() method
+        SYNTHETIC_CONFIG_KEYS = {
+            "dynamic_synthetic_enabled",
+            "backgrounds_dir",
+            "annotated_dir",
+            "synthetic_ratio",
+            "synthetic_scale_range",
+            "synthetic_rotation_range",
+            "synthetic_white_balance",
+            "synthetic_white_balance_strength",
+            "synthetic_edge_blur",
+            "synthetic_max_objects",
+        }
+
+        # Apply synthetic config (stored separately, not added to YOLO config)
+        synthetic_config = {}
         if args.synthetic_config:
             try:
                 import json
                 synthetic = json.loads(args.synthetic_config)
 
-                # Whitelist validation for security
-                allowed_synthetic_keys = {
-                    "dynamic_synthetic_enabled",
-                    "backgrounds_dir",
-                    "annotated_dir",
-                    "synthetic_ratio",
-                    "synthetic_scale_range",
-                    "synthetic_rotation_range",
-                    "synthetic_white_balance",
-                    "synthetic_white_balance_strength",
-                    "synthetic_edge_blur",
-                    "synthetic_max_objects",
-                }
-
                 # Filter to only allowed keys
-                filtered_synthetic = {k: v for k, v in synthetic.items() if k in allowed_synthetic_keys}
-                config.update(filtered_synthetic)
+                synthetic_config = {k: v for k, v in synthetic.items() if k in SYNTHETIC_CONFIG_KEYS}
 
-                print(f"Applied {len(filtered_synthetic)} synthetic generation parameters:")
-                for key, value in filtered_synthetic.items():
+                print(f"Parsed {len(synthetic_config)} synthetic generation parameters:")
+                for key, value in synthetic_config.items():
                     print(f"  {key}: {value}")
 
             except json.JSONDecodeError as e:
@@ -289,11 +289,14 @@ def main():
             tasks_dir=tasks_dir
         )
 
-        # Create trainer
+        # Create trainer with synthetic config merged for _generate_dynamic_synthetic
+        trainer_config = config.copy()
+        trainer_config.update(synthetic_config)
+
         trainer = CompetitionTrainer(
             base_model=args.model or config.get("model", "yolov8m.pt"),
             output_dir=args.output,
-            config=config,
+            config=trainer_config,
             auto_scale=False,  # Already scaled above
             tensorboard=tensorboard_enabled,
             tensorboard_port=args.tensorboard_port,
@@ -352,6 +355,12 @@ def main():
         if not trainer._validate_dataset(args.dataset):
             raise ValueError("Dataset validation failed")
 
+        # Generate dynamic synthetic images if enabled
+        dataset_dir_for_synthetic = Path(args.dataset).resolve().parent
+        synthetic_added = trainer._generate_dynamic_synthetic(dataset_dir_for_synthetic)
+        if synthetic_added > 0:
+            print(f"Added {synthetic_added} dynamic synthetic images to training set")
+
         # Change working directory to dataset directory for relative path resolution
         # This allows data.yaml to use "path: ." which works in both host and container
         import os
@@ -378,14 +387,15 @@ def main():
 
                 llrd_config = LLRDConfig(enabled=True, decay_rate=llrd_decay_rate)
 
-                # Build overrides for LLRD trainer
+                # Build overrides for LLRD trainer (filter out synthetic keys)
+                yolo_config = {k: v for k, v in config.items() if k not in SYNTHETIC_CONFIG_KEYS}
                 llrd_overrides = {
                     "data": str(dataset_path),
                     "model": base_model,
                     "project": str(trainer.output_dir),
                     "name": trainer.run_name,
                     "verbose": True,
-                    **config,
+                    **yolo_config,
                 }
 
                 llrd_trainer = LLRDDetectionTrainer(
@@ -409,13 +419,14 @@ def main():
                 # Train with LLRD
                 results = llrd_trainer.train()
             else:
-                # Use standard YOLO training
+                # Use standard YOLO training (filter out synthetic keys)
+                yolo_config = {k: v for k, v in config.items() if k not in SYNTHETIC_CONFIG_KEYS}
                 results = model.train(
                     data=str(dataset_path),  # Use resolved absolute path
                     project=str(trainer.output_dir),
                     name=trainer.run_name,
                     verbose=True,
-                    **config,
+                    **yolo_config,
                 )
 
             training_time = (time.time() - start_time) / 60  # minutes
