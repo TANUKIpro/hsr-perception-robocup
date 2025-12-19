@@ -11,6 +11,10 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './specs',
 
+  // Global setup and teardown for test profile management
+  globalSetup: require.resolve('./fixtures/setup/global-setup'),
+  globalTeardown: require.resolve('./fixtures/setup/global-teardown'),
+
   // Streamlit requires sequential execution due to session state
   fullyParallel: false,
   workers: 1,

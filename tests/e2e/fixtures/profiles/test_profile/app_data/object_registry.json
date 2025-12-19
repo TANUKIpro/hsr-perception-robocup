@@ -1,0 +1,71 @@
+{
+  "version": "1.0.0",
+  "updated_at": "2025-01-01T00:00:00.000000",
+  "categories": [
+    "Food",
+    "Drink",
+    "Kitchen Item",
+    "Task Item",
+    "Bag",
+    "Other"
+  ],
+  "objects": [
+    {
+      "id": 1,
+      "name": "noodles",
+      "display_name": "Noodles",
+      "category": "Food",
+      "versions": [],
+      "properties": {
+        "is_heavy": false,
+        "is_tiny": false,
+        "has_liquid": false,
+        "size_cm": null,
+        "grasp_strategy": null
+      },
+      "remarks": "",
+      "target_samples": 100,
+      "collected_samples": 200,
+      "last_updated": "2025-01-01T00:00:00.000000",
+      "thumbnail_path": null
+    },
+    {
+      "id": 2,
+      "name": "cup",
+      "display_name": "Cup",
+      "category": "Kitchen Item",
+      "versions": [],
+      "properties": {
+        "is_heavy": false,
+        "is_tiny": false,
+        "has_liquid": false,
+        "size_cm": null,
+        "grasp_strategy": null
+      },
+      "remarks": "",
+      "target_samples": 100,
+      "collected_samples": 200,
+      "last_updated": "2025-01-01T00:00:00.000000",
+      "thumbnail_path": null
+    },
+    {
+      "id": 3,
+      "name": "dice",
+      "display_name": "Dice",
+      "category": "Task Item",
+      "versions": [],
+      "properties": {
+        "is_heavy": false,
+        "is_tiny": false,
+        "has_liquid": false,
+        "size_cm": null,
+        "grasp_strategy": null
+      },
+      "remarks": "",
+      "target_samples": 100,
+      "collected_samples": 0,
+      "last_updated": "2025-01-01T00:00:00.000000",
+      "thumbnail_path": null
+    }
+  ]
+}

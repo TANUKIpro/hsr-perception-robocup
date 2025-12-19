@@ -1,0 +1,7 @@
+{
+  "id": "e2e_test",
+  "display_name": "E2E Test Profile",
+  "created_at": "2025-01-01T00:00:00.000000",
+  "last_accessed": null,
+  "description": "Playwright E2E test profile (auto-generated)"
+}
