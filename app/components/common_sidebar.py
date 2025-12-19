@@ -19,6 +19,7 @@ if str(app_dir) not in sys.path:
 from services.profile_manager import ProfileManager
 from services.path_coordinator import PathCoordinator
 from services.task_manager import TaskManager
+from services.ui_settings_manager import UISettingsManager
 from object_registry import ObjectRegistry
 
 
@@ -42,6 +43,16 @@ def _ensure_session_state() -> None:
             path_coordinator=st.session_state.path_coordinator
         )
 
+    # UI Settings Manager for persisting UI parameters
+    if "ui_settings_manager" not in st.session_state:
+        st.session_state.ui_settings_manager = UISettingsManager(
+            path_coordinator=st.session_state.path_coordinator
+        )
+
+    # Load UI settings on first run
+    if "_ui_settings_loaded" not in st.session_state:
+        st.session_state.ui_settings_manager.load_to_session_state()
+
     if "current_object_id" not in st.session_state:
         st.session_state.current_object_id = None
 
@@ -57,6 +68,14 @@ def _reinitialize_services() -> None:
     st.session_state.task_manager = TaskManager(
         path_coordinator=st.session_state.path_coordinator
     )
+
+    # Reinitialize UI Settings Manager and reload settings for new profile
+    st.session_state.ui_settings_manager = UISettingsManager(
+        path_coordinator=st.session_state.path_coordinator
+    )
+    # Force reload of UI settings
+    st.session_state._ui_settings_loaded = False
+    st.session_state.ui_settings_manager.load_to_session_state()
 
 
 def _render_profile_selector() -> None:

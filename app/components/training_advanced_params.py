@@ -211,8 +211,14 @@ PRESETS = {
 
 def _ensure_session_state():
     """Ensure all advanced parameters are initialized in session state."""
+    # If settings were already loaded from file, don't override with defaults
+    if st.session_state.get("_ui_settings_loaded"):
+        if "adv_params_initialized" not in st.session_state:
+            st.session_state.adv_params_initialized = True
+        return
+
+    # Fallback: Load Competition preset as default if no persisted settings
     if "adv_params_initialized" not in st.session_state:
-        # Load Competition preset as default
         _load_preset("Competition")
         st.session_state.adv_params_initialized = True
         st.session_state.current_preset = "Competition"
@@ -241,6 +247,10 @@ def _on_preset_click(preset_name: str) -> None:
     """Callback for preset button click - updates session state without full rerun."""
     _load_preset(preset_name)
     st.session_state.current_preset = preset_name
+
+    # Auto-save settings to persist preset change
+    if "ui_settings_manager" in st.session_state:
+        st.session_state.ui_settings_manager.save_from_session_state()
 
 
 def _render_preset_selector() -> str:
