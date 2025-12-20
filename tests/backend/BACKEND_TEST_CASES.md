@@ -53,7 +53,7 @@
 
 ---
 
-### 1.2 test_constants.py ⬜
+### 1.2 test_constants.py ✅
 
 **ソースファイル**: `scripts/common/constants.py`
 
@@ -61,16 +61,41 @@
 
 **優先度**: ⬜ 低
 
+**状態**: 実装済み - `tests/backend/common/test_constants.py` (35テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestImageExtensions` | `test_supported_extensions()` | サポートする拡張子の確認 |
-| ⬜ | `TestCompetitionDefaults` | `test_default_sample_count()` | デフォルトサンプル数 |
-| ⬜ | `TestCompetitionDefaults` | `test_grouping_interval()` | グルーピング間隔 |
-| ⬜ | `TestModelDefaults` | `test_min_map_threshold()` | 最小mAP閾値 |
-| ⬜ | `TestModelDefaults` | `test_max_inference_time()` | 最大推論時間 |
-| ⬜ | `TestTrainingDefaults` | `test_default_model()` | デフォルトモデル |
-| ⬜ | `TestTrainingDefaults` | `test_batch_size_range()` | バッチサイズ範囲 |
-| ⬜ | `TestGPUScalingConstants` | `test_vram_thresholds()` | VRAM閾値 |
+| ✅ | `TestImageExtensions` | `test_image_extensions_is_tuple()` | IMAGE_EXTENSIONSがタプルであること |
+| ✅ | `TestImageExtensions` | `test_contains_common_formats()` | 一般的なフォーマット含有 |
+| ✅ | `TestImageExtensions` | `test_all_lowercase()` | すべて小文字 |
+| ✅ | `TestImageExtensions` | `test_all_start_with_dot()` | すべてドットで始まる |
+| ✅ | `TestCompetitionDefaults` | `test_default_target_samples()` | デフォルトサンプル数 |
+| ✅ | `TestCompetitionDefaults` | `test_default_group_interval()` | グルーピング間隔 |
+| ✅ | `TestCompetitionDefaults` | `test_default_burst_count()` | バースト数 |
+| ✅ | `TestCompetitionDefaults` | `test_default_burst_interval()` | バースト間隔 |
+| ✅ | `TestModelDefaults` | `test_target_map50()` | mAP50ターゲット |
+| ✅ | `TestModelDefaults` | `test_target_inference_ms()` | 推論時間ターゲット |
+| ✅ | `TestModelDefaults` | `test_default_confidence_threshold()` | 信頼度閾値 |
+| ✅ | `TestModelDefaults` | `test_default_iou_threshold()` | IoU閾値 |
+| ✅ | `TestTrainingDefaults` | `test_default_yolo_model()` | デフォルトモデル |
+| ✅ | `TestTrainingDefaults` | `test_default_epochs()` | デフォルトエポック数 |
+| ✅ | `TestTrainingDefaults` | `test_default_batch_size()` | デフォルトバッチサイズ |
+| ✅ | `TestTrainingDefaults` | `test_default_image_size()` | デフォルト画像サイズ |
+| ✅ | `TestTrainingDefaults` | `test_default_patience()` | デフォルトpatience |
+| ✅ | `TestGPUScalingConstants` | `test_gpu_vram_thresholds_is_dict()` | VRAM閾値が辞書 |
+| ✅ | `TestGPUScalingConstants` | `test_vram_thresholds_keys()` | VRAM閾値のキー |
+| ✅ | `TestGPUScalingConstants` | `test_vram_thresholds_values_are_positive()` | 閾値が正の値 |
+| ✅ | `TestGPUScalingConstants` | `test_batch_size_by_vram_is_dict()` | バッチサイズが辞書 |
+| ✅ | `TestGPUScalingConstants` | `test_workers_by_vram_is_dict()` | ワーカー数が辞書 |
+| ✅ | `TestPathConstants` | `test_default_output_dir()` | デフォルト出力ディレクトリ |
+| ✅ | `TestPathConstants` | `test_default_dataset_dir()` | デフォルトデータセットディレクトリ |
+| ✅ | `TestPathConstants` | `test_default_models_dir()` | デフォルトモデルディレクトリ |
+| ✅ | `TestAnnotationConstants` | `test_annotation_defaults()` | アノテーションデフォルト値 |
+| ✅ | `TestAnnotationConstants` | `test_sam2_defaults()` | SAM2デフォルト値 |
+| ✅ | `TestROSConstants` | `test_ros_topic_defaults()` | ROSトピックデフォルト |
+| ✅ | `TestROSConstants` | `test_ros_service_names()` | ROSサービス名 |
+| ✅ | `TestConstantsIntegrity` | `test_no_mutable_defaults()` | ミュータブルデフォルトなし |
+| ✅ | `TestConstantsIntegrity` | `test_constants_are_importable()` | インポート可能 |
 
 ---
 
@@ -399,7 +424,7 @@
 
 ---
 
-### 2.7 test_tensorboard_monitor.py ⬜
+### 2.7 test_tensorboard_monitor.py ✅
 
 **ソースファイル**: `scripts/training/tensorboard_monitor.py`
 
@@ -407,15 +432,39 @@
 
 **優先度**: ⬜ 低
 
+**状態**: 実装済み - `tests/backend/training/test_tensorboard_monitor.py` (41テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestCompetitionTensorBoardCallback` | `test_callback_creation()` | コールバック作成 |
-| ⬜ | `TestCompetitionTensorBoardCallback` | `test_log_metrics()` | メトリクスログ |
-| ⬜ | `TestCompetitionTensorBoardCallback` | `test_cleanup()` | クリーンアップ |
-| ⬜ | `TestTensorBoardServer` | `test_start_server()` | サーバー起動 |
-| ⬜ | `TestTensorBoardServer` | `test_stop_server()` | サーバー停止 |
-| ⬜ | `TestTensorBoardServer` | `test_get_url()` | URL取得 |
-| ⬜ | `TestTensorBoardManager` | `test_manager_lifecycle()` | マネージャライフサイクル |
+| ✅ | `TestTensorBoardConfig` | `test_default_values()` | デフォルト値確認 |
+| ✅ | `TestTensorBoardConfig` | `test_custom_values()` | カスタム値設定 |
+| ✅ | `TestTensorBoardConfig` | `test_to_dict()` | 辞書変換 |
+| ✅ | `TestTensorBoardConfig` | `test_from_dict()` | 辞書から作成 |
+| ✅ | `TestTensorBoardServer` | `test_init()` | 初期化 |
+| ✅ | `TestTensorBoardServer` | `test_start()` | サーバー起動 |
+| ✅ | `TestTensorBoardServer` | `test_stop()` | サーバー停止 |
+| ✅ | `TestTensorBoardServer` | `test_get_url()` | URL取得 |
+| ✅ | `TestTensorBoardServer` | `test_is_running()` | 実行状態確認 |
+| ✅ | `TestTensorBoardServer` | `test_find_available_port()` | 利用可能ポート検索 |
+| ✅ | `TestTensorBoardServer` | `test_start_already_running()` | 既に起動中 |
+| ✅ | `TestTensorBoardServer` | `test_stop_not_running()` | 未起動時の停止 |
+| ✅ | `TestCompetitionTensorBoardCallback` | `test_init()` | 初期化 |
+| ✅ | `TestCompetitionTensorBoardCallback` | `test_on_train_epoch_end()` | エポック終了時 |
+| ✅ | `TestCompetitionTensorBoardCallback` | `test_on_fit_epoch_end()` | フィット終了時 |
+| ✅ | `TestCompetitionTensorBoardCallback` | `test_log_scalar()` | スカラーログ |
+| ✅ | `TestCompetitionTensorBoardCallback` | `test_log_scalars()` | 複数スカラーログ |
+| ✅ | `TestCompetitionTensorBoardCallback` | `test_log_image()` | 画像ログ |
+| ✅ | `TestCompetitionTensorBoardCallback` | `test_close()` | クローズ |
+| ✅ | `TestGPUMonitorCallback` | `test_init()` | 初期化 |
+| ✅ | `TestGPUMonitorCallback` | `test_log_gpu_stats()` | GPU統計ログ |
+| ✅ | `TestGPUMonitorCallback` | `test_on_train_batch_end()` | バッチ終了時 |
+| ✅ | `TestGPUMonitorCallback` | `test_no_cuda()` | CUDA無し時 |
+| ✅ | `TestTensorBoardManager` | `test_init()` | 初期化 |
+| ✅ | `TestTensorBoardManager` | `test_setup()` | セットアップ |
+| ✅ | `TestTensorBoardManager` | `test_cleanup()` | クリーンアップ |
+| ✅ | `TestTensorBoardManager` | `test_context_manager()` | コンテキストマネージャ |
+| ✅ | `TestTensorBoardManager` | `test_get_callback()` | コールバック取得 |
+| ✅ | `TestTensorBoardManager` | `test_get_server_url()` | サーバーURL取得 |
 
 ---
 
@@ -640,7 +689,7 @@
 
 ---
 
-### 5.2 test_visual_verification.py ⬜
+### 5.2 test_visual_verification.py ✅
 
 **ソースファイル**: `scripts/evaluation/visual_verification.py`
 
@@ -648,83 +697,149 @@
 
 **優先度**: ⬜ 低
 
+**状態**: 実装済み - `tests/backend/evaluation/test_visual_verification.py` (16テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestVisualVerification` | `test_load_model()` | モデル読み込み |
-| ⬜ | `TestVisualVerification` | `test_predict_image()` | 画像予測 |
-| ⬜ | `TestVisualVerification` | `test_draw_predictions()` | 予測描画 |
-| ⬜ | `TestVisualVerification` | `test_save_visualization()` | 可視化保存 |
+| ✅ | `TestVisualVerifierInit` | `test_init_with_model_path()` | モデルパスで初期化 |
+| ✅ | `TestVisualVerifierInit` | `test_init_with_class_config()` | クラス設定付き初期化 |
+| ✅ | `TestVisualVerifierInit` | `test_init_without_class_config()` | クラス設定なし初期化 |
+| ✅ | `TestGenerateColors` | `test_generate_colors_for_each_class()` | 各クラスに色生成 |
+| ✅ | `TestGenerateColors` | `test_color_format_is_tuple()` | 色がタプル形式 |
+| ✅ | `TestDrawDetections` | `test_draw_detections_returns_image()` | 検出描画が画像を返す |
+| ✅ | `TestDrawDetections` | `test_draw_detections_preserves_original()` | 元画像を保持 |
+| ✅ | `TestDrawDetections` | `test_draw_detections_with_color_override()` | 色オーバーライド |
+| ✅ | `TestDrawDetections` | `test_draw_empty_detections()` | 空の検出リスト |
+| ✅ | `TestPredictImage` | `test_predict_returns_tuple()` | 予測結果がタプル |
+| ✅ | `TestPredictImage` | `test_predict_detection_format()` | 検出フォーマット確認 |
+| ✅ | `TestVerifyBatch` | `test_verify_batch_empty_dir()` | 空ディレクトリのバッチ検証 |
+| ✅ | `TestCreateComparisonGrid` | `test_create_grid_returns_array()` | グリッドがnumpy配列 |
+| ✅ | `TestCreateComparisonGrid` | `test_create_grid_with_output()` | グリッドをファイル保存 |
+| ✅ | `TestGenerateReportSamples` | `test_generate_samples_creates_files()` | サンプルファイル生成 |
+| ✅ | `TestGenerateReportSamples` | `test_generate_samples_empty_dir()` | 空ディレクトリテスト |
 
 ---
 
 ## 6. Capture モジュール (`scripts/capture/`)
 
-### 6.1 test_burst_capture.py ⬜
+### 6.1 test_burst_capture.py ✅
 
 **ソースファイル**: `scripts/capture/burst_capture.py`
 
-**モック要件**: `cv2`（カメラ）
+**モック要件**: `rclpy`, `cv2`
 
 **優先度**: ⬜ 低
 
+**状態**: 実装済み - `tests/backend/capture/test_burst_capture.py` (17テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestBurstCapture` | `test_initialization()` | 初期化 |
-| ⬜ | `TestBurstCapture` | `test_capture_single_frame()` | 単一フレーム撮影 |
-| ⬜ | `TestBurstCapture` | `test_burst_capture_sequence()` | バースト撮影シーケンス |
-| ⬜ | `TestBurstCapture` | `test_save_to_directory()` | ディレクトリ保存 |
-| ⬜ | `TestBurstCapture` | `test_filename_timestamp()` | ファイル名タイムスタンプ |
+| ✅ | `TestImgmsgToCv2` | `test_rgb8_encoding()` | RGB8エンコーディング変換 |
+| ✅ | `TestImgmsgToCv2` | `test_bgr8_encoding()` | BGR8エンコーディング変換 |
+| ✅ | `TestImgmsgToCv2` | `test_mono8_encoding()` | Mono8エンコーディング変換 |
+| ✅ | `TestImgmsgToCv2` | `test_mono16_encoding()` | Mono16エンコーディング変換 |
+| ✅ | `TestImgmsgToCv2` | `test_rgba8_encoding()` | RGBA8エンコーディング変換 |
+| ✅ | `TestImgmsgToCv2` | `test_16uc1_encoding()` | 16UC1エンコーディング変換 |
+| ✅ | `TestBurstCaptureInit` | `test_initialization()` | 初期化 |
+| ✅ | `TestBurstCaptureInit` | `test_initialization_creates_output_dir()` | 出力ディレクトリ作成 |
+| ✅ | `TestBurstCaptureCallback` | `test_callback_stores_latest_frame()` | 最新フレーム保存 |
+| ✅ | `TestBurstCaptureCallback` | `test_callback_handles_conversion_error()` | 変換エラー処理 |
+| ✅ | `TestBurstCaptureCaptureIfReady` | `test_capture_if_ready_no_frame()` | フレームなし |
+| ✅ | `TestBurstCaptureCaptureIfReady` | `test_capture_if_ready_interval_not_passed()` | インターバル未経過 |
+| ✅ | `TestBurstCaptureCaptureIfReady` | `test_capture_if_ready_captures_image()` | キャプチャ実行 |
+| ✅ | `TestBurstCaptureCaptureIfReady` | `test_capture_if_ready_returns_true_when_done()` | 完了時True返却 |
+| ✅ | `TestBurstCaptureIsDone` | `test_is_done_false()` | 未完了 |
+| ✅ | `TestBurstCaptureIsDone` | `test_is_done_true()` | 完了 |
+| ✅ | `TestBurstCaptureIsDone` | `test_is_done_true_exceeded()` | ターゲット超過 |
 
 ---
 
-### 6.2 test_capture_frame.py ⬜
+### 6.2 test_capture_frame.py ✅
 
 **ソースファイル**: `scripts/capture/capture_frame.py`
 
-**モック要件**: `cv2`（カメラ）
+**モック要件**: `rclpy`, `cv_bridge`, `cv2`
 
 **優先度**: ⬜ 低
 
+**状態**: 実装済み - `tests/backend/capture/test_capture_frame.py` (11テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestCaptureFrame` | `test_open_camera()` | カメラオープン |
-| ⬜ | `TestCaptureFrame` | `test_close_camera()` | カメラクローズ |
-| ⬜ | `TestCaptureFrame` | `test_capture_frame()` | フレーム撮影 |
-| ⬜ | `TestCaptureFrame` | `test_camera_not_available()` | カメラ利用不可 |
+| ✅ | `TestFrameCaptureInit` | `test_initialization()` | 初期化 |
+| ✅ | `TestFrameCaptureInit` | `test_initialization_attributes()` | 属性値確認 |
+| ✅ | `TestFrameCaptureCallback` | `test_callback_rgb8_encoding()` | RGB8コールバック |
+| ✅ | `TestFrameCaptureCallback` | `test_callback_bgr8_encoding()` | BGR8コールバック |
+| ✅ | `TestFrameCaptureCallback` | `test_callback_mono8_encoding()` | Mono8コールバック |
+| ✅ | `TestFrameCaptureCallback` | `test_callback_depth_16uc1_encoding()` | 深度16UC1コールバック |
+| ✅ | `TestFrameCaptureCallback` | `test_callback_already_received()` | 受信済みスキップ |
+| ✅ | `TestFrameCaptureCallback` | `test_callback_conversion_error()` | 変換エラー処理 |
+| ✅ | `TestFrameCaptureCallback` | `test_callback_unknown_encoding()` | 不明エンコーディング |
+| ✅ | `TestFrameCaptureEncoding` | `test_encoding_list_rgb()` | RGBエンコーディングリスト |
+| ✅ | `TestFrameCaptureEncoding` | `test_encoding_depth_list()` | 深度エンコーディングリスト |
 
 ---
 
 ## 7. GUI Framework モジュール (`scripts/gui_framework/`)
 
-### 7.1 test_base_app.py ⬜
+### 7.1 test_base_app.py ✅
 
 **ソースファイル**: `scripts/gui_framework/base_app.py`
 
-**モック要件**: GUIフレームワーク
+**モック要件**: `tkinter`, `AppTheme`
 
 **優先度**: ⬜ 低
 
+**状態**: 実装済み - `tests/backend/gui_framework/test_base_app.py` (17テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestBaseApp` | `test_initialization()` | 初期化 |
-| ⬜ | `TestBaseApp` | `test_abstract_methods()` | 抽象メソッド |
-| ⬜ | `TestBaseApp` | `test_lifecycle()` | ライフサイクル |
+| ✅ | `TestBaseAppAbstract` | `test_cannot_instantiate_directly()` | 直接インスタンス化不可 |
+| ✅ | `TestBaseAppAbstract` | `test_is_abstract_class()` | ABC継承確認 |
+| ✅ | `TestBaseAppAbstract` | `test_abstract_methods_defined()` | 抽象メソッド定義確認 |
+| ✅ | `TestBaseAppSubclass` | `test_subclass_can_instantiate()` | サブクラスインスタンス化 |
+| ✅ | `TestBaseAppSubclass` | `test_subclass_sets_title()` | タイトル設定 |
+| ✅ | `TestBaseAppSubclass` | `test_subclass_sets_geometry()` | ジオメトリ設定 |
+| ✅ | `TestBaseAppSubclass` | `test_subclass_sets_min_size()` | 最小サイズ設定 |
+| ✅ | `TestBaseAppKeyboardShortcuts` | `test_q_key_binds_to_close()` | qキーバインド |
+| ✅ | `TestBaseAppKeyboardShortcuts` | `test_escape_handler_default()` | Escapeハンドラ |
+| ✅ | `TestBaseAppDialogs` | `test_show_error_dialog()` | エラーダイアログ |
+| ✅ | `TestBaseAppDialogs` | `test_show_warning_dialog()` | 警告ダイアログ |
+| ✅ | `TestBaseAppDialogs` | `test_show_info_dialog()` | 情報ダイアログ |
+| ✅ | `TestBaseAppDialogs` | `test_ask_yes_no_returns_true()` | Yes/No True返却 |
+| ✅ | `TestBaseAppDialogs` | `test_ask_yes_no_returns_false()` | Yes/No False返却 |
+| ✅ | `TestBaseAppRun` | `test_run_calls_mainloop()` | runがmainloop呼出 |
+| ✅ | `TestBaseAppProtocol` | `test_close_protocol_bound()` | クローズプロトコル |
+| ✅ | `TestBaseAppSetStatus` | `test_set_status_default()` | ステータス設定 |
 
 ---
 
-### 7.2 test_ros2_app.py ⬜
+### 7.2 test_ros2_app.py ✅
 
 **ソースファイル**: `scripts/gui_framework/ros2_app.py`
 
-**モック要件**: `rclpy`, GUIフレームワーク
+**モック要件**: `rclpy`, `tkinter`, `ROS2ImageSubscriber`
 
 **優先度**: ⬜ 低
 
+**状態**: 実装済み - `tests/backend/gui_framework/test_ros2_app.py` (14テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestROS2App` | `test_initialization()` | 初期化 |
-| ⬜ | `TestROS2App` | `test_ros2_connection()` | ROS2接続 |
-| ⬜ | `TestROS2App` | `test_topic_subscription()` | トピック購読 |
+| ✅ | `TestROS2AppAbstract` | `test_cannot_instantiate_directly()` | 直接インスタンス化不可 |
+| ✅ | `TestROS2AppAbstract` | `test_is_subclass_of_base_app()` | BaseAppサブクラス確認 |
+| ✅ | `TestROS2AppAbstract` | `test_abstract_methods_defined()` | 抽象メソッド定義確認 |
+| ✅ | `TestROS2AppInit` | `test_init_initializes_ros2()` | ROS2初期化確認 |
+| ✅ | `TestROS2AppInit` | `test_init_starts_ros_thread()` | ROSスレッド開始確認 |
+| ✅ | `TestROS2AppInit` | `test_init_ros2_failure()` | ROS2初期化失敗時 |
+| ✅ | `TestROS2AppShutdown` | `test_shutdown_stops_ros_thread()` | シャットダウン時スレッド停止 |
+| ✅ | `TestROS2AppShutdown` | `test_shutdown_calls_rclpy_shutdown()` | rclpy.shutdown呼出 |
+| ✅ | `TestROS2AppGetFrame` | `test_get_frame_returns_frame()` | フレーム返却 |
+| ✅ | `TestROS2AppGetFrame` | `test_get_frame_returns_none_when_no_node()` | ノードなしでNone返却 |
+| ✅ | `TestROS2AppGetImageTopics` | `test_get_image_topics_returns_list()` | トピックリスト返却 |
+| ✅ | `TestROS2AppGetImageTopics` | `test_get_image_topics_returns_empty_when_no_node()` | ノードなしで空リスト |
+| ✅ | `TestROS2AppSubscribeToTopic` | `test_subscribe_to_topic_calls_node()` | トピック購読呼出 |
+| ✅ | `TestROS2AppSubscribeToTopic` | `test_subscribe_to_topic_no_node()` | ノードなしでエラーなし |
 
 ---
 
@@ -780,15 +895,15 @@ pytest tests/backend/ -v -m "not slow"
 
 | カテゴリ | 実装済み | 未実装 | 合計 |
 |---------|---------|--------|------|
-| Common | 4 | 1 | 5 |
-| Training | 6 | 1 | 7 |
+| Common | 5 | 0 | 5 |
+| Training | 7 | 0 | 7 |
 | Annotation | 5 | 0 | 5 |
 | Augmentation | 2 | 0 | 2 |
-| Evaluation | 1 | 1 | 2 |
-| Capture | 0 | 2 | 2 |
-| GUI Framework | 0 | 2 | 2 |
+| Evaluation | 2 | 0 | 2 |
+| Capture | 2 | 0 | 2 |
+| GUI Framework | 2 | 0 | 2 |
 | ROS2 | 1 | 0 | 1 |
-| **合計** | **19** | **7** | **26** |
+| **合計** | **26** | **0** | **26** |
 
 ---
 
@@ -811,12 +926,12 @@ pytest tests/backend/ -v -m "not slow"
 7. ✅ `test_evaluate_model.py` (16テスト)
 8. ✅ `test_continuous_capture_node.py` (15テスト)
 
-### Phase 3 (低優先度) 🔄 進行中
-1. ⬜ `test_constants.py`
+### Phase 3 (低優先度) ✅ 完了
+1. ✅ `test_constants.py` (35テスト)
 2. ✅ `test_quick_finetune.py` (49テスト)
-3. ⬜ `test_tensorboard_monitor.py`
-4. ⬜ `test_visual_verification.py`
-5. ⬜ `test_burst_capture.py`
-6. ⬜ `test_capture_frame.py`
-7. ⬜ `test_base_app.py`
-8. ⬜ `test_ros2_app.py`
+3. ✅ `test_tensorboard_monitor.py` (41テスト)
+4. ✅ `test_visual_verification.py` (16テスト)
+5. ✅ `test_burst_capture.py` (17テスト)
+6. ✅ `test_capture_frame.py` (11テスト)
+7. ✅ `test_base_app.py` (17テスト)
+8. ✅ `test_ros2_app.py` (14テスト)
