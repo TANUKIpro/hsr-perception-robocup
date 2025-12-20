@@ -38,8 +38,9 @@ test.describe('Dashboard Page', () => {
 
     test('should show numeric values for statistics', async () => {
       const totalObjects = await dashboard.getTotalObjects();
-      // Value should be a number or empty/N/A in CI environment
-      expect(totalObjects).toMatch(/^(\d+|N\/A|)$/);
+      // Value should be a number (possibly with whitespace) or empty/N/A in CI environment
+      const trimmedValue = totalObjects.trim();
+      expect(trimmedValue).toMatch(/^(\d+|N\/A|)$/);
     });
   });
 
