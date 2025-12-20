@@ -50,7 +50,8 @@ test.describe('Training Page', () => {
 
     test('should switch to Dataset sub-tab', async () => {
       await training.clickDatasetSubTab();
-      await expect(training.page.getByText('Dataset')).toBeVisible();
+      // Use .first() to avoid strict mode violation when multiple elements match
+      await expect(training.page.getByText('Dataset').first()).toBeVisible();
     });
 
     test('should switch to Model sub-tab', async () => {

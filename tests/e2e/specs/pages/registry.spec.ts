@@ -42,7 +42,8 @@ test.describe('Registry Page', () => {
     });
 
     test('should display category filter', async () => {
-      await expect(registry.page.getByText('Filter by Category')).toBeVisible();
+      // Use .first() to avoid strict mode violation when multiple elements match
+      await expect(registry.page.getByText('Filter by Category').first()).toBeVisible();
     });
 
     test('should display object list (may be empty)', async () => {
@@ -69,11 +70,13 @@ test.describe('Registry Page', () => {
 
     test('should display Category selector', async () => {
       // Look for Category selectbox in the form
-      await expect(registry.page.getByText('Category')).toBeVisible();
+      // Use .first() to avoid strict mode violation when multiple elements match
+      await expect(registry.page.getByText('Category').first()).toBeVisible();
     });
 
     test('should display Target Samples input', async () => {
-      await expect(registry.page.getByText('Target Samples')).toBeVisible();
+      // Use .first() to avoid strict mode violation when multiple elements match
+      await expect(registry.page.getByText('Target Samples').first()).toBeVisible();
     });
 
     test('should display Add Object button', async () => {

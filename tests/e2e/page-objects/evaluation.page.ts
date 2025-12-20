@@ -287,7 +287,8 @@ export class EvaluationPage extends BasePage {
    */
   async expectModelSelectionVisible(): Promise<void> {
     await this.clickRunEvaluationTab();
-    await expect(this.page.getByText('Model')).toBeVisible();
+    // Use .first() to avoid strict mode violation when multiple elements match
+    await expect(this.page.getByText('Model').first()).toBeVisible();
   }
 
   /**
@@ -295,15 +296,17 @@ export class EvaluationPage extends BasePage {
    */
   async expectDatasetSelectionVisible(): Promise<void> {
     await this.clickRunEvaluationTab();
-    await expect(this.page.getByText('Dataset')).toBeVisible();
+    // Use .first() to avoid strict mode violation when multiple elements match
+    await expect(this.page.getByText('Dataset').first()).toBeVisible();
   }
 
   /**
    * Assert competition requirements are displayed
    */
   async expectCompetitionRequirementsVisible(): Promise<void> {
-    await expect(this.selectors.metric('Target mAP@50')).toBeVisible();
-    await expect(this.selectors.metric('Target Inference')).toBeVisible();
+    // Use .first() to avoid strict mode violation when multiple metrics match
+    await expect(this.selectors.metric('Target mAP@50').first()).toBeVisible();
+    await expect(this.selectors.metric('Target Inference').first()).toBeVisible();
   }
 
   /**

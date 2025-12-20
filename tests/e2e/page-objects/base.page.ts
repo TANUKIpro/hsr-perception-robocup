@@ -148,7 +148,8 @@ export class BasePage {
    * Get metric value
    */
   async getMetricValue(label: string): Promise<string> {
-    const metricValue = this.selectors.metricValue(label);
+    // Use .first() to avoid strict mode violation when multiple metrics match
+    const metricValue = this.selectors.metricValue(label).first();
     return (await metricValue.textContent()) || '';
   }
 

@@ -212,7 +212,8 @@ export class RegistryPage extends BasePage {
    * Assert View Objects tab content is visible
    */
   async expectViewObjectsTabVisible(): Promise<void> {
-    await expect(this.page.getByText('Filter by Category')).toBeVisible();
+    // Use .first() to avoid strict mode violation when multiple elements match
+    await expect(this.page.getByText('Filter by Category').first()).toBeVisible();
   }
 
   /**

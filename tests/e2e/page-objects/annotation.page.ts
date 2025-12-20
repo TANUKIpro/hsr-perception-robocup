@@ -212,7 +212,8 @@ export class AnnotationPage extends BasePage {
    * Assert class selection is visible
    */
   async expectClassSelectionVisible(): Promise<void> {
-    await expect(this.page.getByText('Select Class')).toBeVisible();
+    // Use .first() to avoid strict mode violation when multiple elements match
+    await expect(this.page.getByText('Select Class').first()).toBeVisible();
   }
 
   /**

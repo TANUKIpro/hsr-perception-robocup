@@ -60,8 +60,9 @@ test.describe('Annotation Page', () => {
     test('should display device selection', async () => {
       const deviceRadio = annotation.selectors.radio('Device');
       if (await deviceRadio.isVisible().catch(() => false)) {
-        await expect(annotation.page.getByText('cuda')).toBeVisible();
-        await expect(annotation.page.getByText('cpu')).toBeVisible();
+        // Use .first() to avoid strict mode violation when multiple elements match
+        await expect(annotation.page.getByText('cuda').first()).toBeVisible();
+        await expect(annotation.page.getByText('cpu').first()).toBeVisible();
       }
     });
 
