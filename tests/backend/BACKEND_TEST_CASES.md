@@ -117,7 +117,7 @@
 
 ---
 
-### 1.4 test_device_utils.py ⬜
+### 1.4 test_device_utils.py ✅
 
 **ソースファイル**: `scripts/common/device_utils.py`
 
@@ -125,25 +125,27 @@
 
 **優先度**: 🔷 中
 
+**状態**: 実装済み - `tests/backend/common/test_device_utils.py` (18テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestCheckCudaAvailable` | `test_cuda_available()` | CUDAが利用可能 |
-| ⬜ | `TestCheckCudaAvailable` | `test_cuda_not_available()` | CUDAが利用不可 |
-| ⬜ | `TestCheckCudaAvailable` | `test_torch_import_error()` | torchインポートエラー |
-| ⬜ | `TestGetDefaultDevice` | `test_returns_cuda_when_available()` | CUDA利用可能時cuda返却 |
-| ⬜ | `TestGetDefaultDevice` | `test_returns_cpu_when_unavailable()` | CUDA利用不可時cpu返却 |
-| ⬜ | `TestLogGpuStatus` | `test_verbose_cuda_available()` | 詳細ログCUDA有効 |
-| ⬜ | `TestLogGpuStatus` | `test_verbose_cuda_not_available()` | 詳細ログCUDA無効 |
-| ⬜ | `TestLogGpuStatus` | `test_silent_mode()` | サイレントモード |
-| ⬜ | `TestGetGpuInfo` | `test_multi_gpu_info()` | マルチGPU情報 |
-| ⬜ | `TestGetGpuInfo` | `test_no_gpu_info()` | GPU無し情報 |
-| ⬜ | `TestGetOptimalBatchSize` | `test_scale_up_large_memory()` | 大メモリでスケールアップ |
-| ⬜ | `TestGetOptimalBatchSize` | `test_scale_down_small_memory()` | 小メモリでスケールダウン |
-| ⬜ | `TestGetOptimalBatchSize` | `test_cpu_fallback()` | CPUフォールバック |
+| ✅ | `TestCheckCudaAvailable` | `test_cuda_available()` | CUDAが利用可能 |
+| ✅ | `TestCheckCudaAvailable` | `test_cuda_not_available()` | CUDAが利用不可 |
+| ✅ | `TestCheckCudaAvailable` | `test_torch_import_error()` | torchインポートエラー |
+| ✅ | `TestGetDefaultDevice` | `test_returns_cuda_when_available()` | CUDA利用可能時cuda返却 |
+| ✅ | `TestGetDefaultDevice` | `test_returns_cpu_when_unavailable()` | CUDA利用不可時cpu返却 |
+| ✅ | `TestLogGpuStatus` | `test_verbose_cuda_available()` | 詳細ログCUDA有効 |
+| ✅ | `TestLogGpuStatus` | `test_verbose_cuda_not_available()` | 詳細ログCUDA無効 |
+| ✅ | `TestLogGpuStatus` | `test_silent_mode()` | サイレントモード |
+| ✅ | `TestGetGpuInfo` | `test_multi_gpu_info()` | マルチGPU情報 |
+| ✅ | `TestGetGpuInfo` | `test_no_gpu_info()` | GPU無し情報 |
+| ✅ | `TestGetOptimalBatchSize` | `test_scale_up_large_memory()` | 大メモリでスケールアップ |
+| ✅ | `TestGetOptimalBatchSize` | `test_scale_down_small_memory()` | 小メモリでスケールダウン |
+| ✅ | `TestGetOptimalBatchSize` | `test_cpu_fallback()` | CPUフォールバック |
 
 ---
 
-### 1.5 test_image_utils.py ⬜
+### 1.5 test_image_utils.py ✅
 
 **ソースファイル**: `scripts/common/image_utils.py`
 
@@ -151,34 +153,36 @@
 
 **優先度**: 🔷 中
 
+**状態**: 実装済み - `tests/backend/common/test_image_utils.py` (29テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestMaskToBbox` | `test_basic_mask_to_bbox()` | 基本的なマスク→BBox変換 |
-| ⬜ | `TestMaskToBbox` | `test_empty_mask_returns_none()` | 空マスクはNone返却 |
-| ⬜ | `TestMaskToBbox` | `test_with_margin()` | マージン付き変換 |
-| ⬜ | `TestMaskToBbox` | `test_clamp_to_image_bounds()` | 画像境界にクランプ |
-| ⬜ | `TestFindObjectBbox` | `test_find_object()` | オブジェクト検出 |
-| ⬜ | `TestFindObjectBbox` | `test_filter_by_min_area()` | 最小面積フィルタ |
-| ⬜ | `TestFindObjectBbox` | `test_filter_by_max_area_ratio()` | 最大面積比フィルタ |
-| ⬜ | `TestFindObjectBbox` | `test_no_valid_contours()` | 有効輪郭なし |
-| ⬜ | `TestDrawBbox` | `test_draw_rectangle()` | 矩形描画 |
-| ⬜ | `TestDrawBbox` | `test_draw_with_label()` | ラベル付き描画 |
-| ⬜ | `TestDrawMaskOverlay` | `test_overlay_application()` | オーバーレイ適用 |
-| ⬜ | `TestDrawMaskOverlay` | `test_alpha_blending()` | アルファブレンディング |
-| ⬜ | `TestDrawDetections` | `test_multiple_detections()` | 複数検出の描画 |
-| ⬜ | `TestDrawDetections` | `test_color_map_usage()` | カラーマップ使用 |
-| ⬜ | `TestDrawDetections` | `test_confidence_display()` | 信頼度表示 |
-| ⬜ | `TestListImageFiles` | `test_find_jpg_png()` | JPG/PNG検出 |
-| ⬜ | `TestListImageFiles` | `test_recursive_search()` | 再帰検索 |
-| ⬜ | `TestListImageFiles` | `test_custom_extensions()` | カスタム拡張子 |
-| ⬜ | `TestListImageFiles` | `test_nonexistent_directory()` | 存在しないディレクトリ |
-| ⬜ | `TestLoadImage` | `test_load_bgr()` | BGR読み込み |
-| ⬜ | `TestLoadImage` | `test_load_rgb()` | RGB読み込み |
-| ⬜ | `TestLoadImage` | `test_load_gray()` | グレースケール読み込み |
-| ⬜ | `TestLoadImage` | `test_load_nonexistent()` | 存在しないファイル |
-| ⬜ | `TestSaveImage` | `test_save_jpg()` | JPG保存 |
-| ⬜ | `TestSaveImage` | `test_save_png()` | PNG保存 |
-| ⬜ | `TestSaveImage` | `test_quality_parameter()` | 品質パラメータ |
+| ✅ | `TestMaskToBbox` | `test_basic_mask_to_bbox()` | 基本的なマスク→BBox変換 |
+| ✅ | `TestMaskToBbox` | `test_empty_mask_returns_none()` | 空マスクはNone返却 |
+| ✅ | `TestMaskToBbox` | `test_with_margin()` | マージン付き変換 |
+| ✅ | `TestMaskToBbox` | `test_clamp_to_image_bounds()` | 画像境界にクランプ |
+| ✅ | `TestFindObjectBbox` | `test_find_object()` | オブジェクト検出 |
+| ✅ | `TestFindObjectBbox` | `test_filter_by_min_area()` | 最小面積フィルタ |
+| ✅ | `TestFindObjectBbox` | `test_filter_by_max_area_ratio()` | 最大面積比フィルタ |
+| ✅ | `TestFindObjectBbox` | `test_no_valid_contours()` | 有効輪郭なし |
+| ✅ | `TestDrawBbox` | `test_draw_rectangle()` | 矩形描画 |
+| ✅ | `TestDrawBbox` | `test_draw_with_label()` | ラベル付き描画 |
+| ✅ | `TestDrawMaskOverlay` | `test_overlay_application()` | オーバーレイ適用 |
+| ✅ | `TestDrawMaskOverlay` | `test_alpha_blending()` | アルファブレンディング |
+| ✅ | `TestDrawDetections` | `test_multiple_detections()` | 複数検出の描画 |
+| ✅ | `TestDrawDetections` | `test_color_map_usage()` | カラーマップ使用 |
+| ✅ | `TestDrawDetections` | `test_confidence_display()` | 信頼度表示 |
+| ✅ | `TestListImageFiles` | `test_find_jpg_png()` | JPG/PNG検出 |
+| ✅ | `TestListImageFiles` | `test_recursive_search()` | 再帰検索 |
+| ✅ | `TestListImageFiles` | `test_custom_extensions()` | カスタム拡張子 |
+| ✅ | `TestListImageFiles` | `test_nonexistent_directory()` | 存在しないディレクトリ |
+| ✅ | `TestLoadImage` | `test_load_bgr()` | BGR読み込み |
+| ✅ | `TestLoadImage` | `test_load_rgb()` | RGB読み込み |
+| ✅ | `TestLoadImage` | `test_load_gray()` | グレースケール読み込み |
+| ✅ | `TestLoadImage` | `test_load_nonexistent()` | 存在しないファイル |
+| ✅ | `TestSaveImage` | `test_save_jpg()` | JPG保存 |
+| ✅ | `TestSaveImage` | `test_save_png()` | PNG保存 |
+| ✅ | `TestSaveImage` | `test_quality_parameter()` | 品質パラメータ |
 
 ---
 
@@ -264,7 +268,7 @@
 
 ---
 
-### 2.4 test_training_config.py ⬜
+### 2.4 test_training_config.py ✅
 
 **ソースファイル**: `scripts/training/training_config.py`
 
@@ -272,27 +276,29 @@
 
 **優先度**: 🔶 高
 
+**状態**: 実装済み - `tests/backend/training/test_training_config.py` (30テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestAugmentationConfig` | `test_default_values()` | デフォルト値 |
-| ⬜ | `TestAugmentationConfig` | `test_hsv_ranges()` | HSV値範囲 |
-| ⬜ | `TestAugmentationConfig` | `test_geometric_transforms()` | 幾何変換パラメータ |
-| ⬜ | `TestAugmentationConfig` | `test_mosaic_mixup()` | Mosaic/Mixup設定 |
-| ⬜ | `TestOptimizerConfig` | `test_default_values()` | デフォルト値 |
-| ⬜ | `TestOptimizerConfig` | `test_llrd_settings()` | LLRD設定 |
-| ⬜ | `TestOptimizerConfig` | `test_swa_settings()` | SWA設定 |
-| ⬜ | `TestPerformanceConfig` | `test_default_values()` | デフォルト値 |
-| ⬜ | `TestPerformanceConfig` | `test_worker_count()` | ワーカー数 |
-| ⬜ | `TestPerformanceConfig` | `test_amp_setting()` | AMP設定 |
-| ⬜ | `TestCheckpointConfig` | `test_default_values()` | デフォルト値 |
-| ⬜ | `TestCheckpointConfig` | `test_save_period()` | 保存間隔 |
-| ⬜ | `TestTrainingConfig` | `test_default_configuration()` | デフォルト設定 |
-| ⬜ | `TestTrainingConfig` | `test_competition_default()` | 競技会デフォルト |
-| ⬜ | `TestTrainingConfig` | `test_fast_test()` | 高速テスト設定 |
-| ⬜ | `TestTrainingConfig` | `test_from_gpu_profile()` | GPUプロファイルから作成 |
-| ⬜ | `TestTrainingConfig` | `test_auto_detect()` | 自動検出 |
-| ⬜ | `TestTrainingConfig` | `test_to_dict()` | 辞書変換 |
-| ⬜ | `TestTrainingConfig` | `test_to_yolo_args()` | YOLOArgs変換 |
+| ✅ | `TestAugmentationConfig` | `test_default_values()` | デフォルト値 |
+| ✅ | `TestAugmentationConfig` | `test_hsv_ranges()` | HSV値範囲 |
+| ✅ | `TestAugmentationConfig` | `test_geometric_transforms()` | 幾何変換パラメータ |
+| ✅ | `TestAugmentationConfig` | `test_mosaic_mixup()` | Mosaic/Mixup設定 |
+| ✅ | `TestOptimizerConfig` | `test_default_values()` | デフォルト値 |
+| ✅ | `TestOptimizerConfig` | `test_llrd_settings()` | LLRD設定 |
+| ✅ | `TestOptimizerConfig` | `test_swa_settings()` | SWA設定 |
+| ✅ | `TestPerformanceConfig` | `test_default_values()` | デフォルト値 |
+| ✅ | `TestPerformanceConfig` | `test_worker_count()` | ワーカー数 |
+| ✅ | `TestPerformanceConfig` | `test_amp_setting()` | AMP設定 |
+| ✅ | `TestCheckpointConfig` | `test_default_values()` | デフォルト値 |
+| ✅ | `TestCheckpointConfig` | `test_save_period()` | 保存間隔 |
+| ✅ | `TestTrainingConfig` | `test_default_configuration()` | デフォルト設定 |
+| ✅ | `TestTrainingConfig` | `test_competition_default()` | 競技会デフォルト |
+| ✅ | `TestTrainingConfig` | `test_fast_test()` | 高速テスト設定 |
+| ✅ | `TestTrainingConfig` | `test_from_gpu_profile()` | GPUプロファイルから作成 |
+| ✅ | `TestTrainingConfig` | `test_auto_detect()` | 自動検出 |
+| ✅ | `TestTrainingConfig` | `test_to_dict()` | 辞書変換 |
+| ✅ | `TestTrainingConfig` | `test_to_yolo_args()` | YOLOArgs変換 |
 
 ---
 
@@ -329,24 +335,67 @@
 
 ---
 
-### 2.6 test_quick_finetune.py ⬜
+### 2.6 test_quick_finetune.py ✅
 
 **ソースファイル**: `scripts/training/quick_finetune.py`
 
-**モック要件**: `torch`, `ultralytics`, `argparse`
+**モック要件**: `torch`, `ultralytics`, `colorama`（sys.modules事前モック）
 
 **優先度**: 🔷 中
 
+**状態**: 実装済み - `tests/backend/training/test_quick_finetune.py` (49テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestArgumentParsing` | `test_required_args()` | 必須引数 |
-| ⬜ | `TestArgumentParsing` | `test_optional_args()` | オプション引数 |
-| ⬜ | `TestArgumentParsing` | `test_default_values()` | デフォルト値 |
-| ⬜ | `TestSyntheticConfigFiltering` | `test_filter_synthetic_keys()` | 合成設定キーのフィルタ |
-| ⬜ | `TestSyntheticConfigFiltering` | `test_yolo_compatible_config()` | YOLO互換設定 |
-| ⬜ | `TestTrainingExecution` | `test_training_success()` | 訓練成功 |
-| ⬜ | `TestTrainingExecution` | `test_training_with_oom_recovery()` | OOMリカバリー付き訓練 |
-| ⬜ | `TestTrainingExecution` | `test_training_dataset_not_found()` | データセット未発見 |
+| ✅ | `TestSyntheticConfigKeys` | `test_contains_expected_keys()` | 期待されるキーが含まれている |
+| ✅ | `TestSyntheticConfigKeys` | `test_keys_are_strings()` | 全キーが文字列型 |
+| ✅ | `TestSyntheticConfigKeys` | `test_is_set()` | setであることを確認 |
+| ✅ | `TestCompetitionConfig` | `test_contains_model_settings()` | モデル設定の確認 |
+| ✅ | `TestCompetitionConfig` | `test_contains_training_settings()` | 訓練設定の確認 |
+| ✅ | `TestCompetitionConfig` | `test_contains_optimizer_settings()` | オプティマイザ設定の確認 |
+| ✅ | `TestCompetitionConfig` | `test_contains_augmentation_settings()` | 拡張設定の確認 |
+| ✅ | `TestCompetitionConfig` | `test_contains_llrd_settings()` | LLRD設定の確認 |
+| ✅ | `TestCompetitionConfig` | `test_contains_synthetic_settings()` | 合成設定の確認 |
+| ✅ | `TestFastConfig` | `test_smaller_model_than_competition()` | より小さなモデル |
+| ✅ | `TestFastConfig` | `test_fewer_epochs()` | より少ないエポック数 |
+| ✅ | `TestFastConfig` | `test_smaller_image_size()` | より小さな画像サイズ |
+| ✅ | `TestFastConfig` | `test_inherits_from_competition()` | COMPETITION_CONFIGからの継承 |
+| ✅ | `TestTrainingResult` | `test_creation()` | インスタンス作成 |
+| ✅ | `TestTrainingResult` | `test_summary_generation()` | サマリ文字列生成 |
+| ✅ | `TestTrainingResult` | `test_meets_target_pass()` | ターゲット達成時True |
+| ✅ | `TestTrainingResult` | `test_meets_target_fail()` | ターゲット未達時False |
+| ✅ | `TestTrainingResult` | `test_meets_target_custom_threshold()` | カスタム閾値 |
+| ✅ | `TestTrainingResult` | `test_meets_target_missing_metric()` | メトリクス欠落時 |
+| ✅ | `TestTrainingResult` | `test_to_dict()` | 辞書変換 |
+| ✅ | `TestTrainingResult` | `test_timestamp_auto_generated()` | タイムスタンプ自動生成 |
+| ✅ | `TestCompetitionTrainerInit` | `test_init_default()` | デフォルト初期化 |
+| ✅ | `TestCompetitionTrainerInit` | `test_init_with_custom_output()` | カスタム出力ディレクトリ |
+| ✅ | `TestCompetitionTrainerInit` | `test_init_with_config()` | カスタム設定で初期化 |
+| ✅ | `TestCompetitionTrainerInit` | `test_init_auto_scale_disabled()` | auto_scale無効 |
+| ✅ | `TestCompetitionTrainerInit` | `test_init_tensorboard_disabled()` | TensorBoard無効 |
+| ✅ | `TestCompetitionTrainerInit` | `test_init_no_gpu_raises()` | GPU無しでエラー |
+| ✅ | `TestCompetitionTrainerInit` | `test_init_no_gpu_with_allow_cpu()` | allow_cpuフラグ |
+| ✅ | `TestCompetitionTrainerInit` | `test_init_base_model_override()` | base_modelオーバーライド |
+| ✅ | `TestValidateDataset` | `test_valid_dataset()` | 有効なデータセット |
+| ✅ | `TestValidateDataset` | `test_dataset_not_found()` | ファイル未発見 |
+| ✅ | `TestValidateDataset` | `test_missing_required_field()` | 必須フィールド欠落 |
+| ✅ | `TestValidateDataset` | `test_train_path_not_found()` | 訓練パス未発見 |
+| ✅ | `TestValidateDataset` | `test_val_path_not_found()` | 検証パス未発見 |
+| ✅ | `TestSyntheticConfigFiltering` | `test_filter_synthetic_keys_from_config()` | 合成キーフィルタ |
+| ✅ | `TestSyntheticConfigFiltering` | `test_yolo_compatible_config_only()` | YOLO互換設定のみ残る |
+| ✅ | `TestArgumentParsing` | `test_required_dataset_arg()` | 必須引数 |
+| ✅ | `TestArgumentParsing` | `test_dataset_arg_provided()` | データセット引数 |
+| ✅ | `TestArgumentParsing` | `test_optional_model_arg()` | オプションモデル引数 |
+| ✅ | `TestArgumentParsing` | `test_default_output_dir()` | デフォルト出力ディレクトリ |
+| ✅ | `TestArgumentParsing` | `test_fast_flag()` | --fastフラグ |
+| ✅ | `TestArgumentParsing` | `test_llrd_flags()` | --llrd, --llrd-decay-rate |
+| ✅ | `TestArgumentParsing` | `test_tensorboard_flags()` | TensorBoardフラグ |
+| ✅ | `TestArgumentParsing` | `test_gpu_tier_choices()` | GPU tier選択 |
+| ✅ | `TestArgumentParsing` | `test_resume_flag()` | --resumeフラグ |
+| ✅ | `TestArgumentParsing` | `test_export_choices()` | --export選択 |
+| ✅ | `TestArgumentParsing` | `test_dynamic_synthetic_flags()` | 動的合成フラグ |
+| ✅ | `TestRunNameGeneration` | `test_run_name_contains_competition()` | run名にcompetition含む |
+| ✅ | `TestRunNameGeneration` | `test_run_name_contains_timestamp()` | run名にタイムスタンプ含む |
 
 ---
 
@@ -418,7 +467,7 @@
 
 ---
 
-### 3.2 test_base_annotator.py ⬜
+### 3.2 test_base_annotator.py ✅
 
 **ソースファイル**: `scripts/annotation/base_annotator.py`
 
@@ -426,13 +475,15 @@
 
 **優先度**: 🔷 中
 
+**状態**: 実装済み - `tests/backend/annotation/test_base_annotator.py` (11テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestBaseAnnotator` | `test_abstract_method_enforcement()` | 抽象メソッド強制 |
-| ⬜ | `TestBaseAnnotator` | `test_cannot_instantiate()` | インスタンス化不可 |
-| ⬜ | `TestConcreteAnnotator` | `test_annotate_batch()` | バッチアノテーション |
-| ⬜ | `TestConcreteAnnotator` | `test_progress_callback()` | 進捗コールバック |
-| ⬜ | `TestConcreteAnnotator` | `test_visualize_annotation()` | アノテーション可視化 |
+| ✅ | `TestBaseAnnotator` | `test_abstract_method_enforcement()` | 抽象メソッド強制 |
+| ✅ | `TestBaseAnnotator` | `test_cannot_instantiate()` | インスタンス化不可 |
+| ✅ | `TestConcreteAnnotator` | `test_annotate_batch()` | バッチアノテーション |
+| ✅ | `TestConcreteAnnotator` | `test_progress_callback()` | 進捗コールバック |
+| ✅ | `TestConcreteAnnotator` | `test_visualize_annotation()` | アノテーション可視化 |
 
 ---
 
@@ -462,7 +513,7 @@
 
 ---
 
-### 3.4 test_sam2_annotator.py ⬜
+### 3.4 test_sam2_annotator.py ✅
 
 **ソースファイル**: `scripts/annotation/sam2_annotator.py`
 
@@ -470,20 +521,22 @@
 
 **優先度**: 🔷 中
 
+**状態**: 実装済み - `tests/backend/annotation/test_sam2_annotator.py` (12テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestSAM2Annotator` | `test_init_with_config()` | 設定付き初期化 |
-| ⬜ | `TestSAM2Annotator` | `test_init_model_loading()` | モデル読み込み |
-| ⬜ | `TestSAM2Annotator` | `test_annotate_single_image()` | 単一画像アノテーション |
-| ⬜ | `TestSAM2Annotator` | `test_mask_generation()` | マスク生成 |
-| ⬜ | `TestSAM2Annotator` | `test_mask_to_bbox_conversion()` | マスク→BBox変換 |
-| ⬜ | `TestSAM2Annotator` | `test_gpu_device_usage()` | GPUデバイス使用 |
-| ⬜ | `TestSAM2Annotator` | `test_cpu_fallback()` | CPUフォールバック |
-| ⬜ | `TestSAM2Annotator` | `test_batch_annotation()` | バッチアノテーション |
+| ✅ | `TestSAM2Annotator` | `test_init_with_config()` | 設定付き初期化 |
+| ✅ | `TestSAM2Annotator` | `test_init_model_loading()` | モデル読み込み |
+| ✅ | `TestSAM2Annotator` | `test_annotate_single_image()` | 単一画像アノテーション |
+| ✅ | `TestSAM2Annotator` | `test_mask_generation()` | マスク生成 |
+| ✅ | `TestSAM2Annotator` | `test_mask_to_bbox_conversion()` | マスク→BBox変換 |
+| ✅ | `TestSAM2Annotator` | `test_gpu_device_usage()` | GPUデバイス使用 |
+| ✅ | `TestSAM2Annotator` | `test_cpu_fallback()` | CPUフォールバック |
+| ✅ | `TestSAM2Annotator` | `test_batch_annotation()` | バッチアノテーション |
 
 ---
 
-### 3.5 test_auto_annotate.py ⬜
+### 3.5 test_auto_annotate.py ✅
 
 **ソースファイル**: `scripts/annotation/auto_annotate.py`
 
@@ -491,14 +544,16 @@
 
 **優先度**: 🔷 中
 
+**状態**: 実装済み - `tests/backend/annotation/test_auto_annotate.py` (14テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestAutoAnnotatePipeline` | `test_background_subtraction_method()` | 背景差分法 |
-| ⬜ | `TestAutoAnnotatePipeline` | `test_sam2_method()` | SAM2法 |
-| ⬜ | `TestAutoAnnotatePipeline` | `test_invalid_method()` | 無効な手法 |
-| ⬜ | `TestAutoAnnotatePipeline` | `test_output_directory_creation()` | 出力ディレクトリ作成 |
-| ⬜ | `TestAutoAnnotatePipeline` | `test_progress_tracking()` | 進捗追跡 |
-| ⬜ | `TestAutoAnnotatePipeline` | `test_error_handling()` | エラーハンドリング |
+| ✅ | `TestAutoAnnotatePipeline` | `test_background_subtraction_method()` | 背景差分法 |
+| ✅ | `TestAutoAnnotatePipeline` | `test_sam2_method()` | SAM2法 |
+| ✅ | `TestAutoAnnotatePipeline` | `test_invalid_method()` | 無効な手法 |
+| ✅ | `TestAutoAnnotatePipeline` | `test_output_directory_creation()` | 出力ディレクトリ作成 |
+| ✅ | `TestAutoAnnotatePipeline` | `test_progress_tracking()` | 進捗追跡 |
+| ✅ | `TestAutoAnnotatePipeline` | `test_error_handling()` | エラーハンドリング |
 
 ---
 
@@ -558,7 +613,7 @@
 
 ## 5. Evaluation モジュール (`scripts/evaluation/`)
 
-### 5.1 test_evaluate_model.py ⬜
+### 5.1 test_evaluate_model.py ✅
 
 **ソースファイル**: `scripts/evaluation/evaluate_model.py`
 
@@ -566,20 +621,22 @@
 
 **優先度**: 🔷 中
 
+**状態**: 実装済み - `tests/backend/evaluation/test_evaluate_model.py` (16テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestClassMetrics` | `test_dataclass_creation()` | データクラス作成 |
-| ⬜ | `TestClassMetrics` | `test_to_dict()` | 辞書変換 |
-| ⬜ | `TestEvaluationReport` | `test_dataclass_creation()` | データクラス作成 |
-| ⬜ | `TestEvaluationReport` | `test_meets_competition_requirements()` | 競技会要件確認 |
-| ⬜ | `TestEvaluationReport` | `test_to_dict()` | 辞書変換 |
-| ⬜ | `TestEvaluateModel` | `test_evaluate_valid_model()` | 有効モデル評価 |
-| ⬜ | `TestEvaluateModel` | `test_model_not_found()` | モデル未発見 |
-| ⬜ | `TestEvaluateModel` | `test_dataset_not_found()` | データセット未発見 |
-| ⬜ | `TestEvaluateModel` | `test_inference_time_measurement()` | 推論時間測定 |
-| ⬜ | `TestEvaluateModel` | `test_per_class_metrics()` | クラス別メトリクス |
-| ⬜ | `TestCompetitionRequirements` | `test_map_threshold()` | mAP閾値 |
-| ⬜ | `TestCompetitionRequirements` | `test_inference_time_threshold()` | 推論時間閾値 |
+| ✅ | `TestClassMetrics` | `test_dataclass_creation()` | データクラス作成 |
+| ✅ | `TestClassMetrics` | `test_to_dict()` | 辞書変換 |
+| ✅ | `TestEvaluationReport` | `test_dataclass_creation()` | データクラス作成 |
+| ✅ | `TestEvaluationReport` | `test_meets_competition_requirements()` | 競技会要件確認 |
+| ✅ | `TestEvaluationReport` | `test_to_dict()` | 辞書変換 |
+| ✅ | `TestEvaluateModel` | `test_evaluate_valid_model()` | 有効モデル評価 |
+| ✅ | `TestEvaluateModel` | `test_model_not_found()` | モデル未発見 |
+| ✅ | `TestEvaluateModel` | `test_dataset_not_found()` | データセット未発見 |
+| ✅ | `TestEvaluateModel` | `test_inference_time_measurement()` | 推論時間測定 |
+| ✅ | `TestEvaluateModel` | `test_per_class_metrics()` | クラス別メトリクス |
+| ✅ | `TestCompetitionRequirements` | `test_map_threshold()` | mAP閾値 |
+| ✅ | `TestCompetitionRequirements` | `test_inference_time_threshold()` | 推論時間閾値 |
 
 ---
 
@@ -673,7 +730,7 @@
 
 ## 8. ROS2 パッケージ (`src/hsr_perception/`)
 
-### 8.1 test_continuous_capture_node.py ⬜
+### 8.1 test_continuous_capture_node.py ✅
 
 **ソースファイル**: `src/hsr_perception/hsr_perception/continuous_capture_node.py`
 
@@ -681,16 +738,18 @@
 
 **優先度**: 🔷 中
 
+**状態**: 実装済み - `tests/backend/ros2/test_continuous_capture_node.py` (15テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestContinuousCaptureNode` | `test_node_initialization()` | ノード初期化 |
-| ⬜ | `TestContinuousCaptureNode` | `test_image_subscription()` | 画像購読 |
-| ⬜ | `TestContinuousCaptureNode` | `test_set_class_service()` | SetClassサービス |
-| ⬜ | `TestContinuousCaptureNode` | `test_start_burst_service()` | StartBurstサービス |
-| ⬜ | `TestContinuousCaptureNode` | `test_get_status_service()` | GetStatusサービス |
-| ⬜ | `TestContinuousCaptureNode` | `test_burst_capture_execution()` | バースト撮影実行 |
-| ⬜ | `TestContinuousCaptureNode` | `test_image_saving()` | 画像保存 |
-| ⬜ | `TestContinuousCaptureNode` | `test_jpeg_quality_setting()` | JPEG品質設定 |
+| ✅ | `TestContinuousCaptureNode` | `test_node_initialization()` | ノード初期化 |
+| ✅ | `TestContinuousCaptureNode` | `test_image_subscription()` | 画像購読 |
+| ✅ | `TestContinuousCaptureNode` | `test_set_class_service()` | SetClassサービス |
+| ✅ | `TestContinuousCaptureNode` | `test_start_burst_service()` | StartBurstサービス |
+| ✅ | `TestContinuousCaptureNode` | `test_get_status_service()` | GetStatusサービス |
+| ✅ | `TestContinuousCaptureNode` | `test_burst_capture_execution()` | バースト撮影実行 |
+| ✅ | `TestContinuousCaptureNode` | `test_image_saving()` | 画像保存 |
+| ✅ | `TestContinuousCaptureNode` | `test_jpeg_quality_setting()` | JPEG品質設定 |
 
 ---
 
@@ -721,43 +780,43 @@ pytest tests/backend/ -v -m "not slow"
 
 | カテゴリ | 実装済み | 未実装 | 合計 |
 |---------|---------|--------|------|
-| Common | 2 | 3 | 5 |
-| Training | 4 | 3 | 7 |
-| Annotation | 2 | 3 | 5 |
+| Common | 4 | 1 | 5 |
+| Training | 6 | 1 | 7 |
+| Annotation | 5 | 0 | 5 |
 | Augmentation | 2 | 0 | 2 |
-| Evaluation | 0 | 2 | 2 |
+| Evaluation | 1 | 1 | 2 |
 | Capture | 0 | 2 | 2 |
 | GUI Framework | 0 | 2 | 2 |
-| ROS2 | 0 | 1 | 1 |
-| **合計** | **10** | **16** | **26** |
+| ROS2 | 1 | 0 | 1 |
+| **合計** | **19** | **7** | **26** |
 
 ---
 
 ## 優先度別実装順序
 
-### Phase 1 (高優先度)
-1. `test_validation.py` - パイプライン全体で使用
-2. `test_config_utils.py` - 設定管理の基盤
-3. `test_annotation_utils.py` - アノテーションの中核
-4. `test_gpu_scaler.py` - 訓練の自動最適化
-5. `test_background_subtraction.py` - 主要アノテーション手法
+### Phase 1 (高優先度) ✅ 完了
+1. ✅ `test_validation.py` - パイプライン全体で使用
+2. ✅ `test_config_utils.py` - 設定管理の基盤
+3. ✅ `test_annotation_utils.py` - アノテーションの中核
+4. ✅ `test_gpu_scaler.py` - 訓練の自動最適化
+5. ✅ `test_background_subtraction.py` - 主要アノテーション手法
 
-### Phase 2 (中優先度)
-1. `test_device_utils.py`
-2. `test_image_utils.py`
-3. `test_training_config.py`
-4. `test_base_annotator.py`
-5. `test_sam2_annotator.py`
-6. `test_auto_annotate.py`
-7. `test_evaluate_model.py`
-8. `test_continuous_capture_node.py`
+### Phase 2 (中優先度) ✅ 完了
+1. ✅ `test_device_utils.py` (18テスト)
+2. ✅ `test_image_utils.py` (29テスト)
+3. ✅ `test_training_config.py` (30テスト)
+4. ✅ `test_base_annotator.py` (11テスト)
+5. ✅ `test_sam2_annotator.py` (12テスト)
+6. ✅ `test_auto_annotate.py` (14テスト)
+7. ✅ `test_evaluate_model.py` (16テスト)
+8. ✅ `test_continuous_capture_node.py` (15テスト)
 
-### Phase 3 (低優先度)
-1. `test_constants.py`
-2. `test_quick_finetune.py`
-3. `test_tensorboard_monitor.py`
-4. `test_visual_verification.py`
-5. `test_burst_capture.py`
-6. `test_capture_frame.py`
-7. `test_base_app.py`
-8. `test_ros2_app.py`
+### Phase 3 (低優先度) 🔄 進行中
+1. ⬜ `test_constants.py`
+2. ✅ `test_quick_finetune.py` (49テスト)
+3. ⬜ `test_tensorboard_monitor.py`
+4. ⬜ `test_visual_verification.py`
+5. ⬜ `test_burst_capture.py`
+6. ⬜ `test_capture_frame.py`
+7. ⬜ `test_base_app.py`
+8. ⬜ `test_ros2_app.py`
