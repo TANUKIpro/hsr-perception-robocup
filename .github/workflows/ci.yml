@@ -18,6 +18,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Permissions needed for test reporting and coverage
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
 env:
   DOCKER_IMAGE: hsr-perception
   DOCKER_TAG: ci-${{ github.sha }}
@@ -43,7 +49,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: docker/Dockerfile
+          file: docker/Dockerfile.ci
           tags: ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -266,22 +272,6 @@ jobs:
           include_passed: true
           detailed_summary: true
           check_name: 'Test Results'
-
-      - name: Download coverage files
-        uses: actions/download-artifact@v4
-        with:
-          pattern: test-results-*
-          path: coverage
-          merge-multiple: true
-
-      - name: Upload to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          files: coverage/coverage-*.xml
-          fail_ci_if_error: false
-          verbose: true
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Check test status
         if: ${{ needs.backend-tests.result != 'success' || needs.frontend-tests.result != 'success' || needs.e2e-tests.result != 'success' }}
