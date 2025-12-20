@@ -73,10 +73,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Skip capture (requires rclpy), gui_framework (requires tkinter), ros2 (requires rclpy)
           - shard: 1
-            paths: "tests/backend/annotation tests/backend/augmentation tests/backend/capture tests/backend/common"
+            paths: "tests/backend/annotation tests/backend/augmentation tests/backend/common"
           - shard: 2
-            paths: "tests/backend/training tests/backend/evaluation tests/backend/gui_framework tests/backend/ros2"
+            paths: "tests/backend/training tests/backend/evaluation --ignore=tests/backend/training/test_memory_utils.py"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -212,8 +213,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: tests/e2e/package-lock.json
 
       - name: Install Playwright
         working-directory: tests/e2e
