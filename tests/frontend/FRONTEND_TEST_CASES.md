@@ -292,55 +292,110 @@
 
 ## 3. Components モジュール (`app/components/`)
 
-### 3.1 test_training_charts.py ⬜
+### 3.1 test_training_charts.py ✅
 
 **ソースファイル**: `app/components/training_charts.py`
 
-**モック要件**: `plotly`
+**モック要件**: `plotly`, `streamlit`
 
 **優先度**: 🔷 中
 
+**実装**: `tests/frontend/components/test_training_charts.py` (25テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestTrainingCharts` | `test_create_loss_chart()` | ロスチャート作成 |
-| ⬜ | `TestTrainingCharts` | `test_create_metrics_chart()` | メトリクスチャート作成 |
-| ⬜ | `TestTrainingCharts` | `test_create_lr_chart()` | 学習率チャート作成 |
-| ⬜ | `TestTrainingCharts` | `test_parse_training_log()` | 訓練ログパース |
-| ⬜ | `TestTrainingCharts` | `test_empty_data_handling()` | 空データ処理 |
+| ✅ | `TestRenderTrainingChart` | `test_empty_history_shows_placeholder()` | 空履歴でプレースホルダー表示 |
+| ✅ | `TestRenderTrainingChart` | `test_single_epoch_data()` | 単一エポック描画 |
+| ✅ | `TestRenderTrainingChart` | `test_multiple_epochs_data()` | 複数エポック描画 |
+| ✅ | `TestRenderTrainingChart` | `test_data_extraction_with_missing_keys()` | 欠落キーでもデフォルト値処理 |
+| ✅ | `TestRenderTrainingChart` | `test_target_line_rendered()` | ターゲットライン描画 |
+| ✅ | `TestRenderTrainingChart` | `test_target_line_not_rendered_when_zero()` | ターゲット0で非描画 |
+| ✅ | `TestRenderTrainingChart` | `test_secondary_yaxis_configuration()` | 二軸設定確認 |
+| ✅ | `TestRenderTrainingChart` | `test_custom_height()` | カスタム高さ |
+| ✅ | `TestRenderTrainingChart` | `test_show_title_true()` | タイトル表示 |
+| ✅ | `TestRenderTrainingChart` | `test_show_title_false()` | タイトル非表示 |
+| ✅ | `TestRenderTrainingChart` | `test_plotly_chart_called()` | plotly_chart呼び出し |
+| ✅ | `TestRenderEpochMetricsChart` | `test_empty_history_shows_placeholder()` | 空履歴でプレースホルダー |
+| ✅ | `TestRenderEpochMetricsChart` | `test_with_valid_history_renders_chart()` | 有効履歴でチャート描画 |
+| ✅ | `TestRenderEpochMetricsChart` | `test_with_custom_metrics_renders_chart()` | カスタムメトリクス |
+| ✅ | `TestRenderEpochMetricsChart` | `test_custom_height()` | カスタム高さ |
+| ✅ | `TestRenderEpochMetricsChart` | `test_plotly_chart_called()` | plotly_chart呼び出し |
+| ✅ | `TestRenderLossBreakdownChart` | `test_empty_history_returns_early()` | 空履歴で早期リターン |
+| ✅ | `TestRenderLossBreakdownChart` | `test_with_valid_history_renders_chart()` | 有効履歴でチャート描画 |
+| ✅ | `TestRenderLossBreakdownChart` | `test_with_partial_zero_losses()` | 部分的に0のロス |
+| ✅ | `TestRenderLossBreakdownChart` | `test_custom_height()` | カスタム高さ |
+| ✅ | `TestRenderLossBreakdownChart` | `test_plotly_chart_called()` | plotly_chart呼び出し |
+| ✅ | `TestRenderEmptyChartPlaceholder` | `test_html_rendered()` | HTML描画確認 |
+| ✅ | `TestPlotlyTheme` | `test_theme_keys()` | テーマキー確認 |
+| ✅ | `TestPlotlyTheme` | `test_transparent_backgrounds()` | 透明背景設定 |
+| ✅ | `TestColors` | `test_required_colors()` | 必要な色キー確認 |
 
 ---
 
-### 3.2 test_progress_display.py ⬜
+### 3.2 test_progress_display.py ✅
 
 **ソースファイル**: `app/components/progress_display.py`
+
+**モック要件**: `streamlit`, `services.task_manager`
+
+**優先度**: 🔷 中
+
+**実装**: `tests/frontend/components/test_progress_display.py` (26テスト)
+
+| 状態 | テストクラス | テストメソッド | 説明 |
+|------|-------------|---------------|------|
+| ✅ | `TestRenderTaskProgress` | `test_task_not_found()` | タスク未発見時エラー |
+| ✅ | `TestRenderTaskProgress` | `test_pending_task()` | 保留中タスク表示 |
+| ✅ | `TestRenderTaskProgress` | `test_running_task()` | 実行中タスク表示 |
+| ✅ | `TestRenderTaskProgress` | `test_completed_task()` | 完了タスク表示 |
+| ✅ | `TestRenderTaskProgress` | `test_failed_task()` | 失敗タスク表示 |
+| ✅ | `TestRenderTaskProgress` | `test_show_cancel_button_for_running()` | キャンセルボタン表示 |
+| ✅ | `TestRenderTaskProgress` | `test_extra_data_displayed()` | extra_data詳細表示 |
+| ✅ | `TestRenderTaskList` | `test_no_tasks()` | タスクなし時info表示 |
+| ✅ | `TestRenderTaskList` | `test_with_tasks()` | タスクリスト表示 |
+| ✅ | `TestRenderTaskList` | `test_active_only_filter()` | アクティブのみフィルタ |
+| ✅ | `TestRenderActiveTaskBanner` | `test_no_active_tasks()` | アクティブなし時None |
+| ✅ | `TestRenderActiveTaskBanner` | `test_with_active_task()` | アクティブタスクバナー |
+| ✅ | `TestRenderExtraData` | `test_simple_dict()` | シンプル辞書表示 |
+| ✅ | `TestRenderExtraData` | `test_nested_dict()` | ネスト辞書表示 |
+| ✅ | `TestRenderExtraData` | `test_float_formatting()` | 浮動小数点フォーマット |
+| ✅ | `TestRenderExtraData` | `test_list_display()` | リスト表示 |
+| ✅ | `TestRenderTaskMetrics` | `test_no_extra_data()` | extra_dataなし時 |
+| ✅ | `TestRenderTaskMetrics` | `test_empty_metrics()` | メトリクスなし時 |
+| ✅ | `TestRenderTaskMetrics` | `test_with_metrics()` | メトリクス表示 |
+| ✅ | `TestRenderCircularProgress` | `test_progress_display()` | 進捗表示 |
+| ✅ | `TestRenderCircularProgress` | `test_custom_label()` | カスタムラベル |
+| ✅ | `TestRenderTrainingMetricCards` | `test_metric_cards_rendered()` | メトリクスカード表示 |
+| ✅ | `TestRenderTrainingProgressBar` | `test_progress_bar_rendered()` | プログレスバー表示 |
+| ✅ | `TestRenderTrainingCompletedBanner` | `test_target_achieved()` | ターゲット達成バナー |
+| ✅ | `TestRenderTrainingCompletedBanner` | `test_target_not_achieved()` | ターゲット未達成バナー |
+| ✅ | `TestRenderTrainingCompletedBanner` | `test_best_model_path_displayed()` | 最良モデルパス表示 |
+
+---
+
+### 3.3 test_captured_images_tree.py ✅
+
+**ソースファイル**: `app/components/captured_images_tree.py`
 
 **モック要件**: `streamlit`
 
 **優先度**: 🔷 中
 
-| 状態 | テストクラス | テストメソッド | 説明 |
-|------|-------------|---------------|------|
-| ⬜ | `TestProgressDisplay` | `test_render_progress()` | 進捗レンダリング |
-| ⬜ | `TestProgressDisplay` | `test_calculate_percentage()` | パーセンテージ計算 |
-| ⬜ | `TestProgressDisplay` | `test_format_elapsed_time()` | 経過時間フォーマット |
-| ⬜ | `TestProgressDisplay` | `test_estimate_remaining_time()` | 残り時間推定 |
-
----
-
-### 3.3 test_captured_images_tree.py ⬜
-
-**ソースファイル**: `app/components/captured_images_tree.py`
-
-**モック要件**: ファイルシステム、`streamlit`
-
-**優先度**: 🔷 中
+**実装**: `tests/frontend/components/test_captured_images_tree.py` (11テスト)
 
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestCapturedImagesTree` | `test_build_tree_structure()` | ツリー構造構築 |
-| ⬜ | `TestCapturedImagesTree` | `test_count_images_per_class()` | クラス別画像数カウント |
-| ⬜ | `TestCapturedImagesTree` | `test_empty_directory()` | 空ディレクトリ |
-| ⬜ | `TestCapturedImagesTree` | `test_nested_directories()` | ネストディレクトリ |
+| ✅ | `TestRenderCapturedImagesTree` | `test_header_rendered()` | ヘッダー描画確認 |
+| ✅ | `TestRenderCapturedImagesTree` | `test_directory_not_exists()` | ディレクトリ未作成時のinfo表示 |
+| ✅ | `TestRenderCapturedImagesTree` | `test_empty_directory()` | 空ディレクトリ時のinfo表示 |
+| ✅ | `TestRenderCapturedImagesTree` | `test_with_subdirectories()` | サブディレクトリありでツリー表示 |
+| ✅ | `TestRenderCapturedImagesTree` | `test_image_counting()` | 画像ファイルカウント |
+| ✅ | `TestRenderCapturedImagesTree` | `test_tree_format()` | ツリー表示フォーマット確認 |
+| ✅ | `TestRenderCapturedImagesTree` | `test_single_subdirectory()` | 単一サブディレクトリ |
+| ✅ | `TestRenderCapturedImagesTree` | `test_refresh_button_column_layout()` | カラムレイアウト確認 |
+| ✅ | `TestRenderCapturedImagesTree` | `test_refresh_button_with_correct_key()` | リフレッシュボタンのキー確認 |
+| ✅ | `TestRenderCapturedImagesTree` | `test_mixed_file_types_in_subdirectory()` | jpg/pngのみカウント |
+| ✅ | `TestRenderCapturedImagesTree` | `test_subdirectories_sorted_alphabetically()` | アルファベット順ソート |
 
 ---
 
