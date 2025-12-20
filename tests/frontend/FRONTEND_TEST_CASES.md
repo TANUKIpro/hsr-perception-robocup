@@ -399,27 +399,51 @@
 
 ---
 
-### 3.4 test_robustness_test.py ⬜
+### 3.4 test_robustness_test.py ✅
 
-**ソースファイル**: `app/components/robustness_test.py`
+**ソースファイル**: `app/components/robustness_test.py`, `app/components/robustness_augmentation.py`
 
-**モック要件**: `cv2`, `numpy`, モデル
+**モック要件**: `cv2`, `numpy`, `streamlit`, モデル
 
 **優先度**: ⬜ 低
 
+**実装**: `tests/frontend/components/test_robustness_test.py` (27テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestRobustnessTest` | `test_apply_brightness_augmentation()` | 明るさ拡張適用 |
-| ⬜ | `TestRobustnessTest` | `test_apply_noise_augmentation()` | ノイズ拡張適用 |
-| ⬜ | `TestRobustnessTest` | `test_apply_blur_augmentation()` | ブラー拡張適用 |
-| ⬜ | `TestRobustnessTest` | `test_run_robustness_test()` | ロバスト性テスト実行 |
-| ⬜ | `TestRobustnessTest` | `test_calculate_robustness_score()` | ロバスト性スコア計算 |
+| ✅ | `TestApplyBrightnessAugmentation` | `test_adjust_brightness_increases()` | 明るさ増加 |
+| ✅ | `TestApplyBrightnessAugmentation` | `test_adjust_brightness_decreases()` | 明るさ減少 |
+| ✅ | `TestApplyBrightnessAugmentation` | `test_adjust_brightness_clipping()` | クリッピング処理 |
+| ✅ | `TestApplyBrightnessAugmentation` | `test_adjust_brightness_zero_unchanged()` | ゼロで変化なし |
+| ✅ | `TestApplyShadowAugmentation` | `test_inject_shadow_creates_mask()` | マスク作成 |
+| ✅ | `TestApplyShadowAugmentation` | `test_inject_shadow_max_strength()` | 最大強度 |
+| ✅ | `TestApplyShadowAugmentation` | `test_inject_shadow_preserves_shape()` | 形状保持 |
+| ✅ | `TestApplyOcclusionAugmentation` | `test_inject_occlusion_adds_rectangle()` | 矩形追加 |
+| ✅ | `TestApplyOcclusionAugmentation` | `test_inject_occlusion_max_ratio()` | 最大比率 |
+| ✅ | `TestApplyOcclusionAugmentation` | `test_inject_occlusion_zero_ratio()` | ゼロ比率 |
+| ✅ | `TestApplyHueRotation` | `test_rotate_hue_shifts_color()` | 色相シフト |
+| ✅ | `TestApplyHueRotation` | `test_rotate_hue_zero_unchanged()` | ゼロで変化なし |
+| ✅ | `TestApplyHueRotation` | `test_rotate_hue_wraps_around()` | ラップアラウンド |
+| ✅ | `TestApplyGaussianNoise` | `test_add_gaussian_noise_increases_variance()` | 分散増加 |
+| ✅ | `TestApplyGaussianNoise` | `test_add_gaussian_noise_zero_sigma()` | シグマゼロ |
+| ✅ | `TestRunRobustnessTest` | `test_run_single_test_returns_result()` | 結果返却 |
+| ✅ | `TestRunRobustnessTest` | `test_run_single_test_no_detections()` | 検出なし |
+| ✅ | `TestCalculateRobustnessScore` | `test_get_avg_confidence()` | 平均信頼度計算 |
+| ✅ | `TestCalculateRobustnessScore` | `test_get_avg_confidence_empty()` | 空リスト |
+| ✅ | `TestRobustnessAugmentorClass` | `test_init_with_default_params()` | デフォルトパラメータ |
+| ✅ | `TestRobustnessAugmentorClass` | `test_init_with_custom_params()` | カスタムパラメータ |
+| ✅ | `TestRobustnessAugmentorClass` | `test_apply_augmentation_brightness()` | 明るさ拡張適用 |
+| ✅ | `TestRobustnessAugmentorClass` | `test_apply_augmentation_shadow()` | シャドウ拡張適用 |
+| ✅ | `TestRobustnessAugmentorClass` | `test_apply_augmentation_occlusion()` | オクルージョン拡張適用 |
+| ✅ | `TestRobustnessAugmentorClass` | `test_apply_augmentation_hue()` | 色相拡張適用 |
+| ✅ | `TestRobustnessAugmentorClass` | `test_apply_augmentation_noise()` | ノイズ拡張適用 |
+| ✅ | `TestRobustnessAugmentorClass` | `test_apply_augmentation_unknown()` | 未知の拡張タイプ |
 
 ---
 
 ## 4. Pages モジュール (`app/pages/`)
 
-### 4.1 test_dashboard_integration.py ⬜
+### 4.1 test_dashboard_integration.py ✅
 
 **ソースファイル**: `app/pages/1_Dashboard.py`
 
@@ -427,17 +451,34 @@
 
 **優先度**: ⬜ 低
 
+**実装**: `tests/frontend/pages/test_dashboard_integration.py` (20テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestDashboard` | `test_load_collection_stats()` | 収集統計読み込み |
-| ⬜ | `TestDashboard` | `test_calculate_pipeline_status()` | パイプラインステータス計算 |
-| ⬜ | `TestDashboard` | `test_category_progress_display()` | カテゴリ進捗表示 |
-| ⬜ | `TestDashboard` | `test_training_readiness_check()` | 訓練準備チェック |
-| ⬜ | `TestDashboard` | `test_active_task_display()` | アクティブタスク表示 |
+| ✅ | `TestLoadCollectionStats` | `test_stats_displayed_as_metrics()` | 統計メトリクス表示 |
+| ✅ | `TestLoadCollectionStats` | `test_stats_with_zero_objects()` | オブジェクト0件 |
+| ✅ | `TestLoadCollectionStats` | `test_ready_percentage_calculation()` | 準備完了率計算 |
+| ✅ | `TestCalculatePipelineStatus` | `test_pipeline_status_renders()` | ステータス描画 |
+| ✅ | `TestCalculatePipelineStatus` | `test_counts_ready_datasets_correctly()` | 準備完了データセットカウント |
+| ✅ | `TestCalculatePipelineStatus` | `test_active_tasks_count()` | アクティブタスク数 |
+| ✅ | `TestCategoryProgressDisplay` | `test_category_progress_with_data()` | データありでプログレス表示 |
+| ✅ | `TestCategoryProgressDisplay` | `test_category_progress_empty()` | 空データ時 |
+| ✅ | `TestCategoryProgressDisplay` | `test_progress_bar_capped_at_100()` | 100%上限 |
+| ✅ | `TestTrainingReadinessCheck` | `test_all_objects_ready()` | 全オブジェクト準備完了 |
+| ✅ | `TestTrainingReadinessCheck` | `test_some_objects_not_ready()` | 一部未準備 |
+| ✅ | `TestTrainingReadinessCheck` | `test_no_objects_registered()` | オブジェクト未登録 |
+| ✅ | `TestTrainingReadinessCheck` | `test_export_button_when_ready()` | 準備完了時エクスポートボタン |
+| ✅ | `TestActiveTaskDisplay` | `test_no_active_tasks()` | アクティブタスクなし |
+| ✅ | `TestActiveTaskDisplay` | `test_with_active_tasks()` | アクティブタスクあり |
+| ✅ | `TestActiveTaskDisplay` | `test_multiple_active_tasks()` | 複数アクティブタスク |
+| ✅ | `TestObjectProgress` | `test_object_progress_with_objects()` | オブジェクト進捗 |
+| ✅ | `TestObjectProgress` | `test_object_progress_empty()` | 空オブジェクト |
+| ✅ | `TestObjectProgress` | `test_progress_status_indicators()` | 進捗状態インジケーター |
+| ✅ | `TestObjectProgress` | `test_properties_badges()` | プロパティバッジ |
 
 ---
 
-### 4.2 test_registry_integration.py ⬜
+### 4.2 test_registry_integration.py ✅
 
 **ソースファイル**: `app/pages/2_Registry.py`
 
@@ -445,35 +486,65 @@
 
 **優先度**: ⬜ 低
 
+**実装**: `tests/frontend/pages/test_registry_integration.py` (19テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestRegistry` | `test_view_objects()` | オブジェクト表示 |
-| ⬜ | `TestRegistry` | `test_add_object_form()` | オブジェクト追加フォーム |
-| ⬜ | `TestRegistry` | `test_edit_object()` | オブジェクト編集 |
-| ⬜ | `TestRegistry` | `test_delete_object()` | オブジェクト削除 |
-| ⬜ | `TestRegistry` | `test_filter_by_category()` | カテゴリフィルタ |
-| ⬜ | `TestRegistry` | `test_search_objects()` | オブジェクト検索 |
+| ✅ | `TestViewObjects` | `test_view_objects_empty_list()` | 空リスト時info |
+| ✅ | `TestViewObjects` | `test_view_objects_with_data()` | データあり一覧 |
+| ✅ | `TestViewObjects` | `test_view_objects_calls_viewer()` | ビューア呼び出し |
+| ✅ | `TestAddObjectForm` | `test_add_object_form_renders()` | フォーム描画 |
+| ✅ | `TestAddObjectForm` | `test_add_object_form_elements()` | フォーム要素 |
+| ✅ | `TestAddObjectForm` | `test_add_object_validates_name()` | 名前検証 |
+| ✅ | `TestAddObjectForm` | `test_add_object_validates_duplicate_name()` | 重複名検証 |
+| ✅ | `TestEditObject` | `test_edit_mode_toggle()` | 編集モード切り替え |
+| ✅ | `TestEditObject` | `test_edit_mode_shows_editor()` | エディタ表示 |
+| ✅ | `TestDeleteObject` | `test_delete_button_calls_remove()` | 削除ボタン |
+| ✅ | `TestDeleteObject` | `test_delete_triggers_rerun()` | 削除後rerun |
+| ✅ | `TestFilterByCategory` | `test_filter_all_shows_all_objects()` | 全件フィルタ |
+| ✅ | `TestFilterByCategory` | `test_filter_category_shows_filtered()` | カテゴリフィルタ |
+| ✅ | `TestFilterByCategory` | `test_filter_category_container()` | containerフィルタ |
+| ✅ | `TestFilterByCategory` | `test_selectbox_includes_all_option()` | All オプション |
+| ✅ | `TestObjectDetails` | `test_details_shows_name()` | 名前表示 |
+| ✅ | `TestObjectDetails` | `test_details_shows_category()` | カテゴリ表示 |
+| ✅ | `TestObjectDetails` | `test_details_shows_target_samples()` | 目標サンプル表示 |
+| ✅ | `TestObjectDetails` | `test_details_shows_properties()` | プロパティ表示 |
 
 ---
 
-### 4.3 test_training_integration.py ⬜
+### 4.3 test_training_integration.py ✅
 
 **ソースファイル**: `app/pages/5_Training.py`
 
-**モック要件**: `streamlit`, `TaskManager`, GPU
+**モック要件**: `streamlit`, `TaskManager`, `torch` (GPU)
 
 **優先度**: ⬜ 低
 
+**実装**: `tests/frontend/pages/test_training_integration.py` (21テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestTrainingPage` | `test_load_datasets()` | データセット読み込み |
-| ⬜ | `TestTrainingPage` | `test_load_models()` | モデル読み込み |
-| ⬜ | `TestTrainingPage` | `test_advanced_params_form()` | 詳細パラメータフォーム |
-| ⬜ | `TestTrainingPage` | `test_start_training()` | 訓練開始 |
-| ⬜ | `TestTrainingPage` | `test_monitor_training_progress()` | 訓練進捗監視 |
-| ⬜ | `TestTrainingPage` | `test_cancel_training()` | 訓練キャンセル |
-| ⬜ | `TestTrainingPage` | `test_gpu_detection_display()` | GPU検出表示 |
-| ⬜ | `TestTrainingPage` | `test_tensorboard_embed()` | TensorBoard埋め込み |
+| ✅ | `TestLoadDatasets` | `test_no_datasets_shows_warning()` | データセットなし警告 |
+| ✅ | `TestLoadDatasets` | `test_datasets_shown_in_selectbox()` | selectbox表示 |
+| ✅ | `TestLoadDatasets` | `test_only_ready_sessions_shown()` | 準備完了セッションのみ |
+| ✅ | `TestLoadModels` | `test_model_selection_options()` | モデル選択オプション |
+| ✅ | `TestLoadModels` | `test_auto_scale_hides_model_selection()` | auto_scale時自動選択 |
+| ✅ | `TestAdvancedParams` | `test_advanced_section_renders()` | 詳細セクション描画 |
+| ✅ | `TestAdvancedParams` | `test_advanced_params_passed_correctly()` | パラメータ渡し |
+| ✅ | `TestStartTraining` | `test_start_button_without_dataset_shows_warning()` | データセット未選択警告 |
+| ✅ | `TestStartTraining` | `test_start_training_calls_task_manager()` | タスクマネージャ呼び出し |
+| ✅ | `TestMonitorTrainingProgress` | `test_active_training_renders_banner()` | バナー表示 |
+| ✅ | `TestMonitorTrainingProgress` | `test_training_chart_rendered()` | チャート表示 |
+| ✅ | `TestMonitorTrainingProgress` | `test_completed_training_shows_balloons()` | 完了時balloons |
+| ✅ | `TestCancelTraining` | `test_cancel_button_in_active_banner()` | キャンセルボタン |
+| ✅ | `TestGpuDetection` | `test_gpu_available_shows_status_card()` | GPU利用可能ステータス |
+| ✅ | `TestGpuDetection` | `test_gpu_not_available_shows_warning()` | GPU利用不可警告 |
+| ✅ | `TestGpuDetection` | `test_gpu_tier_detection()` | GPUティア検出 |
+| ✅ | `TestTensorboardEmbed` | `test_tensorboard_panel_rendered()` | TensorBoardパネル |
+| ✅ | `TestTensorboardEmbed` | `test_tensorboard_status_when_no_url()` | URL未設定時ステータス |
+| ✅ | `TestTrainedModels` | `test_no_models_shows_placeholder()` | モデルなしプレースホルダー |
+| ✅ | `TestTrainedModels` | `test_models_shown_in_expander()` | expander表示 |
+| ✅ | `TestTrainingHistory` | `test_history_renders_task_list()` | 履歴リスト表示 |
 
 ---
 
@@ -503,9 +574,9 @@ pytest tests/frontend/ -v -m "not streamlit"
 |---------|---------|--------|------|
 | Services | 5 | 0 | 5 |
 | Core | 2 | 0 | 2 |
-| Components | 0 | 4 | 4 |
-| Pages | 0 | 3 | 3 |
-| **合計** | **7** | **7** | **14** |
+| Components | 4 | 0 | 4 |
+| Pages | 3 | 0 | 3 |
+| **合計** | **14** | **0** | **14** |
 
 ### 実装済みテスト詳細
 
@@ -518,7 +589,14 @@ pytest tests/frontend/ -v -m "not streamlit"
 | test_ui_settings_manager.py | 18 | 🔷 中 |
 | test_dataset_preparer.py | 19 | 🔷 中 |
 | test_config.py | 18 | 🔷 中 |
-| **合計** | **167** | - |
+| test_training_charts.py | 25 | 🔷 中 |
+| test_progress_display.py | 26 | 🔷 中 |
+| test_captured_images_tree.py | 11 | 🔷 中 |
+| test_robustness_test.py | 27 | ⬜ 低 |
+| test_dashboard_integration.py | 20 | ⬜ 低 |
+| test_registry_integration.py | 19 | ⬜ 低 |
+| test_training_integration.py | 21 | ⬜ 低 |
+| **合計** | **316** | - |
 
 ---
 
@@ -530,19 +608,19 @@ pytest tests/frontend/ -v -m "not streamlit"
 3. ✅ `test_path_coordinator.py` - パス管理の基盤
 4. ✅ `test_object_registry.py` - オブジェクト管理の基盤
 
-### Phase 2 (中優先度) 一部完了
+### Phase 2 (中優先度) ✅ 完了
 1. ✅ `test_ui_settings_manager.py`
 2. ✅ `test_dataset_preparer.py`
 3. ✅ `test_config.py`
-4. ⬜ `test_training_charts.py`
-5. ⬜ `test_progress_display.py`
-6. ⬜ `test_captured_images_tree.py`
+4. ✅ `test_training_charts.py`
+5. ✅ `test_progress_display.py`
+6. ✅ `test_captured_images_tree.py`
 
-### Phase 3 (低優先度)
-1. ⬜ `test_robustness_test.py`
-2. ⬜ `test_dashboard_integration.py`
-3. ⬜ `test_registry_integration.py`
-4. ⬜ `test_training_integration.py`
+### Phase 3 (低優先度) ✅ 完了
+1. ✅ `test_robustness_test.py`
+2. ✅ `test_dashboard_integration.py`
+3. ✅ `test_registry_integration.py`
+4. ✅ `test_training_integration.py`
 
 ---
 
