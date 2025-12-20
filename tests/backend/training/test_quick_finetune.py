@@ -3,6 +3,9 @@ Tests for quick_finetune module.
 
 Tests the CompetitionTrainer class, TrainingResult dataclass,
 configuration constants, and CLI argument parsing.
+
+NOTE: This module uses pytest fixtures to mock heavy dependencies.
+Do not use module-level sys.modules patching as it affects other test files.
 """
 
 import argparse
@@ -13,38 +16,45 @@ from dataclasses import dataclass
 
 import pytest
 
-# Mock heavy dependencies before any import from the module
-# These modules have complex dependencies that are hard to mock after import
-_mock_torch = MagicMock()
-_mock_torch.cuda.is_available.return_value = True
-sys.modules['torch'] = _mock_torch
-
-_mock_colorama = MagicMock()
-_mock_colorama.Fore = MagicMock()
-_mock_colorama.Style = MagicMock()
-_mock_colorama.init = MagicMock()
-sys.modules['colorama'] = _mock_colorama
-
-_mock_ultralytics = MagicMock()
-sys.modules['ultralytics'] = _mock_ultralytics
-sys.modules['ultralytics.cfg'] = MagicMock()
-
-# Mock the training submodules
-sys.modules['training.gpu_scaler'] = MagicMock()
-sys.modules['training.tensorboard_monitor'] = MagicMock()
-sys.modules['training.training_config'] = MagicMock()
-sys.modules['training.swa_trainer'] = MagicMock()
-sys.modules['training.llrd_trainer'] = MagicMock()
-sys.modules['training.memory_utils'] = MagicMock()
-
-# Mock augmentation module
-sys.modules['augmentation'] = MagicMock()
-sys.modules['augmentation.copy_paste_augmentor'] = MagicMock()
-
 # Add scripts directory to path
 scripts_dir = Path(__file__).parent.parent.parent.parent / "scripts"
 if str(scripts_dir) not in sys.path:
     sys.path.insert(0, str(scripts_dir))
+
+
+@pytest.fixture(autouse=True)
+def mock_heavy_dependencies():
+    """
+    Mock heavy dependencies for quick_finetune tests.
+
+    This fixture uses patch.dict to temporarily modify sys.modules,
+    ensuring the mocks are properly cleaned up after each test.
+    """
+    # Save references to original modules if they exist
+    original_modules = {}
+    modules_to_mock = [
+        'training.gpu_scaler',
+        'training.tensorboard_monitor',
+        'training.training_config',
+        'training.swa_trainer',
+        'training.llrd_trainer',
+        'training.memory_utils',
+        'augmentation',
+        'augmentation.copy_paste_augmentor',
+    ]
+
+    for mod in modules_to_mock:
+        if mod in sys.modules:
+            original_modules[mod] = sys.modules[mod]
+
+    # Create mock modules
+    mock_modules = {mod: MagicMock() for mod in modules_to_mock}
+
+    # Patch sys.modules
+    with patch.dict(sys.modules, mock_modules):
+        yield
+
+    # Note: patch.dict automatically restores original values
 
 
 class TestSyntheticConfigKeys:
