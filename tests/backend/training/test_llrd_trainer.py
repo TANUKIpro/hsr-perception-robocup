@@ -48,8 +48,10 @@ sys.modules['ultralytics.models.yolo'] = ultralytics_mock.models.yolo
 sys.modules['ultralytics.models.yolo.detect'] = ultralytics_mock.models.yolo.detect
 sys.modules['ultralytics.utils'] = ultralytics_mock.utils
 
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add scripts/training directory to path
+scripts_training = Path(__file__).parent.parent.parent.parent / "scripts" / "training"
+if str(scripts_training) not in sys.path:
+    sys.path.insert(0, str(scripts_training))
 
 from llrd_trainer import LLRDConfig
 

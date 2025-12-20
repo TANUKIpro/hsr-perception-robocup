@@ -18,8 +18,10 @@ sys.modules['torch.optim.swa_utils'] = MagicMock()
 sys.modules['ultralytics'] = MagicMock()
 sys.modules['ultralytics.utils'] = MagicMock()
 
-# Add parent directory to path to import swa_trainer
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add scripts/training directory to path
+scripts_training = Path(__file__).parent.parent.parent.parent / "scripts" / "training"
+if str(scripts_training) not in sys.path:
+    sys.path.insert(0, str(scripts_training))
 
 from swa_trainer import SWAConfig, calculate_adaptive_swa_start_epoch
 

@@ -100,11 +100,11 @@ temp/
 *.bak
 
 # -----------------------------------------------------------------------------
-# Test Files
+# Test Files - Keep tests/ and pytest.ini for container testing
 # -----------------------------------------------------------------------------
-tests/
-test/
-pytest.ini
+# tests/  # Included for testing inside container
+# test/
+# pytest.ini  # Included for pytest configuration
 .pytest_cache/
 .coverage
 htmlcov/
