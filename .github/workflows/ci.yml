@@ -1,0 +1,293 @@
+# =============================================================================
+# HSR Perception Pipeline - CI Workflow
+# =============================================================================
+# Runs on every PR to main branch
+# All checks must pass before merging
+# =============================================================================
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Cancel in-progress runs for the same PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOCKER_IMAGE: hsr-perception
+  DOCKER_TAG: ci-${{ github.sha }}
+
+jobs:
+  # ===========================================================================
+  # Job 1: Build Docker Image
+  # ===========================================================================
+  build-docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    outputs:
+      image-name: ${{ steps.build.outputs.imageid }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and export
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile
+          tags: ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          outputs: type=docker,dest=/tmp/docker-image.tar
+
+      - name: Upload Docker image
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp/docker-image.tar
+          retention-days: 1
+
+  # ===========================================================================
+  # Job 2: Backend Tests (Matrix: 2 shards)
+  # ===========================================================================
+  backend-tests:
+    name: Backend Tests (${{ matrix.shard }})
+    needs: build-docker
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: 1
+            paths: "tests/backend/annotation tests/backend/augmentation tests/backend/capture tests/backend/common"
+          - shard: 2
+            paths: "tests/backend/training tests/backend/evaluation tests/backend/gui_framework tests/backend/ros2"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Docker image
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp
+
+      - name: Load Docker image
+        run: docker load -i /tmp/docker-image.tar
+
+      - name: Run tests
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }} \
+            test ${{ matrix.paths }} \
+            -v \
+            --tb=short \
+            --cov=scripts \
+            --cov=app \
+            --cov-report=xml:coverage-backend-${{ matrix.shard }}.xml \
+            --junitxml=test-results-backend-${{ matrix.shard }}.xml
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-backend-${{ matrix.shard }}
+          path: |
+            test-results-backend-${{ matrix.shard }}.xml
+            coverage-backend-${{ matrix.shard }}.xml
+
+  # ===========================================================================
+  # Job 3: Frontend Tests (Matrix: 2 shards)
+  # ===========================================================================
+  frontend-tests:
+    name: Frontend Tests (${{ matrix.shard }})
+    needs: build-docker
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: 1
+            paths: "tests/frontend/core tests/frontend/services"
+          - shard: 2
+            paths: "tests/frontend/components tests/frontend/pages"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Docker image
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp
+
+      - name: Load Docker image
+        run: docker load -i /tmp/docker-image.tar
+
+      - name: Run tests
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }} \
+            test ${{ matrix.paths }} \
+            -v \
+            --tb=short \
+            --cov=app \
+            --cov-report=xml:coverage-frontend-${{ matrix.shard }}.xml \
+            --junitxml=test-results-frontend-${{ matrix.shard }}.xml
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-frontend-${{ matrix.shard }}
+          path: |
+            test-results-frontend-${{ matrix.shard }}.xml
+            coverage-frontend-${{ matrix.shard }}.xml
+
+  # ===========================================================================
+  # Job 4: E2E Tests (Playwright)
+  # ===========================================================================
+  e2e-tests:
+    name: E2E Tests
+    needs: build-docker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Docker image
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp
+
+      - name: Load Docker image
+        run: docker load -i /tmp/docker-image.tar
+
+      - name: Create test directories
+        run: |
+          mkdir -p datasets models profiles runs imports
+          chmod -R 777 datasets models profiles runs imports
+
+      - name: Start Streamlit
+        run: |
+          docker run -d \
+            --name streamlit-app \
+            -p 8501:8501 \
+            -v ${{ github.workspace }}/datasets:/workspace/datasets \
+            -v ${{ github.workspace }}/models:/workspace/models \
+            -v ${{ github.workspace }}/profiles:/workspace/profiles \
+            -v ${{ github.workspace }}/runs:/workspace/runs \
+            -v ${{ github.workspace }}/imports:/app/imports \
+            -v ${{ github.workspace }}/config:/workspace/config:ro \
+            ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }} \
+            streamlit
+
+      - name: Wait for Streamlit
+        run: |
+          echo "Waiting for Streamlit to start..."
+          timeout 120 bash -c 'until curl -s http://localhost:8501/_stcore/health; do sleep 2; done'
+          echo "Streamlit is ready"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: tests/e2e/package-lock.json
+
+      - name: Install Playwright
+        working-directory: tests/e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        working-directory: tests/e2e
+        run: npx playwright test --project=chromium-headless
+        env:
+          STREAMLIT_URL: http://localhost:8501
+          CI: true
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: tests/e2e/playwright-report/
+          retention-days: 30
+
+      - name: Upload E2E test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-e2e
+          path: tests/e2e/test-results/
+
+      - name: Stop Streamlit
+        if: always()
+        run: docker stop streamlit-app || true
+
+  # ===========================================================================
+  # Job 5: Test Summary
+  # ===========================================================================
+  test-summary:
+    name: Test Summary
+    needs: [backend-tests, frontend-tests, e2e-tests]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Download all test results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: test-results-*
+          path: test-results
+          merge-multiple: true
+
+      - name: Publish Test Report
+        uses: mikepenz/action-junit-report@v4
+        if: always()
+        with:
+          report_paths: 'test-results/**/*.xml'
+          fail_on_failure: true
+          include_passed: true
+          detailed_summary: true
+          check_name: 'Test Results'
+
+      - name: Download coverage files
+        uses: actions/download-artifact@v4
+        with:
+          pattern: test-results-*
+          path: coverage
+          merge-multiple: true
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage/coverage-*.xml
+          fail_ci_if_error: false
+          verbose: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Check test status
+        if: ${{ needs.backend-tests.result != 'success' || needs.frontend-tests.result != 'success' || needs.e2e-tests.result != 'success' }}
+        run: |
+          echo "One or more test jobs failed"
+          echo "Backend tests: ${{ needs.backend-tests.result }}"
+          echo "Frontend tests: ${{ needs.frontend-tests.result }}"
+          echo "E2E tests: ${{ needs.e2e-tests.result }}"
+          exit 1
