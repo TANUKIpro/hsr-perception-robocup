@@ -96,7 +96,7 @@ jobs:
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }} \
-            test ${{ matrix.paths }} \
+            python -m pytest ${{ matrix.paths }} \
             -v \
             --tb=short \
             --cov=scripts \
@@ -147,7 +147,7 @@ jobs:
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }} \
-            test ${{ matrix.paths }} \
+            python -m pytest ${{ matrix.paths }} \
             -v \
             --tb=short \
             --cov=app \
@@ -200,7 +200,7 @@ jobs:
             -v ${{ github.workspace }}/imports:/app/imports \
             -v ${{ github.workspace }}/config:/workspace/config:ro \
             ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }} \
-            streamlit
+            streamlit run app/main.py --server.headless true --server.port 8501 --server.address 0.0.0.0
 
       - name: Wait for Streamlit
         run: |
