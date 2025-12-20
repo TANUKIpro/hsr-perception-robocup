@@ -489,6 +489,14 @@ class TestTaskLaunchers:
         assert task_id.startswith("training_")
         assert mock_popen.called
 
+    def test_start_training_requires_dataset(self, mock_path_coordinator):
+        """訓練にはデータセットが必要テスト"""
+        manager = TaskManager(path_coordinator=mock_path_coordinator)
+
+        # dataset_yaml なしで呼び出すと TypeError
+        with pytest.raises(TypeError):
+            manager.start_training()
+
     @patch('subprocess.Popen')
     def test_start_evaluation(self, mock_popen, mock_path_coordinator, tmp_path):
         """評価開始テスト"""

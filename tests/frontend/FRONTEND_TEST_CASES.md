@@ -92,7 +92,7 @@
 | ✅ | `TestTaskLaunchers` | `test_start_annotation()` | アノテーション開始 |
 | ✅ | `TestTaskLaunchers` | `test_start_annotation_requires_background()` | アノテーションには背景が必要 |
 | ✅ | `TestTaskLaunchers` | `test_start_training()` | 訓練開始 |
-| ⬜ | `TestTaskLaunchers` | `test_start_training_requires_dataset()` | 訓練にはデータセットが必要 |
+| ✅ | `TestTaskLaunchers` | `test_start_training_requires_dataset()` | 訓練にはデータセットが必要 |
 | ✅ | `TestTaskLaunchers` | `test_start_evaluation()` | 評価開始 |
 | ✅ | `TestUpdateTaskStatus` | `test_update_progress()` | 進捗更新 |
 | ✅ | `TestUpdateTaskStatus` | `test_update_status()` | ステータス更新 |
