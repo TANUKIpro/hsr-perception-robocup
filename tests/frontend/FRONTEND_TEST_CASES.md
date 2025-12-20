@@ -15,7 +15,7 @@
 
 ## 1. Services モジュール (`app/services/`)
 
-### 1.1 test_profile_manager.py ⬜
+### 1.1 test_profile_manager.py ✅
 
 **ソースファイル**: `app/services/profile_manager.py`
 
@@ -23,40 +23,42 @@
 
 **優先度**: 🔶 高
 
+**実装**: `tests/frontend/services/test_profile_manager.py` (28テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestProfileMetadata` | `test_to_dict()` | 辞書変換 |
-| ⬜ | `TestProfileMetadata` | `test_from_dict()` | 辞書から作成 |
-| ⬜ | `TestProfileMetadata` | `test_default_timestamps()` | デフォルトタイムスタンプ |
-| ⬜ | `TestProfileManager` | `test_initialization()` | 初期化 |
-| ⬜ | `TestProfileManager` | `test_initialization_creates_default_profile()` | デフォルトプロファイル作成 |
-| ⬜ | `TestProfileManager` | `test_create_profile()` | プロファイル作成 |
-| ⬜ | `TestProfileManager` | `test_create_profile_with_custom_id()` | カスタムID付きプロファイル作成 |
-| ⬜ | `TestProfileManager` | `test_get_profile()` | プロファイル取得 |
-| ⬜ | `TestProfileManager` | `test_get_profile_not_found()` | プロファイル未発見 |
-| ⬜ | `TestProfileManager` | `test_get_all_profiles()` | 全プロファイル取得 |
-| ⬜ | `TestProfileManager` | `test_set_active_profile()` | アクティブプロファイル設定 |
-| ⬜ | `TestProfileManager` | `test_set_active_profile_not_found()` | 存在しないプロファイルをアクティブに |
-| ⬜ | `TestProfileManager` | `test_get_active_profile_id()` | アクティブプロファイルID取得 |
-| ⬜ | `TestProfileManager` | `test_update_profile()` | プロファイル更新 |
-| ⬜ | `TestProfileManager` | `test_update_profile_name()` | プロファイル名更新 |
-| ⬜ | `TestProfileManager` | `test_delete_profile()` | プロファイル削除 |
-| ⬜ | `TestProfileManager` | `test_cannot_delete_last_profile()` | 最後のプロファイル削除不可 |
-| ⬜ | `TestProfileManager` | `test_cannot_delete_active_profile()` | アクティブプロファイル削除不可 |
-| ⬜ | `TestProfileManager` | `test_duplicate_profile()` | プロファイル複製 |
-| ⬜ | `TestProfileManager` | `test_generate_profile_id()` | プロファイルID生成 |
-| ⬜ | `TestProfileManager` | `test_get_profile_path()` | プロファイルパス取得 |
-| ⬜ | `TestProfileExportImport` | `test_export_profile()` | プロファイルエクスポート |
-| ⬜ | `TestProfileExportImport` | `test_export_profile_to_bytes()` | バイトへエクスポート |
-| ⬜ | `TestProfileExportImport` | `test_import_profile()` | プロファイルインポート |
-| ⬜ | `TestProfileExportImport` | `test_safe_extract_zip_prevents_path_traversal()` | パストラバーサル防止 |
-| ⬜ | `TestProfileExportImport` | `test_resolve_duplicate_name()` | 重複名解決 |
-| ⬜ | `TestProfileExportImport` | `test_import_invalid_zip()` | 無効なZIPインポート |
-| ⬜ | `TestProfileExportImport` | `test_import_too_large_zip()` | 大きすぎるZIPインポート |
+| ✅ | `TestProfileMetadata` | `test_to_dict()` | 辞書変換 |
+| ✅ | `TestProfileMetadata` | `test_from_dict()` | 辞書から作成 |
+| ✅ | `TestProfileMetadata` | `test_default_timestamps()` | デフォルトタイムスタンプ |
+| ✅ | `TestProfileManager` | `test_initialization()` | 初期化 |
+| ✅ | `TestProfileManager` | `test_initialization_creates_default_profile()` | デフォルトプロファイル作成 |
+| ✅ | `TestProfileManager` | `test_create_profile()` | プロファイル作成 |
+| ✅ | `TestProfileManager` | `test_create_profile_with_custom_id()` | カスタムID付きプロファイル作成 |
+| ✅ | `TestProfileManager` | `test_get_profile()` | プロファイル取得 |
+| ✅ | `TestProfileManager` | `test_get_profile_not_found()` | プロファイル未発見 |
+| ✅ | `TestProfileManager` | `test_get_all_profiles()` | 全プロファイル取得 |
+| ✅ | `TestProfileManager` | `test_set_active_profile()` | アクティブプロファイル設定 |
+| ✅ | `TestProfileManager` | `test_set_active_profile_not_found()` | 存在しないプロファイルをアクティブに |
+| ✅ | `TestProfileManager` | `test_get_active_profile_id()` | アクティブプロファイルID取得 |
+| ✅ | `TestProfileManager` | `test_update_profile()` | プロファイル更新 |
+| ✅ | `TestProfileManager` | `test_update_profile_name()` | プロファイル名更新 |
+| ✅ | `TestProfileManager` | `test_delete_profile()` | プロファイル削除 |
+| ✅ | `TestProfileManager` | `test_cannot_delete_last_profile()` | 最後のプロファイル削除不可 |
+| ✅ | `TestProfileManager` | `test_cannot_delete_active_profile()` | アクティブプロファイル削除不可 |
+| ✅ | `TestProfileManager` | `test_duplicate_profile()` | プロファイル複製 |
+| ✅ | `TestProfileManager` | `test_generate_profile_id()` | プロファイルID生成 |
+| ✅ | `TestProfileManager` | `test_get_profile_path()` | プロファイルパス取得 |
+| ✅ | `TestProfileExportImport` | `test_export_profile()` | プロファイルエクスポート |
+| ✅ | `TestProfileExportImport` | `test_export_profile_to_bytes()` | バイトへエクスポート |
+| ✅ | `TestProfileExportImport` | `test_import_profile()` | プロファイルインポート |
+| ✅ | `TestProfileExportImport` | `test_safe_extract_zip_prevents_path_traversal()` | パストラバーサル防止 |
+| ✅ | `TestProfileExportImport` | `test_resolve_duplicate_name()` | 重複名解決 |
+| ✅ | `TestProfileExportImport` | `test_import_invalid_zip()` | 無効なZIPインポート |
+| ✅ | `TestProfileExportImport` | `test_import_too_large_zip()` | 大きすぎるZIPインポート |
 
 ---
 
-### 1.2 test_task_manager.py ⬜
+### 1.2 test_task_manager.py ✅
 
 **ソースファイル**: `app/services/task_manager.py`
 
@@ -64,39 +66,41 @@
 
 **優先度**: 🔶 高
 
+**実装**: `tests/frontend/services/test_task_manager.py` (26テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestTaskStatus` | `test_enum_values()` | Enum値の確認 |
-| ⬜ | `TestTaskInfo` | `test_to_dict()` | 辞書変換 |
-| ⬜ | `TestTaskInfo` | `test_from_dict()` | 辞書から作成 |
-| ⬜ | `TestTaskInfo` | `test_is_active_property()` | アクティブ状態プロパティ |
-| ⬜ | `TestTaskInfo` | `test_is_finished_property()` | 完了状態プロパティ |
-| ⬜ | `TestTaskInfo` | `test_elapsed_time_calculation()` | 経過時間計算 |
-| ⬜ | `TestTaskInfo` | `test_elapsed_time_str_format()` | 経過時間文字列フォーマット |
-| ⬜ | `TestTaskManager` | `test_initialization()` | 初期化 |
-| ⬜ | `TestTaskManager` | `test_generate_task_id()` | タスクID生成 |
-| ⬜ | `TestTaskManager` | `test_save_and_load_status()` | ステータス保存と読み込み |
-| ⬜ | `TestTaskManager` | `test_get_task()` | タスク取得 |
-| ⬜ | `TestTaskManager` | `test_get_task_not_found()` | タスク未発見 |
-| ⬜ | `TestTaskManager` | `test_get_all_tasks()` | 全タスク取得 |
-| ⬜ | `TestTaskManager` | `test_get_active_tasks()` | アクティブタスク取得 |
-| ⬜ | `TestTaskManager` | `test_get_recent_tasks()` | 最近のタスク取得 |
-| ⬜ | `TestTaskManager` | `test_cancel_task()` | タスクキャンセル |
-| ⬜ | `TestTaskManager` | `test_cancel_nonexistent_task()` | 存在しないタスクキャンセル |
-| ⬜ | `TestTaskManager` | `test_delete_task()` | タスク削除 |
-| ⬜ | `TestTaskManager` | `test_cleanup_old_tasks()` | 古いタスクのクリーンアップ |
-| ⬜ | `TestTaskLaunchers` | `test_start_annotation()` | アノテーション開始 |
-| ⬜ | `TestTaskLaunchers` | `test_start_annotation_requires_background()` | アノテーションには背景が必要 |
-| ⬜ | `TestTaskLaunchers` | `test_start_training()` | 訓練開始 |
+| ✅ | `TestTaskStatus` | `test_enum_values()` | Enum値の確認 |
+| ✅ | `TestTaskInfo` | `test_to_dict()` | 辞書変換 |
+| ✅ | `TestTaskInfo` | `test_from_dict()` | 辞書から作成 |
+| ✅ | `TestTaskInfo` | `test_is_active_property()` | アクティブ状態プロパティ |
+| ✅ | `TestTaskInfo` | `test_is_finished_property()` | 完了状態プロパティ |
+| ✅ | `TestTaskInfo` | `test_elapsed_time_calculation()` | 経過時間計算 |
+| ✅ | `TestTaskInfo` | `test_elapsed_time_str_format()` | 経過時間文字列フォーマット |
+| ✅ | `TestTaskManager` | `test_initialization()` | 初期化 |
+| ✅ | `TestTaskManager` | `test_generate_task_id()` | タスクID生成 |
+| ✅ | `TestTaskManager` | `test_save_and_load_status()` | ステータス保存と読み込み |
+| ✅ | `TestTaskManager` | `test_get_task()` | タスク取得 |
+| ✅ | `TestTaskManager` | `test_get_task_not_found()` | タスク未発見 |
+| ✅ | `TestTaskManager` | `test_get_all_tasks()` | 全タスク取得 |
+| ✅ | `TestTaskManager` | `test_get_active_tasks()` | アクティブタスク取得 |
+| ✅ | `TestTaskManager` | `test_get_recent_tasks()` | 最近のタスク取得 |
+| ✅ | `TestTaskManager` | `test_cancel_task()` | タスクキャンセル |
+| ✅ | `TestTaskManager` | `test_cancel_nonexistent_task()` | 存在しないタスクキャンセル |
+| ✅ | `TestTaskManager` | `test_delete_task()` | タスク削除 |
+| ✅ | `TestTaskManager` | `test_cleanup_old_tasks()` | 古いタスクのクリーンアップ |
+| ✅ | `TestTaskLaunchers` | `test_start_annotation()` | アノテーション開始 |
+| ✅ | `TestTaskLaunchers` | `test_start_annotation_requires_background()` | アノテーションには背景が必要 |
+| ✅ | `TestTaskLaunchers` | `test_start_training()` | 訓練開始 |
 | ⬜ | `TestTaskLaunchers` | `test_start_training_requires_dataset()` | 訓練にはデータセットが必要 |
-| ⬜ | `TestTaskLaunchers` | `test_start_evaluation()` | 評価開始 |
-| ⬜ | `TestUpdateTaskStatus` | `test_update_progress()` | 進捗更新 |
-| ⬜ | `TestUpdateTaskStatus` | `test_update_status()` | ステータス更新 |
-| ⬜ | `TestUpdateTaskStatus` | `test_update_error_message()` | エラーメッセージ更新 |
+| ✅ | `TestTaskLaunchers` | `test_start_evaluation()` | 評価開始 |
+| ✅ | `TestUpdateTaskStatus` | `test_update_progress()` | 進捗更新 |
+| ✅ | `TestUpdateTaskStatus` | `test_update_status()` | ステータス更新 |
+| ✅ | `TestUpdateTaskStatus` | `test_update_error_message()` | エラーメッセージ更新 |
 
 ---
 
-### 1.3 test_path_coordinator.py ⬜
+### 1.3 test_path_coordinator.py ✅
 
 **ソースファイル**: `app/services/path_coordinator.py`
 
@@ -104,32 +108,34 @@
 
 **優先度**: 🔶 高
 
+**実装**: `tests/frontend/services/test_path_coordinator.py` (20テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestPathConfig` | `test_default_paths()` | デフォルトパス |
-| ⬜ | `TestPathConfig` | `test_custom_paths()` | カスタムパス |
-| ⬜ | `TestPathCoordinator` | `test_initialization()` | 初期化 |
-| ⬜ | `TestPathCoordinator` | `test_initialization_with_profile_manager()` | ProfileManager付き初期化 |
-| ⬜ | `TestPathCoordinator` | `test_get_path_profile_specific()` | プロファイル固有パス取得 |
-| ⬜ | `TestPathCoordinator` | `test_get_path_shared()` | 共有パス取得 |
-| ⬜ | `TestPathCoordinator` | `test_resolve_path_absolute()` | 絶対パス解決 |
-| ⬜ | `TestPathCoordinator` | `test_resolve_path_relative()` | 相対パス解決 |
-| ⬜ | `TestPathCoordinator` | `test_create_annotation_session()` | アノテーションセッション作成 |
-| ⬜ | `TestPathCoordinator` | `test_get_annotation_sessions()` | アノテーションセッション取得 |
-| ⬜ | `TestPathCoordinator` | `test_get_training_paths()` | 訓練パス取得 |
-| ⬜ | `TestPathCoordinator` | `test_get_trained_models()` | 訓練済みモデル取得 |
-| ⬜ | `TestPathCoordinator` | `test_get_pretrained_models()` | 事前訓練モデル取得 |
-| ⬜ | `TestPathCoordinator` | `test_get_background_images()` | 背景画像取得 |
-| ⬜ | `TestPathCoordinator` | `test_add_background_image()` | 背景画像追加 |
-| ⬜ | `TestPathCoordinator` | `test_validate_paths()` | パス検証 |
-| ⬜ | `TestCachedFunctions` | `test_cached_get_annotation_sessions()` | キャッシュ付きセッション取得 |
-| ⬜ | `TestCachedFunctions` | `test_cached_get_trained_models()` | キャッシュ付きモデル取得 |
-| ⬜ | `TestCachedFunctions` | `test_cached_get_background_images()` | キャッシュ付き背景取得 |
-| ⬜ | `TestCachedFunctions` | `test_cache_invalidation()` | キャッシュ無効化 |
+| ✅ | `TestPathConfig` | `test_default_paths()` | デフォルトパス |
+| ✅ | `TestPathConfig` | `test_custom_paths()` | カスタムパス |
+| ✅ | `TestPathCoordinator` | `test_initialization()` | 初期化 |
+| ✅ | `TestPathCoordinator` | `test_initialization_with_profile_manager()` | ProfileManager付き初期化 |
+| ✅ | `TestPathCoordinator` | `test_get_path_profile_specific()` | プロファイル固有パス取得 |
+| ✅ | `TestPathCoordinator` | `test_get_path_shared()` | 共有パス取得 |
+| ✅ | `TestPathCoordinator` | `test_resolve_path_absolute()` | 絶対パス解決 |
+| ✅ | `TestPathCoordinator` | `test_resolve_path_relative()` | 相対パス解決 |
+| ✅ | `TestPathCoordinator` | `test_create_annotation_session()` | アノテーションセッション作成 |
+| ✅ | `TestPathCoordinator` | `test_get_annotation_sessions()` | アノテーションセッション取得 |
+| ✅ | `TestPathCoordinator` | `test_get_training_paths()` | 訓練パス取得 |
+| ✅ | `TestPathCoordinator` | `test_get_trained_models()` | 訓練済みモデル取得 |
+| ✅ | `TestPathCoordinator` | `test_get_pretrained_models()` | 事前訓練モデル取得 |
+| ✅ | `TestPathCoordinator` | `test_get_background_images()` | 背景画像取得 |
+| ✅ | `TestPathCoordinator` | `test_add_background_image()` | 背景画像追加 |
+| ✅ | `TestPathCoordinator` | `test_validate_paths()` | パス検証 |
+| ✅ | `TestCachedFunctions` | `test_cached_get_annotation_sessions()` | キャッシュ付きセッション取得 |
+| ✅ | `TestCachedFunctions` | `test_cached_get_trained_models()` | キャッシュ付きモデル取得 |
+| ✅ | `TestCachedFunctions` | `test_cached_get_background_images()` | キャッシュ付き背景取得 |
+| ✅ | `TestCachedFunctions` | `test_cache_invalidation()` | キャッシュ無効化 |
 
 ---
 
-### 1.4 test_ui_settings_manager.py ⬜
+### 1.4 test_ui_settings_manager.py ✅
 
 **ソースファイル**: `app/services/ui_settings_manager.py`
 
@@ -137,22 +143,32 @@
 
 **優先度**: 🔷 中
 
+**実装**: `tests/frontend/services/test_ui_settings_manager.py` (18テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestUISettingsManager` | `test_initialization()` | 初期化 |
-| ⬜ | `TestUISettingsManager` | `test_load_settings()` | 設定読み込み |
-| ⬜ | `TestUISettingsManager` | `test_load_settings_file_not_found()` | 設定ファイル未発見 |
-| ⬜ | `TestUISettingsManager` | `test_save_settings()` | 設定保存 |
-| ⬜ | `TestUISettingsManager` | `test_get_setting()` | 設定取得 |
-| ⬜ | `TestUISettingsManager` | `test_get_setting_with_default()` | デフォルト付き設定取得 |
-| ⬜ | `TestUISettingsManager` | `test_set_setting()` | 設定設定 |
-| ⬜ | `TestUISettingsManager` | `test_delete_setting()` | 設定削除 |
-| ⬜ | `TestUISettingsManager` | `test_nested_settings()` | ネストした設定 |
-| ⬜ | `TestUISettingsManager` | `test_settings_persistence()` | 設定の永続化 |
+| ✅ | `TestUISettingsManager` | `test_initialization()` | 初期化 |
+| ✅ | `TestUISettingsManager` | `test_load_settings()` | 設定読み込み |
+| ✅ | `TestUISettingsManager` | `test_load_settings_file_not_found()` | 設定ファイル未発見 |
+| ✅ | `TestUISettingsManager` | `test_save_settings()` | 設定保存 |
+| ✅ | `TestUISettingsManager` | `test_get_setting()` | 設定取得 |
+| ✅ | `TestUISettingsManager` | `test_get_setting_with_default()` | デフォルト付き設定取得 |
+| ✅ | `TestUISettingsManager` | `test_set_setting()` | 設定設定 |
+| ✅ | `TestUISettingsManager` | `test_delete_setting()` | 設定削除 |
+| ✅ | `TestUISettingsManager` | `test_nested_settings()` | ネストした設定 |
+| ✅ | `TestUISettingsManager` | `test_settings_persistence()` | 設定の永続化 |
+| ✅ | `TestTrainingAdvancedParams` | `test_default_values()` | デフォルト値 |
+| ✅ | `TestTrainingAdvancedParams` | `test_custom_values()` | カスタム値 |
+| ✅ | `TestSyntheticParams` | `test_default_values()` | デフォルト値 |
+| ✅ | `TestSyntheticParams` | `test_custom_values()` | カスタム値 |
+| ✅ | `TestDatasetPreparationParams` | `test_default_values()` | デフォルト値 |
+| ✅ | `TestEvaluationParams` | `test_default_values()` | デフォルト値 |
+| ✅ | `TestUISettings` | `test_default_values()` | デフォルト値 |
+| ✅ | `TestUISettings` | `test_nested_access()` | ネストしたアクセス |
 
 ---
 
-### 1.5 test_dataset_preparer.py ⬜
+### 1.5 test_dataset_preparer.py ✅
 
 **ソースファイル**: `app/services/dataset_preparer.py`
 
@@ -160,22 +176,35 @@
 
 **優先度**: 🔷 中
 
+**実装**: `tests/frontend/services/test_dataset_preparer.py` (19テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestDatasetPreparer` | `test_initialization()` | 初期化 |
-| ⬜ | `TestDatasetPreparer` | `test_prepare_dataset()` | データセット準備 |
-| ⬜ | `TestDatasetPreparer` | `test_prepare_dataset_with_split()` | 分割付きデータセット準備 |
-| ⬜ | `TestDatasetPreparer` | `test_validate_annotations()` | アノテーション検証 |
-| ⬜ | `TestDatasetPreparer` | `test_create_yaml()` | YAML作成 |
-| ⬜ | `TestDatasetPreparer` | `test_copy_images()` | 画像コピー |
-| ⬜ | `TestDatasetPreparer` | `test_symlink_images()` | 画像シンボリックリンク |
-| ⬜ | `TestDatasetPreparer` | `test_get_dataset_stats()` | データセット統計取得 |
+| ✅ | `TestHelperFunctions` | `test_extract_timestamp()` | タイムスタンプ抽出 |
+| ✅ | `TestHelperFunctions` | `test_extract_timestamp_invalid_format()` | 無効フォーマット |
+| ✅ | `TestHelperFunctions` | `test_group_by_timestamp()` | タイムスタンプグループ化 |
+| ✅ | `TestHelperFunctions` | `test_group_by_timestamp_empty()` | 空リストグループ化 |
+| ✅ | `TestClassInfo` | `test_match_ratio()` | マッチ率 |
+| ✅ | `TestClassInfo` | `test_match_ratio_zero_images()` | ゼロ画像時マッチ率 |
+| ✅ | `TestClassInfo` | `test_is_ready()` | 準備完了判定 |
+| ✅ | `TestClassInfo` | `test_status()` | ステータス判定 |
+| ✅ | `TestDatasetResult` | `test_success_result()` | 成功結果 |
+| ✅ | `TestDatasetResult` | `test_failure_result()` | 失敗結果 |
+| ✅ | `TestDatasetPreparer` | `test_initialization()` | 初期化 |
+| ✅ | `TestDatasetPreparer` | `test_prepare_dataset()` | データセット準備 |
+| ✅ | `TestDatasetPreparer` | `test_prepare_dataset_with_split()` | 分割付きデータセット準備 |
+| ✅ | `TestDatasetPreparer` | `test_validate_annotations()` | アノテーション検証 |
+| ✅ | `TestDatasetPreparer` | `test_create_yaml()` | YAML作成 |
+| ✅ | `TestDatasetPreparer` | `test_copy_images()` | 画像コピー |
+| ✅ | `TestDatasetPreparer` | `test_get_dataset_stats()` | データセット統計取得 |
+| ✅ | `TestDatasetPreparer` | `test_prepare_dataset_class_not_found()` | クラス未発見 |
+| ✅ | `TestDatasetPreparer` | `test_prepare_dataset_no_pairs()` | ペアなし |
 
 ---
 
 ## 2. Core モジュール (`app/`)
 
-### 2.1 test_object_registry.py ⬜
+### 2.1 test_object_registry.py ✅
 
 **ソースファイル**: `app/object_registry.py`
 
@@ -183,50 +212,52 @@
 
 **優先度**: 🔶 高
 
+**実装**: `tests/frontend/core/test_object_registry.py` (38テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestObjectVersion` | `test_default_values()` | デフォルト値 |
-| ⬜ | `TestObjectVersion` | `test_custom_values()` | カスタム値 |
-| ⬜ | `TestObjectProperties` | `test_default_values()` | デフォルト値 |
-| ⬜ | `TestObjectProperties` | `test_to_dict()` | 辞書変換 |
-| ⬜ | `TestObjectProperties` | `test_from_dict()` | 辞書から作成 |
-| ⬜ | `TestRegisteredObject` | `test_to_dict()` | 辞書変換 |
-| ⬜ | `TestRegisteredObject` | `test_from_dict()` | 辞書から作成 |
-| ⬜ | `TestRegisteredObject` | `test_roundtrip_serialization()` | 往復シリアライズ |
-| ⬜ | `TestObjectRegistry` | `test_initialization()` | 初期化 |
-| ⬜ | `TestObjectRegistry` | `test_initialization_creates_file()` | 初期化でファイル作成 |
-| ⬜ | `TestObjectRegistry` | `test_add_object()` | オブジェクト追加 |
-| ⬜ | `TestObjectRegistry` | `test_add_object_duplicate_name()` | 重複名オブジェクト追加 |
-| ⬜ | `TestObjectRegistry` | `test_remove_object()` | オブジェクト削除 |
-| ⬜ | `TestObjectRegistry` | `test_get_object()` | オブジェクト取得 |
-| ⬜ | `TestObjectRegistry` | `test_get_object_not_found()` | オブジェクト未発見 |
-| ⬜ | `TestObjectRegistry` | `test_get_object_by_name()` | 名前でオブジェクト取得 |
-| ⬜ | `TestObjectRegistry` | `test_get_all_objects()` | 全オブジェクト取得 |
-| ⬜ | `TestObjectRegistry` | `test_get_objects_by_category()` | カテゴリでオブジェクト取得 |
-| ⬜ | `TestObjectRegistry` | `test_get_next_id()` | 次のID取得 |
-| ⬜ | `TestObjectRegistry` | `test_add_category()` | カテゴリ追加 |
-| ⬜ | `TestObjectRegistry` | `test_add_duplicate_category()` | 重複カテゴリ追加 |
-| ⬜ | `TestObjectRegistry` | `test_update_object()` | オブジェクト更新 |
-| ⬜ | `TestObjectRegistry` | `test_update_object_name_renames_directories()` | 名前変更時ディレクトリリネーム |
-| ⬜ | `TestThumbnailManagement` | `test_set_thumbnail()` | サムネイル設定 |
-| ⬜ | `TestThumbnailManagement` | `test_save_thumbnail_from_bytes()` | バイトからサムネイル保存 |
-| ⬜ | `TestThumbnailManagement` | `test_get_thumbnail_path()` | サムネイルパス取得 |
-| ⬜ | `TestThumbnailManagement` | `test_get_thumbnail_path_not_found()` | サムネイルパス未発見 |
-| ⬜ | `TestReferenceImageManagement` | `test_add_reference_image()` | 参照画像追加 |
-| ⬜ | `TestReferenceImageManagement` | `test_get_reference_images()` | 参照画像取得 |
-| ⬜ | `TestReferenceImageManagement` | `test_delete_reference_image()` | 参照画像削除 |
-| ⬜ | `TestCollectionManagement` | `test_add_collected_image()` | 収集画像追加 |
-| ⬜ | `TestCollectionManagement` | `test_save_collected_image()` | 収集画像保存 |
-| ⬜ | `TestCollectionManagement` | `test_get_collected_images()` | 収集画像取得 |
-| ⬜ | `TestCollectionManagement` | `test_update_collection_count()` | 収集カウント更新 |
-| ⬜ | `TestCollectionManagement` | `test_update_all_collection_counts()` | 全収集カウント更新 |
-| ⬜ | `TestStatistics` | `test_get_collection_stats()` | 収集統計取得 |
-| ⬜ | `TestStatistics` | `test_get_category_progress()` | カテゴリ進捗取得 |
-| ⬜ | `TestExport` | `test_export_to_yolo_config()` | YOLO設定エクスポート |
+| ✅ | `TestObjectVersion` | `test_default_values()` | デフォルト値 |
+| ✅ | `TestObjectVersion` | `test_custom_values()` | カスタム値 |
+| ✅ | `TestObjectProperties` | `test_default_values()` | デフォルト値 |
+| ✅ | `TestObjectProperties` | `test_to_dict()` | 辞書変換 |
+| ✅ | `TestObjectProperties` | `test_from_dict()` | 辞書から作成 |
+| ✅ | `TestRegisteredObject` | `test_to_dict()` | 辞書変換 |
+| ✅ | `TestRegisteredObject` | `test_from_dict()` | 辞書から作成 |
+| ✅ | `TestRegisteredObject` | `test_roundtrip_serialization()` | 往復シリアライズ |
+| ✅ | `TestObjectRegistry` | `test_initialization()` | 初期化 |
+| ✅ | `TestObjectRegistry` | `test_initialization_creates_file()` | 初期化でファイル作成 |
+| ✅ | `TestObjectRegistry` | `test_add_object()` | オブジェクト追加 |
+| ✅ | `TestObjectRegistry` | `test_add_object_duplicate_name()` | 重複名オブジェクト追加 |
+| ✅ | `TestObjectRegistry` | `test_remove_object()` | オブジェクト削除 |
+| ✅ | `TestObjectRegistry` | `test_get_object()` | オブジェクト取得 |
+| ✅ | `TestObjectRegistry` | `test_get_object_not_found()` | オブジェクト未発見 |
+| ✅ | `TestObjectRegistry` | `test_get_object_by_name()` | 名前でオブジェクト取得 |
+| ✅ | `TestObjectRegistry` | `test_get_all_objects()` | 全オブジェクト取得 |
+| ✅ | `TestObjectRegistry` | `test_get_objects_by_category()` | カテゴリでオブジェクト取得 |
+| ✅ | `TestObjectRegistry` | `test_get_next_id()` | 次のID取得 |
+| ✅ | `TestObjectRegistry` | `test_add_category()` | カテゴリ追加 |
+| ✅ | `TestObjectRegistry` | `test_add_duplicate_category()` | 重複カテゴリ追加 |
+| ✅ | `TestObjectRegistry` | `test_update_object()` | オブジェクト更新 |
+| ✅ | `TestObjectRegistry` | `test_update_object_name_renames_directories()` | 名前変更時ディレクトリリネーム |
+| ✅ | `TestThumbnailManagement` | `test_set_thumbnail()` | サムネイル設定 |
+| ✅ | `TestThumbnailManagement` | `test_save_thumbnail_from_bytes()` | バイトからサムネイル保存 |
+| ✅ | `TestThumbnailManagement` | `test_get_thumbnail_path()` | サムネイルパス取得 |
+| ✅ | `TestThumbnailManagement` | `test_get_thumbnail_path_not_found()` | サムネイルパス未発見 |
+| ✅ | `TestReferenceImageManagement` | `test_add_reference_image()` | 参照画像追加 |
+| ✅ | `TestReferenceImageManagement` | `test_get_reference_images()` | 参照画像取得 |
+| ✅ | `TestReferenceImageManagement` | `test_delete_reference_image()` | 参照画像削除 |
+| ✅ | `TestCollectionManagement` | `test_add_collected_image()` | 収集画像追加 |
+| ✅ | `TestCollectionManagement` | `test_save_collected_image()` | 収集画像保存 |
+| ✅ | `TestCollectionManagement` | `test_get_collected_images()` | 収集画像取得 |
+| ✅ | `TestCollectionManagement` | `test_update_collection_count()` | 収集カウント更新 |
+| ✅ | `TestCollectionManagement` | `test_update_all_collection_counts()` | 全収集カウント更新 |
+| ✅ | `TestStatistics` | `test_get_collection_stats()` | 収集統計取得 |
+| ✅ | `TestStatistics` | `test_get_category_progress()` | カテゴリ進捗取得 |
+| ✅ | `TestExport` | `test_export_to_yolo_config()` | YOLO設定エクスポート |
 
 ---
 
-### 2.2 test_config.py ⬜
+### 2.2 test_config.py ✅
 
 **ソースファイル**: `app/config.py`
 
@@ -234,19 +265,28 @@
 
 **優先度**: 🔷 中
 
+**実装**: `tests/frontend/core/test_config.py` (18テスト)
+
 | 状態 | テストクラス | テストメソッド | 説明 |
 |------|-------------|---------------|------|
-| ⬜ | `TestAppConfig` | `test_default_values()` | デフォルト値 |
-| ⬜ | `TestAppConfig` | `test_environment_detection()` | 環境検出 |
-| ⬜ | `TestAppConfig` | `test_docker_environment()` | Docker環境 |
-| ⬜ | `TestAppConfig` | `test_property_paths()` | プロパティパス |
-| ⬜ | `TestAppConfig` | `test_check_ros2_available()` | ROS2利用可能チェック |
-| ⬜ | `TestAppConfig` | `test_check_ros2_not_available()` | ROS2利用不可チェック |
-| ⬜ | `TestAppConfig` | `test_check_gpu_available()` | GPU利用可能チェック |
-| ⬜ | `TestAppConfig` | `test_check_gpu_not_available()` | GPU利用不可チェック |
-| ⬜ | `TestAppConfig` | `test_to_dict()` | 辞書変換 |
-| ⬜ | `TestGetConfig` | `test_singleton_pattern()` | シングルトンパターン |
-| ⬜ | `TestGetConfig` | `test_reload_config()` | 設定リロード |
+| ✅ | `TestAppConfig` | `test_default_values()` | デフォルト値 |
+| ✅ | `TestAppConfig` | `test_environment_detection()` | 環境検出 |
+| ✅ | `TestAppConfig` | `test_docker_environment()` | Docker環境 |
+| ✅ | `TestAppConfig` | `test_property_paths()` | プロパティパス |
+| ✅ | `TestAppConfig` | `test_check_ros2_available()` | ROS2利用可能チェック |
+| ✅ | `TestAppConfig` | `test_check_ros2_not_available()` | ROS2利用不可チェック |
+| ✅ | `TestAppConfig` | `test_check_ros2_disabled()` | ROS2無効時チェック |
+| ✅ | `TestAppConfig` | `test_check_gpu_available()` | GPU利用可能チェック |
+| ✅ | `TestAppConfig` | `test_check_gpu_not_available()` | GPU利用不可チェック |
+| ✅ | `TestAppConfig` | `test_to_dict()` | 辞書変換 |
+| ✅ | `TestAppConfig` | `test_default_image_topics()` | デフォルト画像トピック |
+| ✅ | `TestAppConfig` | `test_capture_services()` | キャプチャサービス |
+| ✅ | `TestGetConfig` | `test_singleton_pattern()` | シングルトンパターン |
+| ✅ | `TestGetConfig` | `test_reload_config()` | 設定リロード |
+| ✅ | `TestGetConfig` | `test_get_config_creates_instance()` | インスタンス作成 |
+| ✅ | `TestEnvironmentVariables` | `test_ros2_enabled_from_env()` | 環境変数からROS2有効化 |
+| ✅ | `TestEnvironmentVariables` | `test_gpu_enabled_from_env()` | 環境変数からGPU有効化 |
+| ✅ | `TestEnvironmentVariables` | `test_ros2_source_script_from_env()` | 環境変数からROS2スクリプト |
 
 ---
 
@@ -406,35 +446,48 @@ pytest tests/frontend/ -v -m "not streamlit"
 
 | カテゴリ | 実装済み | 未実装 | 合計 |
 |---------|---------|--------|------|
-| Services | 0 | 5 | 5 |
-| Core | 0 | 2 | 2 |
+| Services | 5 | 0 | 5 |
+| Core | 2 | 0 | 2 |
 | Components | 0 | 4 | 4 |
 | Pages | 0 | 3 | 3 |
-| **合計** | **0** | **14** | **14** |
+| **合計** | **7** | **7** | **14** |
+
+### 実装済みテスト詳細
+
+| テストファイル | テスト数 | 優先度 |
+|---------------|---------|--------|
+| test_profile_manager.py | 28 | 🔶 高 |
+| test_task_manager.py | 26 | 🔶 高 |
+| test_path_coordinator.py | 20 | 🔶 高 |
+| test_object_registry.py | 38 | 🔶 高 |
+| test_ui_settings_manager.py | 18 | 🔷 中 |
+| test_dataset_preparer.py | 19 | 🔷 中 |
+| test_config.py | 18 | 🔷 中 |
+| **合計** | **167** | - |
 
 ---
 
 ## 優先度別実装順序
 
-### Phase 1 (高優先度)
-1. `test_profile_manager.py` - プロファイル管理の基盤
-2. `test_task_manager.py` - タスク管理の基盤
-3. `test_path_coordinator.py` - パス管理の基盤
-4. `test_object_registry.py` - オブジェクト管理の基盤
+### Phase 1 (高優先度) ✅ 完了
+1. ✅ `test_profile_manager.py` - プロファイル管理の基盤
+2. ✅ `test_task_manager.py` - タスク管理の基盤
+3. ✅ `test_path_coordinator.py` - パス管理の基盤
+4. ✅ `test_object_registry.py` - オブジェクト管理の基盤
 
-### Phase 2 (中優先度)
-1. `test_ui_settings_manager.py`
-2. `test_dataset_preparer.py`
-3. `test_config.py`
-4. `test_training_charts.py`
-5. `test_progress_display.py`
-6. `test_captured_images_tree.py`
+### Phase 2 (中優先度) 一部完了
+1. ✅ `test_ui_settings_manager.py`
+2. ✅ `test_dataset_preparer.py`
+3. ✅ `test_config.py`
+4. ⬜ `test_training_charts.py`
+5. ⬜ `test_progress_display.py`
+6. ⬜ `test_captured_images_tree.py`
 
 ### Phase 3 (低優先度)
-1. `test_robustness_test.py`
-2. `test_dashboard_integration.py`
-3. `test_registry_integration.py`
-4. `test_training_integration.py`
+1. ⬜ `test_robustness_test.py`
+2. ⬜ `test_dashboard_integration.py`
+3. ⬜ `test_registry_integration.py`
+4. ⬜ `test_training_integration.py`
 
 ---
 
