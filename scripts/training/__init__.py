@@ -9,12 +9,40 @@ Features:
 - OOM recovery with automatic parameter adjustment
 """
 
-from .quick_finetune import (
-    CompetitionTrainer,
+# Core training (facade)
+from .quick_finetune import CompetitionTrainer
+
+# Extracted modules (new structure)
+from .config_manager import (
     COMPETITION_CONFIG,
     FAST_CONFIG,
+    ConfigBuilder,
+    TrainerConfig,
+)
+from .dataset_validator import (
+    DatasetValidator,
+    DatasetValidationResult,
+    validate_dataset,
+)
+from .model_operations import (
+    ModelValidator,
+    ModelExporter,
+    validate_model,
+    export_model,
+)
+from .synthetic_data_manager import (
+    SyntheticConfig,
+    SyntheticDataManager,
+    SyntheticGenerationResult,
+    SYNTHETIC_CONFIG_KEYS,
+    filter_synthetic_keys,
+)
+from .training_executor import (
+    TrainingExecutor,
     TrainingResult,
 )
+
+# GPU scaling
 from .gpu_scaler import (
     GPUScaler,
     GPUScalingConfig,
@@ -22,12 +50,16 @@ from .gpu_scaler import (
     GPUTier,
     OOMRecoveryStrategy,
 )
+
+# Configuration dataclasses
 from .training_config import (
     TrainingConfig,
     AugmentationConfig,
     OptimizerConfig,
     PerformanceConfig,
 )
+
+# TensorBoard
 from .tensorboard_monitor import (
     TensorBoardServer,
     TensorBoardManager,
@@ -36,12 +68,48 @@ from .tensorboard_monitor import (
     check_tensorboard_available,
 )
 
+# Logging
+from .training_logger import (
+    setup_training_logger,
+    get_logger,
+    ColoredFormatter,
+)
+
+# Constants
+from .training_constants import (
+    VRAMThreshold,
+    MODEL_VRAM_OVERHEAD_GB,
+    MODEL_PER_SAMPLE_MEMORY_MB,
+    MAX_OOM_RETRIES,
+    OOM_BATCH_REDUCTION_FACTOR,
+    MIN_BATCH_SIZE,
+    DEFAULT_VRAM_SAFETY_MARGIN,
+    DEFAULT_MAX_VRAM_UTILIZATION,
+    STANDARD_IMAGE_SIZES,
+)
+
 __all__ = [
-    # Core training
+    # Core training (facade)
     "CompetitionTrainer",
-    "TrainingResult",
+    # Extracted modules
     "COMPETITION_CONFIG",
     "FAST_CONFIG",
+    "ConfigBuilder",
+    "TrainerConfig",
+    "DatasetValidator",
+    "DatasetValidationResult",
+    "validate_dataset",
+    "ModelValidator",
+    "ModelExporter",
+    "validate_model",
+    "export_model",
+    "SyntheticConfig",
+    "SyntheticDataManager",
+    "SyntheticGenerationResult",
+    "SYNTHETIC_CONFIG_KEYS",
+    "filter_synthetic_keys",
+    "TrainingExecutor",
+    "TrainingResult",
     # GPU scaling
     "GPUScaler",
     "GPUScalingConfig",
@@ -59,4 +127,18 @@ __all__ = [
     "CompetitionTensorBoardCallback",
     "enable_ultralytics_tensorboard",
     "check_tensorboard_available",
+    # Logging
+    "setup_training_logger",
+    "get_logger",
+    "ColoredFormatter",
+    # Constants
+    "VRAMThreshold",
+    "MODEL_VRAM_OVERHEAD_GB",
+    "MODEL_PER_SAMPLE_MEMORY_MB",
+    "MAX_OOM_RETRIES",
+    "OOM_BATCH_REDUCTION_FACTOR",
+    "MIN_BATCH_SIZE",
+    "DEFAULT_VRAM_SAFETY_MARGIN",
+    "DEFAULT_MAX_VRAM_UTILIZATION",
+    "STANDARD_IMAGE_SIZES",
 ]

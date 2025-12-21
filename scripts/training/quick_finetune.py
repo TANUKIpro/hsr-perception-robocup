@@ -15,13 +15,10 @@ import argparse
 import json
 import sys
 import time
-from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
-import torch
-import yaml
 from colorama import Fore, Style, init as colorama_init
 
 colorama_init()
@@ -34,174 +31,37 @@ if str(_scripts_dir) not in sys.path:
 from common.device_utils import log_gpu_status
 from common.constants import TARGET_MAP50
 
-# Import new modules
-from .gpu_scaler import GPUScaler, GPUScalingConfig, OOMRecoveryStrategy
+# Import extracted modules
+from .config_manager import COMPETITION_CONFIG, FAST_CONFIG
+from .dataset_validator import DatasetValidator
+from .gpu_scaler import GPUScaler
+from .memory_utils import full_training_cleanup, log_memory_snapshot
+from .model_operations import ModelExporter, ModelValidator
+from .swa_trainer import SWACallback, create_swa_callback, register_swa_callbacks
+from .synthetic_data_manager import (
+    SYNTHETIC_CONFIG_KEYS,
+    SyntheticConfig,
+    SyntheticDataManager,
+)
 from .tensorboard_monitor import (
     CompetitionTensorBoardCallback,
     TensorBoardServer,
-    TensorBoardManager,
-    enable_ultralytics_tensorboard,
     check_tensorboard_available,
+    enable_ultralytics_tensorboard,
 )
-from .training_config import TrainingConfig
-from .swa_trainer import SWAConfig, SWACallback, create_swa_callback, register_swa_callbacks
-from .llrd_trainer import LLRDDetectionTrainer, LLRDConfig
-from .memory_utils import full_training_cleanup, cleanup_cuda_memory, log_memory_snapshot
-
-# Import augmentation modules
-sys.path.insert(0, str(_scripts_dir / "augmentation"))
-from augmentation.copy_paste_augmentor import CopyPasteAugmentor, CopyPasteConfig
-
-# Keys that should NOT be passed to YOLO's train() method
-SYNTHETIC_CONFIG_KEYS = {
-    "dynamic_synthetic_enabled",
-    "backgrounds_dir",
-    "annotated_dir",
-    "synthetic_ratio",
-    "synthetic_scale_range",
-    "synthetic_rotation_range",
-    "synthetic_white_balance",
-    "synthetic_white_balance_strength",
-    "synthetic_edge_blur",
-    "synthetic_max_objects",
-}
-
-# Competition-optimized training configuration (legacy compatibility)
-# Updated for better generalization based on Tier 1 recommendations
-COMPETITION_CONFIG = {
-    # Model settings
-    "model": "yolov8m.pt",
-    "imgsz": 640,
-    # Training settings
-    "epochs": 50,
-    "batch": 16,
-    "patience": 10,  # Early stopping patience
-    # Optimizer settings
-    "optimizer": "AdamW",
-    "lr0": 0.001,
-    "lrf": 0.01,
-    "momentum": 0.937,
-    "weight_decay": 0.001,  # Increased from 0.0005 for better regularization
-    # Warmup settings (for stable fine-tuning)
-    "warmup_epochs": 3,
-    "warmup_momentum": 0.8,
-    "warmup_bias_lr": 0.1,
-    # Layer freeze (prevent overfitting on small datasets)
-    "freeze": 10,  # Freeze first 10 backbone layers
-    # Augmentation settings
-    "augment": True,
-    "hsv_h": 0.015,
-    "hsv_s": 0.7,
-    "hsv_v": 0.4,
-    "degrees": 10.0,
-    "translate": 0.1,
-    "scale": 0.5,
-    "shear": 2.0,
-    "flipud": 0.0,
-    "fliplr": 0.5,
-    "mosaic": 0.7,  # Reduced from 0.8 for better generalization on small datasets
-    "mixup": 0.1,
-    # Performance settings
-    "workers": 8,
-    "cache": True,  # Cache images in RAM for speed
-    "amp": True,  # Automatic mixed precision
-    "close_mosaic": 20,  # Increased from 15 for longer pure-image training
-    # Overfitting prevention (Tier 1) - enabled for better generalization
-    "label_smoothing": 0.05,  # Enabled for overfitting prevention
-    "cos_lr": True,  # Enabled for smoother LR decay
-    "multi_scale": False,  # Keep False due to VRAM consumption (enabled in GPU scaler for HIGH tier)
-    # Checkpointing
-    "save": True,
-    "save_period": 5,
-    "exist_ok": True,
-    # LLRD (Layer-wise Learning Rate Decay)
-    # Disabled by default for backward compatibility
-    # Enable for potential +1-3% mAP improvement on small datasets
-    "llrd_enabled": False,
-    "llrd_decay_rate": 0.9,  # LR decay factor per layer (0.0-1.0]
-    # Dynamic Copy-Paste settings
-    "dynamic_synthetic_enabled": True,  # Enable by default (user requirement)
-    "synthetic_ratio": 2.0,
-    "synthetic_scale_range": (0.5, 1.5),
-    "synthetic_rotation_range": (-15.0, 15.0),
-    "synthetic_white_balance": True,
-    "synthetic_white_balance_strength": 0.7,
-    "synthetic_edge_blur": 2.0,
-    "synthetic_max_objects": 3,
-    "backgrounds_dir": None,  # Passed from UI
-    "annotated_dir": None,    # Passed from UI
-}
-
-# Fast training configuration (for testing or limited GPU)
-FAST_CONFIG = {
-    **COMPETITION_CONFIG,
-    "model": "yolov8s.pt",  # Smaller model
-    "epochs": 30,
-    "batch": 32,
-    "patience": 5,
-    "imgsz": 480,
-}
-
-
-@dataclass
-class TrainingResult:
-    """Result of a training run."""
-
-    best_model_path: str
-    last_model_path: str
-    metrics: Dict
-    training_time_minutes: float
-    epochs_completed: int
-    config: Dict
-    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
-
-    def summary(self) -> str:
-        """Generate summary string."""
-        return f"""
-{'='*60}
-  Training Complete
-{'='*60}
-  Timestamp: {self.timestamp}
-  Training Time: {self.training_time_minutes:.1f} minutes
-  Epochs Completed: {self.epochs_completed}
-
-  Best Model: {self.best_model_path}
-  Last Model: {self.last_model_path}
-
-  Metrics:
-    mAP50: {self.metrics.get('mAP50', 'N/A'):.4f}
-    mAP50-95: {self.metrics.get('mAP50-95', 'N/A'):.4f}
-    Precision: {self.metrics.get('precision', 'N/A'):.4f}
-    Recall: {self.metrics.get('recall', 'N/A'):.4f}
-{'='*60}
-"""
-
-    def meets_target(self, target_map: float = 0.85) -> bool:
-        """Check if training met target mAP."""
-        return self.metrics.get("mAP50", 0) >= target_map
-
-    def to_dict(self) -> Dict:
-        """Convert to dictionary for JSON serialization."""
-        return {
-            "best_model_path": self.best_model_path,
-            "last_model_path": self.last_model_path,
-            "metrics": self.metrics,
-            "training_time_minutes": self.training_time_minutes,
-            "epochs_completed": self.epochs_completed,
-            "config": self.config,
-            "timestamp": self.timestamp,
-        }
+from .training_executor import TrainingExecutor, TrainingResult
 
 
 class CompetitionTrainer:
     """
     Competition-day YOLOv8 fine-tuning handler.
 
-    Features:
-    - GPU hardware auto-scaling
-    - TensorBoard integration with competition metrics
-    - OOM recovery with automatic parameter adjustment
-    - Optimized for rapid training with early stopping
+    This is a facade class that orchestrates the training pipeline using
+    extracted modules:
+    - DatasetValidator: Dataset validation
+    - SyntheticDataManager: Copy-Paste augmentation
+    - TrainingExecutor: Core training logic
+    - ModelValidator/ModelExporter: Model operations
     """
 
     def __init__(
@@ -256,6 +116,11 @@ class CompetitionTrainer:
         # SWA setup
         self.swa_callback: Optional[SWACallback] = None
 
+        # Initialize extracted module instances
+        self._dataset_validator = DatasetValidator()
+        self._model_validator = ModelValidator()
+        self._model_exporter = ModelExporter()
+
         # Verify CUDA availability
         self._check_cuda()
 
@@ -274,49 +139,12 @@ class CompetitionTrainer:
         return f"competition_{timestamp}"
 
     def _validate_dataset(self, dataset_yaml: str) -> bool:
-        """Validate dataset configuration."""
-        dataset_path = Path(dataset_yaml)
-
-        if not dataset_path.exists():
-            print(f"{Fore.RED}Error: Dataset config not found: {dataset_yaml}{Style.RESET_ALL}")
-            return False
-
-        with open(dataset_path, "r") as f:
-            config = yaml.safe_load(f)
-
-        # Check required fields
-        required = ["train", "val", "names"]
-        for field in required:
-            if field not in config:
-                print(f"{Fore.RED}Error: Missing field '{field}' in dataset config{Style.RESET_ALL}")
-                return False
-
-        # Check paths exist
-        base_path = dataset_path.parent
-        train_path = base_path / config["train"]
-        val_path = base_path / config["val"]
-
-        if not train_path.exists():
-            print(f"{Fore.RED}Error: Train path not found: {train_path}{Style.RESET_ALL}")
-            return False
-
-        if not val_path.exists():
-            print(f"{Fore.RED}Error: Val path not found: {val_path}{Style.RESET_ALL}")
-            return False
-
-        # Count images
-        train_count = len(list(train_path.glob("*")))
-        val_count = len(list(val_path.glob("*")))
-
-        print(f"Dataset validated:")
-        print(f"  Train images: {train_count}")
-        print(f"  Val images: {val_count}")
-        print(f"  Classes: {len(config['names'])}")
-
-        return True
+        """Validate dataset configuration using DatasetValidator."""
+        result = self._dataset_validator.validate(dataset_yaml)
+        return result.is_valid
 
     def _setup_tensorboard(self, model: Any) -> None:
-        """Setup TensorBoard monitoring."""
+        """Setup TensorBoard monitoring with comprehensive error handling."""
         if not self.tensorboard_enabled:
             return
 
@@ -325,48 +153,53 @@ class CompetitionTrainer:
                 f"{Fore.YELLOW}Warning: TensorBoard not available. "
                 f"Install with: pip install tensorboard{Style.RESET_ALL}"
             )
+            self.tensorboard_enabled = False
             return
 
-        # Enable Ultralytics built-in TensorBoard
-        enable_ultralytics_tensorboard()
+        try:
+            # Enable Ultralytics built-in TensorBoard
+            enable_ultralytics_tensorboard()
 
-        # Create log directory
-        log_dir = self.output_dir / self.run_name / "tensorboard"
+            # Create log directory
+            log_dir = self.output_dir / self.run_name / "tensorboard"
 
-        # Create custom callback
-        self.tensorboard_callback = CompetitionTensorBoardCallback(
-            log_dir=str(log_dir),
-            target_map50=TARGET_MAP50,
-        )
+            # Create custom callback
+            self.tensorboard_callback = CompetitionTensorBoardCallback(
+                log_dir=str(log_dir),
+                target_map50=TARGET_MAP50,
+            )
 
-        # Register callbacks
-        model.add_callback(
-            "on_pretrain_routine_start",
-            self.tensorboard_callback.on_pretrain_routine_start,
-        )
-        model.add_callback(
-            "on_train_epoch_start",
-            self.tensorboard_callback.on_train_epoch_start,
-        )
-        model.add_callback(
-            "on_train_epoch_end",
-            self.tensorboard_callback.on_train_epoch_end,
-        )
-        model.add_callback(
-            "on_fit_epoch_end",
-            self.tensorboard_callback.on_fit_epoch_end,
-        )
-        model.add_callback(
-            "on_train_end",
-            self.tensorboard_callback.on_train_end,
-        )
+            # Register callbacks with individual error handling
+            callback_mappings = [
+                ("on_pretrain_routine_start", self.tensorboard_callback.on_pretrain_routine_start),
+                ("on_train_epoch_start", self.tensorboard_callback.on_train_epoch_start),
+                ("on_train_epoch_end", self.tensorboard_callback.on_train_epoch_end),
+                ("on_fit_epoch_end", self.tensorboard_callback.on_fit_epoch_end),
+                ("on_train_end", self.tensorboard_callback.on_train_end),
+            ]
 
-        # Start TensorBoard server
-        self.tensorboard_server = TensorBoardServer(
-            str(log_dir),
-            port=self.tensorboard_port,
-        )
-        self.tensorboard_url = self.tensorboard_server.start()
+            for event_name, callback_fn in callback_mappings:
+                try:
+                    model.add_callback(event_name, callback_fn)
+                except Exception as cb_error:
+                    print(f"{Fore.YELLOW}Warning: Failed to register callback {event_name}: {cb_error}{Style.RESET_ALL}")
+
+            # Start TensorBoard server
+            self.tensorboard_server = TensorBoardServer(
+                str(log_dir),
+                port=self.tensorboard_port,
+            )
+            self.tensorboard_url = self.tensorboard_server.start()
+
+        except ImportError as e:
+            print(f"{Fore.YELLOW}Warning: TensorBoard import failed: {e}{Style.RESET_ALL}")
+            self.tensorboard_enabled = False
+        except OSError as e:
+            print(f"{Fore.YELLOW}Warning: TensorBoard server startup failed: {e}{Style.RESET_ALL}")
+            self.tensorboard_enabled = False
+        except Exception as e:
+            print(f"{Fore.YELLOW}Warning: Unexpected error setting up TensorBoard: {e}{Style.RESET_ALL}")
+            self.tensorboard_enabled = False
 
     def _cleanup_tensorboard(self) -> None:
         """Cleanup TensorBoard resources (server remains running for user access)."""
@@ -449,126 +282,11 @@ class CompetitionTrainer:
             register_swa_callbacks(model, self.swa_callback)
 
     def _generate_dynamic_synthetic(self, dataset_path: Path) -> int:
-        """Generate dynamic Copy-Paste synthetic images before training."""
-        if not self.config.get('dynamic_synthetic_enabled', False):
-            return 0
-
-        backgrounds_dir = self.config.get('backgrounds_dir')
-        annotated_dir = self.config.get('annotated_dir')
-
-        if not backgrounds_dir or not annotated_dir:
-            print(f"{Fore.YELLOW}Dynamic synthetic: backgrounds_dir or annotated_dir not specified{Style.RESET_ALL}")
-            return 0
-
-        backgrounds_dir = Path(backgrounds_dir)
-        annotated_dir = Path(annotated_dir)
-
-        if not backgrounds_dir.exists() or not annotated_dir.exists():
-            print(f"{Fore.YELLOW}Dynamic synthetic: directories do not exist{Style.RESET_ALL}")
-            return 0
-
-        print(f"{Fore.CYAN}Generating dynamic synthetic images...{Style.RESET_ALL}")
-
-        # CopyPasteConfig construction
-        cp_config = CopyPasteConfig(
-            synthetic_to_real_ratio=self.config.get('synthetic_ratio', 2.0),
-            scale_range=self.config.get('synthetic_scale_range', (0.5, 1.5)),
-            rotation_range=self.config.get('synthetic_rotation_range', (-15.0, 15.0)),
-            enable_white_balance=self.config.get('synthetic_white_balance', True),
-            white_balance_strength=self.config.get('synthetic_white_balance_strength', 0.7),
-            edge_blur_sigma=self.config.get('synthetic_edge_blur', 2.0),
-            max_objects_per_image=self.config.get('synthetic_max_objects', 3),
-            seed=int(time.time()),
-        )
-
-        augmentor = CopyPasteAugmentor(cp_config)
-
-        # Count training images
-        train_images_dir = dataset_path / "images" / "train"
-        real_count = len(list(train_images_dir.glob("*"))) if train_images_dir.exists() else 0
-
-        if real_count == 0:
-            print(f"{Fore.YELLOW}No training images found for synthetic generation{Style.RESET_ALL}")
-            return 0
-
-        # Generate synthetic images
-        output_dir = dataset_path / "synthetic_dynamic"
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        try:
-            # Load class names from dataset YAML
-            import yaml
-            yaml_path = dataset_path / "data.yaml"
-            if not yaml_path.exists():
-                print(f"{Fore.YELLOW}Dataset YAML not found: {yaml_path}{Style.RESET_ALL}")
-                return 0
-
-            with open(yaml_path, "r") as f:
-                data_config = yaml.safe_load(f)
-
-            class_names = list(data_config.get("names", {}).values())
-            if not class_names:
-                print(f"{Fore.YELLOW}No class names found in dataset YAML{Style.RESET_ALL}")
-                return 0
-
-            stats = augmentor.generate_batch(
-                backgrounds_dir=backgrounds_dir,
-                annotated_dir=annotated_dir,
-                output_dir=output_dir,
-                real_image_count=real_count,
-                class_names=class_names,
-            )
-
-            if "error" in stats:
-                print(f"{Fore.RED}Synthetic generation error: {stats['error']}{Style.RESET_ALL}")
-                return 0
-
-            # Merge generated images into training set
-            added = self._merge_synthetic_to_train(output_dir, dataset_path)
-            print(f"{Fore.GREEN}Added {added} dynamic synthetic images to training set{Style.RESET_ALL}")
-            return added
-
-        except Exception as e:
-            print(f"{Fore.RED}Dynamic synthetic generation failed: {e}{Style.RESET_ALL}")
-            import traceback
-            traceback.print_exc()
-            return 0
-
-    def _merge_synthetic_to_train(self, synthetic_dir: Path, dataset_path: Path) -> int:
-        """Merge generated synthetic images into training set."""
-        import shutil
-
-        train_images_dir = dataset_path / "images" / "train"
-        train_labels_dir = dataset_path / "labels" / "train"
-
-        train_images_dir.mkdir(parents=True, exist_ok=True)
-        train_labels_dir.mkdir(parents=True, exist_ok=True)
-
-        images_dir = synthetic_dir / "images"
-        labels_dir = synthetic_dir / "labels"
-
-        if not images_dir.exists() or not labels_dir.exists():
-            return 0
-
-        added = 0
-        images = list(images_dir.glob("*.jpg")) + list(images_dir.glob("*.png"))
-
-        for image_path in images:
-            label_path = labels_dir / f"{image_path.stem}.txt"
-            if not label_path.exists():
-                continue
-
-            # Unique filename for saving
-            new_name = f"dynamic_synth_{image_path.stem}"
-            image_dest = train_images_dir / f"{new_name}{image_path.suffix}"
-            label_dest = train_labels_dir / f"{new_name}.txt"
-
-            if not image_dest.exists():
-                shutil.copy2(image_path, image_dest)
-                shutil.copy2(label_path, label_dest)
-                added += 1
-
-        return added
+        """Generate dynamic Copy-Paste synthetic images using SyntheticDataManager."""
+        synthetic_config = SyntheticConfig.from_dict(self.config)
+        manager = SyntheticDataManager(synthetic_config, verbose=True)
+        result = manager.generate(dataset_path)
+        return result.images_added
 
     def get_tensorboard_url(self) -> str:
         """Get TensorBoard URL if available."""
@@ -580,56 +298,15 @@ class CompetitionTrainer:
         resume: bool = False,
         verbose: bool = True,
     ) -> Any:
-        """
-        Execute training using LLRD (Layer-wise Learning Rate Decay).
-
-        Args:
-            dataset_yaml: Path to dataset configuration YAML
-            resume: Resume from checkpoint if available
-            verbose: Enable verbose output
-
-        Returns:
-            Training results from LLRDDetectionTrainer
-        """
-        from ultralytics.cfg import DEFAULT_CFG_DICT
-
-        print(f"\n{Fore.CYAN}LLRD Training Mode{Style.RESET_ALL}")
-        print(f"  Decay rate: {self.config.get('llrd_decay_rate', 0.9)}")
-
-        # Prepare LLRD config
-        llrd_config = LLRDConfig(
-            enabled=True,
-            decay_rate=self.config.get("llrd_decay_rate", 0.9),
+        """Execute training using LLRD via TrainingExecutor."""
+        executor = TrainingExecutor(
+            base_model=self.base_model,
+            output_dir=self.output_dir,
+            run_name=self.run_name,
+            config=self.config,
+            verbose=verbose,
         )
-
-        # Build overrides for LLRDDetectionTrainer
-        # Remove LLRD-specific keys and synthetic keys from config
-        excluded_keys = {"llrd_enabled", "llrd_decay_rate"} | SYNTHETIC_CONFIG_KEYS
-        trainer_config = {k: v for k, v in self.config.items()
-                         if k not in excluded_keys}
-
-        overrides = {
-            "data": dataset_yaml,
-            "project": str(self.output_dir),
-            "name": self.run_name,
-            "model": self.base_model,
-            "resume": resume,
-            "verbose": verbose,
-            **trainer_config,
-        }
-
-        # Create and run LLRD trainer
-        trainer = LLRDDetectionTrainer(
-            cfg=DEFAULT_CFG_DICT,
-            overrides=overrides,
-            llrd_config=llrd_config,
-        )
-
-        # Note: TensorBoard/SWA callbacks need to be registered differently for custom trainer
-        # The built-in Ultralytics logging will still work
-
-        results = trainer.train()
-        return results
+        return executor.execute_llrd(dataset_yaml, resume=resume)
 
     def train(
         self,
@@ -710,7 +387,7 @@ class CompetitionTrainer:
                 # Training with OOM recovery
                 if enable_oom_recovery:
                     oom_recovery = OOMRecoveryStrategy(self.config)
-                    current_config = self.config.copy()
+                    current_config = copy.deepcopy(self.config)
 
                     while True:
                         try:
@@ -749,9 +426,15 @@ class CompetitionTrainer:
                                 del model
 
                                 # Reload model for retry
-                                model = YOLO(self.base_model)
-                                self._setup_tensorboard(model)
-                                self._setup_swa(model)
+                                try:
+                                    model = YOLO(self.base_model)
+                                    self._setup_tensorboard(model)
+                                    self._setup_swa(model)
+                                except Exception as reload_error:
+                                    print(f"{Fore.RED}Failed to reload model: {reload_error}{Style.RESET_ALL}")
+                                    raise RuntimeError(
+                                        f"Model reload failed during OOM recovery: {reload_error}"
+                                    ) from reload_error
                             elif "cuda" in error_msg:
                                 # CUDA general error (not OOM) - fail immediately
                                 print(f"{Fore.RED}CUDA error detected (not OOM): {e}{Style.RESET_ALL}")
@@ -789,17 +472,13 @@ class CompetitionTrainer:
                 config=self.config.copy(),
             )
 
-            # Save result
+            # Save result (single write operation)
+            result_data = result.to_dict()
+            if self.tensorboard_url:
+                result_data["tensorboard_url"] = self.tensorboard_url
             result_path = run_dir / "training_result.json"
             with open(result_path, "w") as f:
-                json.dump(result.to_dict(), f, indent=2)
-
-            # Add TensorBoard URL to result
-            if self.tensorboard_url:
-                result_data = result.to_dict()
-                result_data["tensorboard_url"] = self.tensorboard_url
-                with open(result_path, "w") as f:
-                    json.dump(result_data, f, indent=2)
+                json.dump(result_data, f, indent=2)
 
             # Cleanup
             self._cleanup_tensorboard()
@@ -810,6 +489,17 @@ class CompetitionTrainer:
             # Guaranteed cleanup on success or failure
             # This ensures resources are freed even if an exception occurs
             log_memory_snapshot("Before final cleanup")
+            try:
+                # Only cleanup if model exists (standard training path, not LLRD)
+                if 'model' in dir() and model is not None:
+                    self._cleanup_all_resources(
+                        model=model,
+                        trainer=None,
+                        stop_tensorboard=False  # Keep TensorBoard for result viewing
+                    )
+            except Exception as cleanup_error:
+                print(f"{Fore.YELLOW}Warning: Error during final cleanup: {cleanup_error}{Style.RESET_ALL}")
+            log_memory_snapshot("After final cleanup")
 
     def _extract_metrics(self, results) -> Dict:
         """Extract relevant metrics from training results."""
@@ -827,28 +517,8 @@ class CompetitionTrainer:
             return {}
 
     def validate(self, model_path: str, dataset_yaml: str) -> Dict:
-        """
-        Run validation on a trained model.
-
-        Args:
-            model_path: Path to model weights
-            dataset_yaml: Path to dataset configuration
-
-        Returns:
-            Dictionary of validation metrics
-        """
-        from ultralytics import YOLO
-
-        print(f"\nValidating model: {model_path}")
-        model = YOLO(model_path)
-        results = model.val(data=dataset_yaml)
-
-        return {
-            "mAP50": results.box.map50,
-            "mAP50-95": results.box.map,
-            "precision": results.box.mp,
-            "recall": results.box.mr,
-        }
+        """Run validation using ModelValidator."""
+        return self._model_validator.validate(model_path, dataset_yaml)
 
     def export(
         self,
@@ -856,27 +526,8 @@ class CompetitionTrainer:
         format: str = "onnx",
         simplify: bool = True,
     ) -> str:
-        """
-        Export model for deployment.
-
-        Args:
-            model_path: Path to model weights
-            format: Export format (onnx, torchscript, etc.)
-            simplify: Simplify ONNX model
-
-        Returns:
-            Path to exported model
-        """
-        from ultralytics import YOLO
-
-        print(f"\nExporting model: {model_path}")
-        print(f"Format: {format}")
-
-        model = YOLO(model_path)
-        export_path = model.export(format=format, simplify=simplify)
-
-        print(f"Exported to: {export_path}")
-        return export_path
+        """Export model using ModelExporter."""
+        return self._model_exporter.export(model_path, format, simplify)
 
 
 def main():
