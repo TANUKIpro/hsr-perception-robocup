@@ -52,32 +52,99 @@ YOLOv8モデルのファインチューニング。GPU自動最適化、OOMリ�
 
 ---
 
-## CLI使用方法
+## Docker実行方法
+
+### コマンドヘルプ
+
+```bash
+docker compose run --rm hsr-perception train --help
+```
 
 ### 基本的な学習
 
 ```bash
-python scripts/training/quick_finetune.py \
-    --dataset datasets/competition_day/data.yaml \
+docker compose run --rm hsr-perception train \
+    --dataset /workspace/datasets/competition_day/data.yaml \
     --model yolov8m.pt \
-    --output models/finetuned
+    --output /workspace/models/finetuned
 ```
 
 ### 高速モード（テスト用）
 
 ```bash
-python scripts/training/quick_finetune.py \
-    --dataset datasets/competition_day/data.yaml \
+docker compose run --rm hsr-perception train \
+    --dataset /workspace/datasets/competition_day/data.yaml \
     --fast
 ```
 
-### GPU自動スケーリング
+### GPU自動スケーリング付き
 
 ```bash
-python scripts/training/quick_finetune.py \
-    --dataset datasets/competition_day/data.yaml \
-    --auto-scale
+docker compose run --rm hsr-perception train \
+    --dataset /workspace/datasets/competition_day/data.yaml
 ```
+※ GPU自動スケーリングはデフォルトで有効
+
+### 主要オプション
+
+| オプション | 説明 | デフォルト |
+|-----------|------|-----------|
+| `--dataset, -d` | データセットYAMLパス（必須） | - |
+| `--model, -m` | ベースモデル | 自動検出 |
+| `--output, -o` | 出力ディレクトリ | models/finetuned |
+| `--fast` | 高速学習設定（小モデル、少エポック） | - |
+| `--epochs` | エポック数を上書き | - |
+| `--batch` | バッチサイズを上書き | - |
+| `--resume` | チェックポイントから再開 | - |
+| `--validate-only` | 検証のみ実行 | - |
+
+### 高度なオプション
+
+| オプション | 説明 | デフォルト |
+|-----------|------|-----------|
+| `--no-auto-scale` | GPU自動スケーリングを無効化 | 有効 |
+| `--gpu-tier` | GPU階層を指定（low/medium/high/workstation） | 自動 |
+| `--llrd` | Layer-wise Learning Rate Decay有効化 | - |
+| `--llrd-decay-rate` | LLRD減衰率 | 0.9 |
+| `--no-tensorboard` | TensorBoard監視を無効化 | 有効 |
+| `--tensorboard-port` | TensorBoardポート | 6006 |
+| `--no-oom-recovery` | OOMリカバリーを無効化 | 有効 |
+
+### Dynamic Copy-Paste拡張
+
+| オプション | 説明 | デフォルト |
+|-----------|------|-----------|
+| `--dynamic-synthetic` | 動的Copy-Paste合成データ生成 | 有効 |
+| `--no-dynamic-synthetic` | Copy-Pasteを無効化 | - |
+| `--backgrounds-dir` | 背景画像ディレクトリ | - |
+| `--annotated-dir` | アノテーション済み画像ディレクトリ | - |
+| `--synthetic-ratio` | 合成/実画像比率 | 2.0 |
+
+### モデルエクスポート
+
+```bash
+docker compose run --rm hsr-perception train \
+    --dataset /workspace/datasets/competition_day/data.yaml \
+    --export onnx
+```
+
+---
+
+## TensorBoard監視
+
+### TensorBoardを起動
+
+```bash
+docker compose run --rm -p 6006:6006 hsr-perception tensorboard /workspace/runs
+```
+
+ブラウザで http://localhost:6006 を開く
+
+### 表示メトリクス
+
+- **Loss**: box_loss, cls_loss, dfl_loss
+- **Metrics**: mAP50, mAP50-95, precision, recall
+- **Learning Rate**: 学習率推移
 
 ---
 
@@ -175,26 +242,6 @@ epoch,box_loss,cls_loss,dfl_loss,mAP50,mAP50-95,precision,recall
 
 ---
 
-## TensorBoard監視
-
-### 起動
-
-```bash
-# 自動起動（学習スクリプトが管理）
-python scripts/training/quick_finetune.py --tensorboard
-
-# 手動起動
-tensorboard --logdir models/finetuned/competition_*/tensorboard --port 6006
-```
-
-### 表示メトリクス
-
-- **Loss**: box_loss, cls_loss, dfl_loss
-- **Metrics**: mAP50, mAP50-95, precision, recall
-- **Learning Rate**: 学習率推移
-
----
-
 ## OOMリカバリー
 
 GPU メモリ不足時の自動対策:
@@ -224,23 +271,3 @@ COMPETITION_CONFIG = {
     "close_mosaic": 10,
 }
 ```
-
----
-
-## 大会当日のワークフロー
-
-```mermaid
-flowchart TD
-    A[データセット準備完了] --> B[GPU検出・自動スケーリング]
-    B --> C[学習開始]
-    C --> D[TensorBoard監視]
-    D --> E{mAP ≥ 85%?}
-    E -->|Yes| F[学習完了]
-    E -->|No| G{エポック残あり?}
-    G -->|Yes| D
-    G -->|No| H[追加エポック検討]
-    F --> I[評価へ]
-```
-
-**目標時間**: 45分以内
-**目標mAP**: ≥ 85%（mAP@50）

@@ -132,7 +132,7 @@ case "${1:-streamlit}" in
         print_info
         echo ""
         echo "Starting YOLOv8 Training..."
-        exec python3 /workspace/scripts/training/quick_finetune.py "$@"
+        exec python3 -m scripts.training.quick_finetune "$@"
         ;;
 
     # -------------------------------------------------------------------------

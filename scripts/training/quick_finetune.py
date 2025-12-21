@@ -12,6 +12,7 @@ Designed to complete training within ~45-60 minutes on a capable GPU.
 """
 
 import argparse
+import copy
 import json
 import sys
 import time
@@ -31,25 +32,47 @@ if str(_scripts_dir) not in sys.path:
 from common.device_utils import log_gpu_status
 from common.constants import TARGET_MAP50
 
-# Import extracted modules
-from .config_manager import COMPETITION_CONFIG, FAST_CONFIG
-from .dataset_validator import DatasetValidator
-from .gpu_scaler import GPUScaler
-from .memory_utils import full_training_cleanup, log_memory_snapshot
-from .model_operations import ModelExporter, ModelValidator
-from .swa_trainer import SWACallback, create_swa_callback, register_swa_callbacks
-from .synthetic_data_manager import (
-    SYNTHETIC_CONFIG_KEYS,
-    SyntheticConfig,
-    SyntheticDataManager,
-)
-from .tensorboard_monitor import (
-    CompetitionTensorBoardCallback,
-    TensorBoardServer,
-    check_tensorboard_available,
-    enable_ultralytics_tensorboard,
-)
-from .training_executor import TrainingExecutor, TrainingResult
+# Import extracted modules - use try/except for both direct execution and module import
+try:
+    # When run as module: python -m scripts.training.quick_finetune
+    from .config_manager import COMPETITION_CONFIG, FAST_CONFIG
+    from .dataset_validator import DatasetValidator
+    from .gpu_scaler import GPUScaler, GPUTier, OOMRecoveryStrategy, TIER_CONFIGS
+    from .memory_utils import full_training_cleanup, log_memory_snapshot
+    from .model_operations import ModelExporter, ModelValidator
+    from .swa_trainer import SWACallback, create_swa_callback, register_swa_callbacks
+    from .synthetic_data_manager import (
+        SYNTHETIC_CONFIG_KEYS,
+        SyntheticConfig,
+        SyntheticDataManager,
+    )
+    from .tensorboard_monitor import (
+        CompetitionTensorBoardCallback,
+        TensorBoardServer,
+        check_tensorboard_available,
+        enable_ultralytics_tensorboard,
+    )
+    from .training_executor import TrainingExecutor, TrainingResult
+except ImportError:
+    # When run directly: python scripts/training/quick_finetune.py
+    from config_manager import COMPETITION_CONFIG, FAST_CONFIG
+    from dataset_validator import DatasetValidator
+    from gpu_scaler import GPUScaler, GPUTier, OOMRecoveryStrategy, TIER_CONFIGS
+    from memory_utils import full_training_cleanup, log_memory_snapshot
+    from model_operations import ModelExporter, ModelValidator
+    from swa_trainer import SWACallback, create_swa_callback, register_swa_callbacks
+    from synthetic_data_manager import (
+        SYNTHETIC_CONFIG_KEYS,
+        SyntheticConfig,
+        SyntheticDataManager,
+    )
+    from tensorboard_monitor import (
+        CompetitionTensorBoardCallback,
+        TensorBoardServer,
+        check_tensorboard_available,
+        enable_ultralytics_tensorboard,
+    )
+    from training_executor import TrainingExecutor, TrainingResult
 
 
 class CompetitionTrainer:
@@ -696,7 +719,6 @@ Examples:
         auto_scale = False  # Fast mode uses fixed config
     elif args.gpu_tier:
         # Use specific tier config
-        from .gpu_scaler import GPUTier, TIER_CONFIGS
         tier = GPUTier(args.gpu_tier)
         config = TIER_CONFIGS[tier].copy()
         auto_scale = False

@@ -7,27 +7,24 @@ GUI application usage guide for the RoboCup@Home object recognition pipeline.
 HSR Object Manager is a Streamlit-based web application that provides a GUI for the entire object recognition model creation process, from data collection to evaluation.
 
 **Key Features:**
-- 📊 Dashboard: Visualize collection progress and pipeline status
-- 📋 Registry: Object registration and reference image management
-- 📸 Collection: Data collection from ROS2/camera/files
-- 🏷️ Annotation: Run auto-annotation pipeline
-- 🎓 Training: Execute YOLOv8 fine-tuning
-- 📈 Evaluation: Model evaluation and competition requirement check
-- ⚙️ Settings: System settings and status check
+- Dashboard: Visualize collection progress and pipeline status
+- Registry: Object registration and reference image management
+- Collection: Data collection from ROS2/camera/files
+- Annotation: Run auto-annotation pipeline
+- Training: Execute YOLOv8 fine-tuning
+- Evaluation: Model evaluation and competition requirement check
+- Settings: System settings and status check
 
 ---
 
 ## Starting the App
 
 ```bash
-# Method 1: Shell script
-./run_app.sh
+# Docker launch (recommended)
+./start.sh
 
-# Method 2: Direct launch
-streamlit run app/main.py
-
-# Method 3: Custom port
-streamlit run app/main.py --server.port 8502
+# Or
+docker compose up
 ```
 
 Open http://localhost:8501 in your browser.
@@ -36,7 +33,7 @@ Open http://localhost:8501 in your browser.
 
 ## Page Guide
 
-### 📊 Dashboard
+### Dashboard
 
 Get an overview of the entire pipeline status at a glance.
 
@@ -51,7 +48,7 @@ Get an overview of the entire pipeline status at a glance.
 **Actions:**
 - "Export to YOLO Config": Update `config/object_classes.json`
 
-### 📋 Registry
+### Registry
 
 Register and manage objects.
 
@@ -59,7 +56,7 @@ Register and manage objects.
 - Display list of registered objects
 - Filter by category
 - Add reference images
-- "📸 Collect" to navigate to Collection page
+- "Collect" to navigate to Collection page
 - Delete objects
 
 **Add New Object Tab:**
@@ -70,21 +67,21 @@ Register and manage objects.
 - Target sample count
 - Properties (heavy/tiny/has liquid/size)
 
-### 📸 Collection
+### Collection
 
 Collect image data. Four methods are available.
 
-#### 🤖 ROS2 Camera Tab
+#### ROS2 Camera Tab
 
 Collect images directly from HSR or ROS2-compatible cameras.
 
 **Requirements:**
-- ROS2 Humble installed and sourced
-- Continuous capture node running
+- ROS2-compatible camera connected
+- For Xtion camera, `start.sh` auto-configures
 
 ```bash
-# Node launch command
-ros2 launch hsr_perception capture.launch.py
+# Start ROS2 camera node (separate terminal)
+docker compose run --rm hsr-perception ros2-camera
 ```
 
 **Operation Steps:**
@@ -99,7 +96,7 @@ ros2 launch hsr_perception capture.launch.py
 - Generic USB: `/usb_cam/image_raw`
 - RealSense: `/camera/color/image_raw`
 
-#### 📷 Local Camera Tab
+#### Local Camera Tab
 
 Capture with webcam or device built-in camera.
 
@@ -107,7 +104,7 @@ Capture with webcam or device built-in camera.
 2. Click "Take a photo"
 3. Auto-saved
 
-#### 📁 File Upload Tab
+#### File Upload Tab
 
 Upload image files.
 
@@ -115,7 +112,7 @@ Upload image files.
 2. Select and upload multiple images
 3. Auto-saved with count update
 
-#### 📂 Folder Import Tab
+#### Folder Import Tab
 
 Bulk import by specifying a folder path.
 
@@ -126,7 +123,7 @@ Bulk import by specifying a folder path.
 **Data Sync:**
 After collection, click "Sync to Datasets Directory" to sync data to `datasets/raw_captures/`.
 
-### 🏷️ Annotation
+### Annotation
 
 Run the auto-annotation pipeline.
 
@@ -149,16 +146,13 @@ Run the auto-annotation pipeline.
 3. Set split ratio
 4. Click "Start Annotation"
 
-**Estimated Time:**
-- Approximately 5 minutes per 100 images
-
 **Output:**
 - `datasets/annotated/{session_name}/`
   - `images/train/`, `images/val/`
   - `labels/train/`, `labels/val/`
   - `data.yaml`
 
-### 🎓 Training
+### Training
 
 Execute YOLOv8 fine-tuning.
 
@@ -173,9 +167,9 @@ Execute YOLOv8 fine-tuning.
 | Fast Mode | Fast mode (for testing) | OFF |
 
 **Model Selection Guide:**
-- `yolov8m.pt`: Accuracy-focused (competition recommended), training time: ~45 min
-- `yolov8s.pt`: Balanced, training time: ~30 min
-- `yolov8n.pt`: Fast, training time: ~20 min
+- `yolov8m.pt`: Accuracy-focused (competition recommended)
+- `yolov8s.pt`: Balanced
+- `yolov8n.pt`: Fast
 
 **GPU Check:**
 GPU availability is automatically checked on the page.
@@ -190,7 +184,7 @@ GPU availability is automatically checked on the page.
 - `models/finetuned/{run_name}/weights/last.pt`
 - `models/finetuned/{run_name}/training_result.json`
 
-### 📈 Evaluation
+### Evaluation
 
 Evaluate trained models.
 
@@ -202,10 +196,10 @@ Evaluate trained models.
 4. Click "Start Evaluation"
 
 **Metrics:**
-- mAP@50: Target ≥ 85%
+- mAP@50: Target >= 85%
 - mAP@50-95
 - Precision / Recall
-- Inference time: Target ≤ 100ms
+- Inference time: Target <= 100ms
 - Competition requirement check (automatic)
 
 **Results Tab:**
@@ -219,7 +213,7 @@ Test predictions on a single image.
 3. Click "Run Prediction"
 4. Visualize detection results
 
-### ⚙️ Settings
+### Settings
 
 System settings and status check.
 
@@ -241,71 +235,15 @@ System settings and status check.
 
 ---
 
-## Competition Day Workflow
-
-### Preparation (Before Competition)
-
-1. Start the app: `./run_app.sh`
-2. Register objects in Registry
-3. Prepare background image (white sheet, etc.)
-
-### Phase 1: Data Collection (40 min)
-
-1. Go to Collection → ROS2 Camera tab
-2. Start continuous capture node (separate terminal)
-3. For each object:
-   - Select object
-   - Set class
-   - Burst capture (50-100 images)
-   - Rotate object and capture multiple times
-
-### Phase 2: Annotation (25 min)
-
-1. Go to Annotation page
-2. Select Background method
-3. Select background image
-4. Click "Start Annotation"
-5. Wait for completion
-
-### Phase 3: Training (45 min)
-
-1. Go to Training page
-2. Select created dataset
-3. Set `yolov8m.pt` / 50 epochs
-4. Click "Start Training"
-5. Monitor progress bar
-
-### Phase 4: Evaluation (15 min)
-
-1. Go to Evaluation page
-2. Select trained model
-3. Click "Start Evaluation"
-4. Competition requirement check:
-   - mAP@50 ≥ 85% ✓
-   - Inference time ≤ 100ms ✓
-5. Final confirmation with Visual Test
-
-### Deployment
-
-Copy the trained model path:
-```
-models/finetuned/{run_name}/weights/best.pt
-```
-
----
-
 ## Troubleshooting
 
 ### Cannot Connect to ROS2
 
-1. Source ROS2 environment:
+1. Start camera node:
    ```bash
-   source /opt/ros/humble/setup.bash
+   docker compose run --rm hsr-perception ros2-camera
    ```
-2. Start capture node:
-   ```bash
-   ros2 launch hsr_perception capture.launch.py
-   ```
+2. For Xtion camera, use `start.sh` for automatic configuration
 
 ### Annotation Fails
 
@@ -324,30 +262,6 @@ models/finetuned/{run_name}/weights/best.pt
 1. Check if data volume is sufficient (50+ images per class recommended)
 2. Check annotation quality
 3. Increase epochs and retrain
-
----
-
-## Related Commands
-
-### CLI Operations (Alternative to GUI)
-
-```bash
-# Annotation
-python scripts/annotation/auto_annotate.py \
-    --method background \
-    --background datasets/backgrounds/bg.jpg \
-    --input-dir datasets/raw_captures \
-    --output-dir datasets/annotated/session1
-
-# Training
-python scripts/training/quick_finetune.py \
-    --dataset datasets/annotated/session1/data.yaml
-
-# Evaluation
-python scripts/evaluation/evaluate_model.py \
-    --model models/finetuned/run1/weights/best.pt \
-    --dataset datasets/annotated/session1/data.yaml
-```
 
 ---
 

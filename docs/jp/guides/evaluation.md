@@ -31,8 +31,8 @@
 
 | メトリクス | 目標値 | 説明 |
 |-----------|-------|------|
-| mAP@50 | ≥ 85% | IoU=0.50での平均精度 |
-| 推論時間 | ≤ 100ms | リアルタイム性確保 |
+| mAP@50 | >= 85% | IoU=0.50での平均精度 |
+| 推論時間 | <= 100ms | リアルタイム性確保 |
 
 ---
 
@@ -59,33 +59,83 @@
 
 - 640x480合成画像で100回測定
 - ウォームアップ10回（除外）
-- 平均値 ± 標準偏差
+- 平均値 +/- 標準偏差
 
 ---
 
-## CLI使用方法
+## Docker実行方法
 
 ### モデル評価
 
 ```bash
-python scripts/evaluation/evaluate_model.py \
-    --model models/finetuned/competition_*/weights/best.pt \
-    --dataset datasets/competition_day/data.yaml
+# ヘルプ表示
+docker compose run --rm hsr-perception evaluate --help
+
+# データセットで評価
+docker compose run --rm hsr-perception evaluate \
+    --model /workspace/models/finetuned/competition_*/weights/best.pt \
+    --dataset /workspace/datasets/competition_day/data.yaml
+
+# 推論時間のみ測定
+docker compose run --rm hsr-perception evaluate \
+    --model /workspace/models/finetuned/competition_*/weights/best.pt \
+    --time-only
+
+# レポートをJSON保存
+docker compose run --rm hsr-perception evaluate \
+    --model /workspace/models/finetuned/competition_*/weights/best.pt \
+    --dataset /workspace/datasets/competition_day/data.yaml \
+    --save-report /workspace/evaluation_report.json
 ```
+
+### evaluateオプション
+
+| オプション | 説明 | デフォルト |
+|-----------|------|-----------|
+| `--model, -m` | モデルパス（必須） | - |
+| `--dataset, -d` | データセットYAML | - |
+| `--image, -i` | 単一画像パス | - |
+| `--output, -o` | 出力パス | - |
+| `--conf` | 信頼度閾値 | 0.25 |
+| `--time-only` | 推論時間のみ測定 | - |
+| `--save-report` | レポートをJSON保存 | - |
 
 ### 可視化検証
 
 ```bash
+# ヘルプ表示
+docker compose run --rm hsr-perception verify --help
+
 # バッチモード（対話的に画像を確認）
-python scripts/evaluation/visual_verification.py \
-    --model models/finetuned/competition_*/weights/best.pt \
-    --batch-dir datasets/competition_day/images/val
+docker compose run --rm hsr-perception verify \
+    --model /workspace/models/finetuned/competition_*/weights/best.pt \
+    --batch-dir /workspace/datasets/competition_day/images/val
 
 # 単一画像
-python scripts/evaluation/visual_verification.py \
-    --model models/finetuned/competition_*/weights/best.pt \
-    --image path/to/image.jpg
+docker compose run --rm hsr-perception verify \
+    --model /workspace/models/finetuned/competition_*/weights/best.pt \
+    --image /workspace/path/to/image.jpg
+
+# グリッド表示
+docker compose run --rm hsr-perception verify \
+    --model /workspace/models/finetuned/competition_*/weights/best.pt \
+    --batch-dir /workspace/datasets/competition_day/images/val \
+    --grid --grid-cols 3
 ```
+
+### verifyオプション
+
+| オプション | 説明 | デフォルト |
+|-----------|------|-----------|
+| `--model, -m` | モデルパス（必須） | - |
+| `--image, -i` | 単一画像パス | - |
+| `--batch-dir, -b` | バッチ検証ディレクトリ | - |
+| `--output, -o` | 出力パス/ディレクトリ | - |
+| `--conf` | 信頼度閾値 | 0.25 |
+| `--grid` | グリッド表示モード | - |
+| `--grid-cols` | グリッド列数 | 3 |
+| `--report-samples` | レポート用サンプル生成 | - |
+| `--class-config` | クラス設定JSON | - |
 
 ### キーボード操作（バッチモード）
 
@@ -133,24 +183,24 @@ python scripts/evaluation/visual_verification.py \
 === Model Evaluation Report ===
 
 Overall Metrics:
-  mAP@50:     87.2% [PASS] (target: ≥85%)
+  mAP@50:     87.2% [PASS] (target: >=85%)
   mAP@50-95:  72.1%
   Precision:  89.3%
   Recall:     83.1%
 
 Inference Time:
-  Mean:       45.2ms [PASS] (target: ≤100ms)
+  Mean:       45.2ms [PASS] (target: <=100ms)
   Std Dev:    3.1ms
 
 Per-Class Results:
-╔══════════╦═══════╦══════════╦═══════════╦════════╦═════════╗
-║ Class    ║ AP@50 ║ AP@50-95 ║ Precision ║ Recall ║ Samples ║
-╠══════════╬═══════╬══════════╬═══════════╬════════╬═════════╣
-║ bottle   ║ 92.1% ║ 78.3%    ║ 94.2%     ║ 88.1%  ║ 50      ║
-║ cup      ║ 85.3% ║ 68.2%    ║ 87.1%     ║ 82.3%  ║ 48      ║
-╚══════════╩═══════╩══════════╩═══════════╩════════╩═════════╝
++----------+-------+----------+-----------+--------+---------+
+| Class    | AP@50 | AP@50-95 | Precision | Recall | Samples |
++----------+-------+----------+-----------+--------+---------+
+| bottle   | 92.1% | 78.3%    | 94.2%     | 88.1%  | 50      |
+| cup      | 85.3% | 68.2%    | 87.1%     | 82.3%  | 48      |
++----------+-------+----------+-----------+--------+---------+
 
-✓ All requirements met!
+All requirements met!
 ```
 
 ---
@@ -170,27 +220,7 @@ Per-Class Results:
 | Brightness | -100 〜 +100 | 明度変化 |
 | Shadow | 0 〜 100% | 影の追加 |
 | Occlusion | 0 〜 50% | 遮蔽シミュレーション |
-| Hue Rotation | 0 〜 180° | 色相回転 |
-
----
-
-## Xtionリアルタイムテスト
-
-### 起動
-
-```bash
-python scripts/evaluation/xtion_test_app.py \
-    --model models/finetuned/competition_*/weights/best.pt \
-    --confidence 0.5
-```
-
-### 機能
-
-- ROS2トピックからリアルタイム推論
-- 信頼度閾値スライダー
-- FPS表示（30フレーム移動平均）
-- 検出リスト表示
-- モデル情報パネル
+| Hue Rotation | 0 〜 180 | 色相回転 |
 
 ---
 
@@ -205,28 +235,6 @@ python scripts/evaluation/xtion_test_app.py \
 | Visual Test | 画像アップロードで単発テスト |
 | Robustness Test | ロバストネステスト |
 | Xtion Live Test | リアルタイムテスト起動 |
-
----
-
-## 大会当日のワークフロー
-
-```mermaid
-flowchart TD
-    A[学習完了] --> B[評価実行]
-    B --> C{mAP ≥ 85%?}
-    C -->|Yes| D{推論 ≤ 100ms?}
-    C -->|No| E[追加学習検討]
-    D -->|Yes| F[可視化検証]
-    D -->|No| G[モデルサイズ縮小検討]
-    F --> H{目視で問題なし?}
-    H -->|Yes| I[デプロイへ]
-    H -->|No| J[問題クラス特定・対策]
-    E --> A
-    G --> A
-    J --> A
-```
-
-**目標時間**: 15分以内
 
 ---
 
