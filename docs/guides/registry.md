@@ -140,13 +140,20 @@ $DATA_DIR/
 
 ## 使用方法
 
-### GUIアプリ
+### GUIアプリ（推奨）
 
-1. `./run_app.sh` でアプリ起動
-2. サイドバーから「Registry」ページを選択
-3. 「Add Object」でオブジェクト追加
-4. 参照画像をアップロード
-5. 収集進捗を確認
+```bash
+# Docker起動
+./start.sh
+# または
+docker compose up
+```
+
+ブラウザで http://localhost:8501 を開き、Registryページにアクセス
+
+1. 「Add Object」でオブジェクト追加
+2. 参照画像をアップロード
+3. 収集進捗を確認
 
 ### プログラムから
 

@@ -42,58 +42,70 @@ MP4動画を録画し、後から均等にフレーム抽出
 
 ---
 
-## GUIアプリ（capture_app.py）
+## Docker実行方法
 
-### 機能
-- リアルタイムカメラプレビュー（中央にレティクル表示）
-- ROS2トピック選択
-- Registryからクラス選択
-- カウントダウンタイマー（3秒）
-- 進捗バー表示
-
-### 起動方法
+### Xtionカメラノード起動
 
 ```bash
-# ROS2環境をsource済みで実行
-python scripts/capture/capture_app.py
+# OpenNI2カメラノード起動（Xtion用）
+docker compose run --rm hsr-perception ros2-camera
 ```
 
-### キーボード操作
+### HSRキャプチャノード起動
 
-| キー | 機能 |
+```bash
+# HSR向けキャプチャノード起動
+docker compose run --rm hsr-perception ros2-capture
+```
+
+### start.shを使用（推奨）
+
+```bash
+# Xtionカメラ接続時は自動でカメラノードを起動
+./start.sh
+```
+
+`start.sh`は以下を自動で行います：
+- Xtionカメラの検出
+- udevルール設定
+- カメラノードのバックグラウンド起動
+
+---
+
+## GUIアプリ（Streamlit UI推奨）
+
+Streamlit UIからデータ収集を行う場合は、Collectionページを使用してください。
+
+### 収集方法
+
+| 方法 | 説明 |
 |-----|------|
-| Space | 単発撮影 |
-| Enter | バースト開始 |
-| Escape | バースト停止 |
+| ROS2 Camera | ROS2トピックからリアルタイム収集 |
+| Local Camera | Webカメラで撮影 |
+| File Upload | 画像ファイルをアップロード |
+| Folder Import | フォルダから一括インポート |
 
 ---
 
 ## ROS2ノード
 
-### サービス
+### サービス（Docker内から実行）
 
 ```bash
-# クラス設定
+# Dockerコンテナにアクセス
+docker compose run --rm hsr-perception bash
+
+# コンテナ内でROS2コマンド実行
 ros2 service call /continuous_capture/set_class \
     hsr_perception/srv/SetClass "{class_id: 0}"
 
-# バースト撮影開始
 ros2 service call /continuous_capture/start_burst \
     hsr_perception/srv/StartBurst "{num_images: 100, interval_seconds: 0.2}"
 
-# バースト停止
 ros2 service call /continuous_capture/stop_burst std_srvs/srv/Empty
 
-# 状態取得
 ros2 service call /continuous_capture/get_status \
     hsr_perception/srv/GetStatus
-```
-
-### 起動
-
-```bash
-# ROS2パッケージビルド後
-ros2 launch hsr_perception capture.launch.py
 ```
 
 ---
@@ -142,30 +154,6 @@ videos/
 
 ---
 
-## 動画録画（record_app.py）
-
-### 機能
-- MP4形式で動画録画
-- 録画時間表示（MM:SS形式）
-- 後からフレーム抽出可能
-
-### 起動
-
-```bash
-python scripts/capture/record_app.py
-```
-
-### フレーム抽出
-
-録画した動画から均等にフレームを抽出:
-
-```python
-# 動画から50フレームを均等抽出
-# 抽出間隔 = 総フレーム数 / 50
-```
-
----
-
 ## 画像エンコーディング対応
 
 ROS2 Imageメッセージの以下のエンコーディングをサポート:
@@ -178,18 +166,11 @@ ROS2 Imageメッセージの以下のエンコーディングをサポート:
 
 ---
 
-## 大会当日のワークフロー
+## トピックプリセット
 
-```mermaid
-flowchart TD
-    A[オブジェクト受取] --> B[Registryに登録]
-    B --> C[capture_app起動]
-    C --> D[クラス選択]
-    D --> E[バースト撮影]
-    E --> F{50枚以上?}
-    F -->|No| E
-    F -->|Yes| G[次のクラスへ]
-    G --> D
-```
-
-**目標時間**: 全クラス合計 40分以内
+| プリセット | トピック |
+|-----------|---------|
+| HSR | `/hsrb/head_rgbd_sensor/rgb/image_rect_color` |
+| 汎用USB | `/usb_cam/image_raw` |
+| RealSense | `/camera/color/image_raw` |
+| Xtion | `/camera/rgb/image_raw` |

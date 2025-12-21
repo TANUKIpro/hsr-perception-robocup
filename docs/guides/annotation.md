@@ -33,7 +33,7 @@
 ### 1. 背景差分方式（推奨）
 
 **特徴:**
-- 高速処理（大会当日向け）
+- 高速処理
 - 均一背景が必要（白シート推奨）
 - GPU不要
 
@@ -105,37 +105,48 @@ YOLO形式で保存
 
 ---
 
-## CLI使用方法
+## Docker実行方法
+
+### コマンドヘルプ
+
+```bash
+docker compose run --rm hsr-perception annotate --help
+```
 
 ### 背景差分方式
 
 ```bash
-python scripts/annotation/auto_annotate.py \
+docker compose run --rm hsr-perception annotate \
     --method background \
-    --background datasets/backgrounds/white_sheet.jpg \
-    --input-dir datasets/raw_captures \
-    --output-dir datasets/competition_day \
-    --class-config config/object_classes.json
+    --background /workspace/datasets/backgrounds/white_sheet.jpg \
+    --input-dir /workspace/datasets/raw_captures \
+    --output-dir /workspace/datasets/competition_day \
+    --class-config /workspace/config/object_classes.json
 ```
 
 ### SAM2方式
 
 ```bash
-python scripts/annotation/auto_annotate.py \
+docker compose run --rm hsr-perception annotate \
     --method sam2 \
-    --input-dir datasets/raw_captures \
-    --output-dir datasets/competition_day \
-    --class-config config/object_classes.json
+    --input-dir /workspace/datasets/raw_captures \
+    --output-dir /workspace/datasets/competition_day \
+    --class-config /workspace/config/object_classes.json
 ```
 
-### 対話式GUI
+### 主要オプション
 
-```bash
-python scripts/annotation/sam2_interactive_app.py \
-    --input-dir datasets/raw_captures/bottle \
-    --output-dir datasets/annotated/bottle \
-    --class-id 0
-```
+| オプション | 説明 | デフォルト |
+|-----------|------|-----------|
+| `--method, -m` | アノテーション方式（background/sam2） | background |
+| `--background, -b` | 背景画像パス（background方式で必須） | - |
+| `--input-dir, -i` | 入力ディレクトリ（必須） | - |
+| `--output-dir, -o` | 出力ディレクトリ（必須） | - |
+| `--class-config, -c` | クラス設定ファイル | config/object_classes.json |
+| `--split` | train/val分割比率 | 0.80 |
+| `--min-area` | 最小輪郭面積 | 500 |
+| `--group-frames` | フレームグループ化（データ漏洩防止） | 有効 |
+| `--no-verify` | アノテーション検証をスキップ | - |
 
 ---
 
@@ -156,8 +167,8 @@ python scripts/annotation/sam2_interactive_app.py \
 ```
 output_dir/
 ├── images/
-│   ├── train/     # 学習用画像（85%）
-│   └── val/       # 検証用画像（15%）
+│   ├── train/     # 学習用画像（80%）
+│   └── val/       # 検証用画像（20%）
 ├── labels/
 │   ├── train/     # 学習用ラベル
 │   └── val/       # 検証用ラベル
@@ -227,23 +238,3 @@ y_center = (y_min + y_max) / 2 / img_height
 width = (x_max - x_min) / img_width
 height = (y_max - y_min) / img_height
 ```
-
----
-
-## 大会当日のワークフロー
-
-```mermaid
-flowchart TD
-    A[収集完了] --> B{背景が均一?}
-    B -->|Yes| C[背景差分方式]
-    B -->|No| D[SAM2方式]
-    C --> E[自動アノテーション実行]
-    D --> E
-    E --> F{成功率 > 90%?}
-    F -->|Yes| G[データセット生成]
-    F -->|No| H[SAM2対話式で修正]
-    H --> G
-    G --> I[学習へ]
-```
-
-**目標時間**: 25分以内

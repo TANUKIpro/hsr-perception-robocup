@@ -7,27 +7,24 @@ RoboCup@Home競技用物体認識パイプラインのGUIアプリケーショ�
 HSR Object ManagerはStreamlitベースのWebアプリケーションで、物体認識モデルの作成から評価までの全工程をGUIで操作できます。
 
 **主要機能:**
-- 📊 Dashboard: 収集進捗とパイプライン状態の可視化
-- 📋 Registry: オブジェクト登録・参照画像管理
-- 📸 Collection: ROS2/カメラ/ファイルからのデータ収集
-- 🏷️ Annotation: 自動アノテーションパイプライン実行
-- 🎓 Training: YOLOv8 fine-tuning実行
-- 📈 Evaluation: モデル評価・競技要件チェック
-- ⚙️ Settings: システム設定・状態確認
+- Dashboard: 収集進捗とパイプライン状態の可視化
+- Registry: オブジェクト登録・参照画像管理
+- Collection: ROS2/カメラ/ファイルからのデータ収集
+- Annotation: 自動アノテーションパイプライン実行
+- Training: YOLOv8 fine-tuning実行
+- Evaluation: モデル評価・競技要件チェック
+- Settings: システム設定・状態確認
 
 ---
 
 ## 起動方法
 
 ```bash
-# 方法1: シェルスクリプト
-./run_app.sh
+# Docker起動（推奨）
+./start.sh
 
-# 方法2: 直接起動
-streamlit run app/main.py
-
-# 方法3: カスタムポート
-streamlit run app/main.py --server.port 8502
+# または
+docker compose up
 ```
 
 ブラウザで http://localhost:8501 を開きます。
@@ -36,7 +33,7 @@ streamlit run app/main.py --server.port 8502
 
 ## 各ページの使い方
 
-### 📊 Dashboard
+### Dashboard
 
 パイプライン全体の状態を一目で確認できます。
 
@@ -51,7 +48,7 @@ streamlit run app/main.py --server.port 8502
 **アクション:**
 - 「Export to YOLO Config」: `config/object_classes.json` を更新
 
-### 📋 Registry
+### Registry
 
 オブジェクトの登録・管理を行います。
 
@@ -59,7 +56,7 @@ streamlit run app/main.py --server.port 8502
 - 登録済みオブジェクト一覧表示
 - カテゴリでフィルタリング
 - 参照画像の追加
-- 「📸 Collect」でCollectionページへ移動
+- 「Collect」でCollectionページへ移動
 - オブジェクトの削除
 
 **Add New Object タブ:**
@@ -70,21 +67,21 @@ streamlit run app/main.py --server.port 8502
 - 目標サンプル数
 - プロパティ（重い/小さい/液体含む/サイズ）
 
-### 📸 Collection
+### Collection
 
 画像データの収集を行います。4つの方法が利用可能です。
 
-#### 🤖 ROS2 Camera タブ
+#### ROS2 Camera タブ
 
 HSRやROS2対応カメラから直接画像を収集します。
 
 **必要条件:**
-- ROS2 Humbleがインストール・ソース済み
-- 連続撮影ノードが起動中
+- ROS2対応カメラが接続済み
+- Xtionカメラ使用時は`start.sh`が自動設定
 
 ```bash
-# ノード起動コマンド
-ros2 launch hsr_perception capture.launch.py
+# ROS2カメラノード起動（別ターミナル）
+docker compose run --rm hsr-perception ros2-camera
 ```
 
 **操作手順:**
@@ -99,7 +96,7 @@ ros2 launch hsr_perception capture.launch.py
 - 汎用USB: `/usb_cam/image_raw`
 - RealSense: `/camera/color/image_raw`
 
-#### 📷 Local Camera タブ
+#### Local Camera タブ
 
 Webカメラやデバイス内蔵カメラで撮影します。
 
@@ -107,7 +104,7 @@ Webカメラやデバイス内蔵カメラで撮影します。
 2. 「Take a photo」で撮影
 3. 自動保存
 
-#### 📁 File Upload タブ
+#### File Upload タブ
 
 画像ファイルをアップロードします。
 
@@ -115,7 +112,7 @@ Webカメラやデバイス内蔵カメラで撮影します。
 2. 複数画像を選択してアップロード
 3. 自動保存・カウント更新
 
-#### 📂 Folder Import タブ
+#### Folder Import タブ
 
 フォルダパスを指定して一括インポートします。
 
@@ -126,7 +123,7 @@ Webカメラやデバイス内蔵カメラで撮影します。
 **データ同期:**
 収集後、「Sync to Datasets Directory」で `datasets/raw_captures/` にデータを同期します。
 
-### 🏷️ Annotation
+### Annotation
 
 自動アノテーションパイプラインを実行します。
 
@@ -149,16 +146,13 @@ Webカメラやデバイス内蔵カメラで撮影します。
 3. 分割比率を設定
 4. 「Start Annotation」で実行
 
-**推定時間:**
-- 100画像あたり約5分
-
 **出力:**
 - `datasets/annotated/{session_name}/`
   - `images/train/`, `images/val/`
   - `labels/train/`, `labels/val/`
   - `data.yaml`
 
-### 🎓 Training
+### Training
 
 YOLOv8 fine-tuningを実行します。
 
@@ -173,9 +167,9 @@ YOLOv8 fine-tuningを実行します。
 | Fast Mode | 高速モード（テスト用） | OFF |
 
 **モデル選択ガイド:**
-- `yolov8m.pt`: 精度重視（競技推奨）、学習時間: 約45分
-- `yolov8s.pt`: バランス型、学習時間: 約30分
-- `yolov8n.pt`: 高速、学習時間: 約20分
+- `yolov8m.pt`: 精度重視（競技推奨）
+- `yolov8s.pt`: バランス型
+- `yolov8n.pt`: 高速
 
 **GPU確認:**
 ページ内で自動的にGPU利用可能性をチェックします。
@@ -190,7 +184,7 @@ YOLOv8 fine-tuningを実行します。
 - `models/finetuned/{run_name}/weights/last.pt`
 - `models/finetuned/{run_name}/training_result.json`
 
-### 📈 Evaluation
+### Evaluation
 
 学習済みモデルを評価します。
 
@@ -219,7 +213,7 @@ YOLOv8 fine-tuningを実行します。
 3. 「Run Prediction」で実行
 4. 検出結果を可視化
 
-### ⚙️ Settings
+### Settings
 
 システム設定と状態確認を行います。
 
@@ -241,71 +235,15 @@ YOLOv8 fine-tuningを実行します。
 
 ---
 
-## 競技当日ワークフロー
-
-### 準備（競技開始前）
-
-1. アプリを起動: `./run_app.sh`
-2. Registry でオブジェクトを登録
-3. 背景画像を準備（白いシートなど）
-
-### Phase 1: データ収集（40分）
-
-1. Collection → ROS2 Camera タブ
-2. 連続撮影ノードを起動（別ターミナル）
-3. 各オブジェクトについて:
-   - オブジェクトを選択
-   - クラス設定
-   - バースト撮影（50-100枚）
-   - オブジェクトを回転させながら複数回撮影
-
-### Phase 2: アノテーション（25分）
-
-1. Annotation ページへ移動
-2. Background方式を選択
-3. 背景画像を選択
-4. 「Start Annotation」
-5. 完了まで待機
-
-### Phase 3: 学習（45分）
-
-1. Training ページへ移動
-2. 作成したデータセットを選択
-3. `yolov8m.pt` / 50エポックを設定
-4. 「Start Training」
-5. 進捗バーで確認
-
-### Phase 4: 評価（15分）
-
-1. Evaluation ページへ移動
-2. 学習済みモデルを選択
-3. 「Start Evaluation」
-4. 競技要件チェック:
-   - mAP@50 ≥ 85% ✓
-   - 推論時間 ≤ 100ms ✓
-5. Visual Testで最終確認
-
-### デプロイ
-
-学習済みモデルのパスをコピー:
-```
-models/finetuned/{run_name}/weights/best.pt
-```
-
----
-
 ## トラブルシューティング
 
 ### ROS2が接続できない
 
-1. ROS2環境をソース:
+1. カメラノードを起動:
    ```bash
-   source /opt/ros/humble/setup.bash
+   docker compose run --rm hsr-perception ros2-camera
    ```
-2. 撮影ノードを起動:
-   ```bash
-   ros2 launch hsr_perception capture.launch.py
-   ```
+2. Xtionカメラの場合、`start.sh`を使用すると自動設定されます
 
 ### アノテーションが失敗する
 
@@ -324,30 +262,6 @@ models/finetuned/{run_name}/weights/best.pt
 1. データ量が十分か確認（クラスあたり50枚以上推奨）
 2. アノテーション品質を確認
 3. エポック数を増やして再学習
-
----
-
-## 関連コマンド
-
-### CLIでの操作（GUIの代替）
-
-```bash
-# アノテーション
-python scripts/annotation/auto_annotate.py \
-    --method background \
-    --background datasets/backgrounds/bg.jpg \
-    --input-dir datasets/raw_captures \
-    --output-dir datasets/annotated/session1
-
-# 学習
-python scripts/training/quick_finetune.py \
-    --dataset datasets/annotated/session1/data.yaml
-
-# 評価
-python scripts/evaluation/evaluate_model.py \
-    --model models/finetuned/run1/weights/best.pt \
-    --dataset datasets/annotated/session1/data.yaml
-```
 
 ---
 
