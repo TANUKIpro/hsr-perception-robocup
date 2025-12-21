@@ -1,0 +1,91 @@
+# =============================================================================
+# HSR Perception Pipeline - CI Dockerfile (Ultra Lightweight)
+# Python 3.10 only - No ROS2, No CUDA - For CI testing only
+# =============================================================================
+# This image is optimized for CI/testing:
+# - No CUDA (GPU operations are mocked in tests)
+# - No ROS2 (ROS2 operations are mocked in tests)
+# - CPU-only PyTorch
+# - No ML model downloads
+# - ~1.5GB instead of ~10GB
+# =============================================================================
+
+FROM python:3.10-slim
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Tokyo
+
+# =============================================================================
+# Layer 1: System dependencies
+# =============================================================================
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    libfontconfig1 \
+    libice6 \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# =============================================================================
+# Layer 2: PyTorch (CPU only for CI)
+# =============================================================================
+RUN pip install --no-cache-dir \
+    torch>=2.1.0 \
+    torchvision>=0.16.0 \
+    --index-url https://download.pytorch.org/whl/cpu
+
+# =============================================================================
+# Layer 3: ML Dependencies (Ultralytics)
+# =============================================================================
+RUN pip install --no-cache-dir ultralytics>=8.3.0
+
+# =============================================================================
+# Layer 4: Application Dependencies
+# =============================================================================
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt && \
+    rm /tmp/requirements.txt
+
+# =============================================================================
+# Layer 5: Workspace Setup
+# =============================================================================
+WORKDIR /workspace
+
+# Create required directories
+RUN mkdir -p /workspace/datasets \
+             /workspace/models/pretrained \
+             /workspace/models/finetuned \
+             /workspace/profiles \
+             /workspace/runs \
+             /workspace/src
+
+# =============================================================================
+# Layer 6: Application Code
+# =============================================================================
+COPY app/ /workspace/app/
+COPY scripts/ /workspace/scripts/
+COPY config/ /workspace/config/
+COPY tests/ /workspace/tests/
+COPY pytest.ini /workspace/pytest.ini
+
+# =============================================================================
+# Environment Variables
+# =============================================================================
+ENV PYTHONPATH=/workspace:/workspace/scripts:$PYTHONPATH
+ENV PYTHONUNBUFFERED=1
+
+# =============================================================================
+# Ports
+# =============================================================================
+EXPOSE 8501
+
+# =============================================================================
+# Default Command
+# =============================================================================
+CMD ["python", "-m", "pytest"]

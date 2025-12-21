@@ -1,0 +1,49 @@
+# =============================================================================
+# HSR Perception Pipeline - Docker Compose CI Override
+# =============================================================================
+# This file overrides settings for CI environment:
+# - Disables GPU requirements (CI runs on CPU only)
+# - Changes network mode to bridge (host mode not available in CI)
+# - Disables privileged mode (not needed for tests)
+# =============================================================================
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f .github/docker-compose.ci.yml run --rm hsr-perception test
+#
+# =============================================================================
+
+services:
+  hsr-perception:
+    # Disable GPU requirements for CI
+    deploy:
+      resources:
+        reservations:
+          devices: []
+
+    # Use bridge network (host mode not available in CI)
+    network_mode: bridge
+
+    # Expose Streamlit port
+    ports:
+      - "8501:8501"
+
+    # Disable privileged mode
+    privileged: false
+
+    # Remove USB device mounts (not available in CI)
+    devices: []
+
+    # Override volumes for CI (remove host-specific mounts)
+    volumes:
+      - ./datasets:/workspace/datasets
+      - ./models:/workspace/models
+      - ./profiles:/workspace/profiles
+      - ./runs:/workspace/runs
+      - ./imports:/app/imports
+      - ./config:/workspace/config:ro
+      - ./test-results:/workspace/test-results
+
+    # Simplify environment for CI
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ROS_DOMAIN_ID=0
