@@ -165,12 +165,16 @@ jobs:
             coverage-frontend-${{ matrix.shard }}.xml
 
   # ===========================================================================
-  # Job 4: E2E Tests (Playwright)
+  # Job 4: E2E Tests (Playwright) - Parallelized with 3 shards
   # ===========================================================================
   e2e-tests:
-    name: E2E Tests
+    name: E2E Tests (Shard ${{ matrix.shard }}/3)
     needs: build-docker
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -189,11 +193,14 @@ jobs:
           mkdir -p datasets models profiles runs imports
           chmod -R 777 datasets models profiles runs imports
 
+      - name: Set Streamlit port
+        run: echo "STREAMLIT_PORT=$((8500 + ${{ matrix.shard }}))" >> $GITHUB_ENV
+
       - name: Start Streamlit
         run: |
           docker run -d \
-            --name streamlit-app \
-            -p 8501:8501 \
+            --name streamlit-app-${{ matrix.shard }} \
+            -p ${{ env.STREAMLIT_PORT }}:8501 \
             -v ${{ github.workspace }}/datasets:/workspace/datasets \
             -v ${{ github.workspace }}/models:/workspace/models \
             -v ${{ github.workspace }}/profiles:/workspace/profiles \
@@ -205,9 +212,9 @@ jobs:
 
       - name: Wait for Streamlit
         run: |
-          echo "Waiting for Streamlit to start..."
-          timeout 120 bash -c 'until curl -s http://localhost:8501/_stcore/health; do sleep 2; done'
-          echo "Streamlit is ready"
+          echo "Waiting for Streamlit on port ${{ env.STREAMLIT_PORT }}..."
+          timeout 120 bash -c 'until curl -s http://localhost:${{ env.STREAMLIT_PORT }}/_stcore/health; do sleep 2; done'
+          echo "Streamlit is ready on port ${{ env.STREAMLIT_PORT }}"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -220,18 +227,18 @@ jobs:
           npm install
           npx playwright install --with-deps chromium
 
-      - name: Run E2E tests
+      - name: Run E2E tests (Shard ${{ matrix.shard }}/3)
         working-directory: tests/e2e
-        run: npx playwright test --project=chromium-headless
+        run: npx playwright test --project=chromium-headless --shard=${{ matrix.shard }}/3
         env:
-          STREAMLIT_URL: http://localhost:8501
+          STREAMLIT_URL: http://localhost:${{ env.STREAMLIT_PORT }}
           CI: true
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: playwright-report
+          name: playwright-report-shard-${{ matrix.shard }}
           path: tests/e2e/playwright-report/
           retention-days: 30
 
@@ -239,12 +246,12 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-results-e2e
+          name: test-results-e2e-shard-${{ matrix.shard }}
           path: tests/e2e/test-results/
 
       - name: Stop Streamlit
         if: always()
-        run: docker stop streamlit-app || true
+        run: docker stop streamlit-app-${{ matrix.shard }} || true
 
   # ===========================================================================
   # Job 5: Test Summary
