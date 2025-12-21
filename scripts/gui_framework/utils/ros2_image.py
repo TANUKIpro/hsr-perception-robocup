@@ -138,16 +138,19 @@ class ROS2ImageSubscriber(Node):
 
     def get_image_topics(self) -> list[str]:
         """
-        Get list of available image topics.
+        Get list of available image topics with active publishers.
 
         Returns:
-            Sorted list of image topic names
+            Sorted list of image topic names that have at least one publisher
         """
         topics = self.get_topic_names_and_types()
         image_topics = []
         for name, types in topics:
             for t in types:
                 if "sensor_msgs/msg/Image" in t or "sensor_msgs/Image" in t:
-                    image_topics.append(name)
+                    # Only include topics with active publishers
+                    publishers = self.get_publishers_info_by_topic(name)
+                    if len(publishers) > 0:
+                        image_topics.append(name)
                     break
         return sorted(image_topics)

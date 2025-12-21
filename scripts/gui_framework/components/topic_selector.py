@@ -11,18 +11,6 @@ from typing import Callable, Optional
 from gui_framework.utils.ros2_image import ROS2ImageSubscriber
 
 
-# Common ROS2 image topics
-COMMON_TOPICS = [
-    "/camera/color/image_raw",
-    "/camera/image_raw",
-    "/image_raw",
-    "/xtion/rgb/image_raw",
-    "/xtion/depth/image_raw",
-    "/head_camera/rgb/image_raw",
-    "/hand_camera/image_raw",
-]
-
-
 class TopicSelector(ttk.Frame):
     """
     Topic selection widget for ROS2 image topics.
@@ -95,7 +83,7 @@ class TopicSelector(ttk.Frame):
         self._ros_node = ros_node
 
     def refresh_topics(self) -> None:
-        """Refresh the list of available topics."""
+        """Refresh the list of available topics with active publishers."""
         topics = []
 
         if self._ros_node is not None:
@@ -103,11 +91,6 @@ class TopicSelector(ttk.Frame):
                 topics = self._ros_node.get_image_topics()
             except Exception:
                 pass
-
-        # Add common topics that might not be published yet
-        for topic in COMMON_TOPICS:
-            if topic not in topics:
-                topics.append(topic)
 
         topics.sort()
         self.topic_combo["values"] = topics
