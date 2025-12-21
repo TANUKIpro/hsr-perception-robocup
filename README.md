@@ -1,4 +1,14 @@
-# HSR Perception Pipeline for RoboCup@Home
+<div align="center">
+
+[日本語](#日本語) | [English](#english)
+
+</div>
+
+---
+
+# 日本語
+
+## HSR Perception Pipeline for RoboCup@Home
 
 RoboCup@Home大会向けのHSR（Human Support Robot）用物体認識パイプライン。
 
@@ -6,7 +16,7 @@ RoboCup@Home大会向けのHSR（Human Support Robot）用物体認識パイプ�
 
 ---
 
-## パイプライン概要
+### パイプライン概要
 
 ```
 Collection → Annotation → Training → Evaluation → Deploy
@@ -22,11 +32,11 @@ Collection → Annotation → Training → Evaluation → Deploy
 
 ---
 
-## Docker実行
+### Docker実行
 
 すべての機能はDocker上で動作します。
 
-### 前提条件
+#### 前提条件
 
 | 項目 | 要件 |
 |------|------|
@@ -35,7 +45,7 @@ Collection → Annotation → Training → Evaluation → Deploy
 | NVIDIA Driver | 525以上 |
 | NVIDIA Container Toolkit | インストール済み |
 
-### クイックスタート
+#### クイックスタート
 
 ```bash
 # 起動（初回はイメージビルド・udevルール設定を自動実行）
@@ -51,7 +61,7 @@ Collection → Annotation → Training → Evaluation → Deploy
 ./start.sh -d             # バックグラウンド起動
 ```
 
-### 主要コマンド
+#### 主要コマンド
 
 | コマンド | 説明 |
 |---------|------|
@@ -59,7 +69,7 @@ Collection → Annotation → Training → Evaluation → Deploy
 | `docker compose down` | 停止 |
 | `docker compose run --rm hsr-perception bash` | シェルアクセス |
 
-### 含まれるコンポーネント
+#### 含まれるコンポーネント
 
 | コンポーネント | バージョン |
 |---------------|-----------|
@@ -72,7 +82,7 @@ Collection → Annotation → Training → Evaluation → Deploy
 
 ---
 
-## 使い方
+### 使い方
 
 起動後、ブラウザで http://localhost:8501 を開くとStreamlit GUIにアクセスできます。
 
@@ -88,7 +98,7 @@ Collection → Annotation → Training → Evaluation → Deploy
 
 ---
 
-## ディレクトリ構成
+### ディレクトリ構成
 
 ```
 hsr-perception-robocup/
@@ -111,11 +121,9 @@ hsr-perception-robocup/
 └── datasets/               # データセット
 ```
 
-各ファイルの詳細は [docs/implementation.md](docs/implementation.md) を参照。
-
 ---
 
-## 技術スタック
+### 技術スタック
 
 | カテゴリ | 技術 |
 |---------|------|
@@ -127,7 +135,7 @@ hsr-perception-robocup/
 
 ---
 
-## テスト
+### テスト
 
 ```bash
 # 全テスト実行
@@ -142,16 +150,187 @@ cd tests/e2e && npm test
 
 ---
 
-## ドキュメント
+### ドキュメント
 
-- [アプリガイド（日本語）](docs/app_guide.md)
-- [App Guide (English)](docs/app_guide_en.md)
-- [実装リファレンス](docs/implementation.md)
-- [設定リファレンス](docs/configuration.md)
+- [アプリガイド（日本語）](docs/jp/app_guide.md)
+- [App Guide (English)](docs/en/app_guide.md)
+
+**ガイド:**
+- [Registry](docs/jp/guides/registry.md) / [Registry (EN)](docs/en/guides/registry.md)
+- [Collection](docs/jp/guides/collection.md) / [Collection (EN)](docs/en/guides/collection.md)
+- [Annotation](docs/jp/guides/annotation.md) / [Annotation (EN)](docs/en/guides/annotation.md)
+- [Training](docs/jp/guides/training.md) / [Training (EN)](docs/en/guides/training.md)
+- [Evaluation](docs/jp/guides/evaluation.md) / [Evaluation (EN)](docs/en/guides/evaluation.md)
 
 ---
 
-## 参考資料
+### 参考資料
+
+- [RoboCup@Home Rulebook](https://github.com/RoboCupAtHome/RuleBook)
+- [Ultralytics YOLOv8 Docs](https://docs.ultralytics.com/)
+- [Segment Anything 2](https://github.com/facebookresearch/sam2)
+
+---
+
+# English
+
+## HSR Perception Pipeline for RoboCup@Home
+
+Object recognition pipeline for HSR (Human Support Robot) for RoboCup@Home competitions.
+
+**Environment**: Ubuntu 22.04 / ROS2 Humble / Python
+
+---
+
+### Pipeline Overview
+
+```
+Collection → Annotation → Training → Evaluation → Deploy
+```
+
+| Step | Description |
+|------|-------------|
+| Collection | Image collection (file upload / ROS2 camera / video extraction) |
+| Annotation | Auto-annotation with SAM2 |
+| Training | YOLOv8 fine-tuning (GPU auto-scaling supported) |
+| Evaluation | mAP and inference speed verification |
+| Deploy | Model deployment to HSR |
+
+---
+
+### Docker Execution
+
+All features run on Docker.
+
+#### Prerequisites
+
+| Item | Requirement |
+|------|-------------|
+| Docker | 24.0 or higher |
+| Docker Compose | v2.0 or higher |
+| NVIDIA Driver | 525 or higher |
+| NVIDIA Container Toolkit | Installed |
+
+#### Quick Start
+
+```bash
+# Start (first run automatically builds image and sets udev rules)
+./start.sh
+
+# Open http://localhost:8501 in your browser
+```
+
+**Options:**
+```bash
+./start.sh --build        # Force rebuild image
+./start.sh --tensorboard  # Start with TensorBoard (port 6006)
+./start.sh -d             # Run in background
+```
+
+#### Main Commands
+
+| Command | Description |
+|---------|-------------|
+| `docker compose up` | Start Streamlit UI |
+| `docker compose down` | Stop |
+| `docker compose run --rm hsr-perception bash` | Shell access |
+
+#### Included Components
+
+| Component | Version |
+|-----------|---------|
+| Python | 3.10 |
+| PyTorch | 2.x (CUDA 12.1 compatible) |
+| Ultralytics | >=8.3.0 (YOLOv8) |
+| SAM2 | latest |
+| ROS2 | Humble |
+| Streamlit | >=1.28.0 |
+
+---
+
+### Usage
+
+After starting, open http://localhost:8501 in your browser to access the Streamlit GUI.
+
+**Page Structure:**
+| Page | Function |
+|------|----------|
+| Dashboard | Pipeline progress and status visualization |
+| Registry | Object registration and reference image management |
+| Collection | Data collection (ROS2/file/video extraction) |
+| Annotation | Auto-annotation execution |
+| Training | YOLOv8 fine-tuning and progress monitoring |
+| Evaluation | Model evaluation and visual testing |
+
+---
+
+### Directory Structure
+
+```
+hsr-perception-robocup/
+├── app/                    # Streamlit GUI app
+│   ├── main.py             # Main entry point
+│   ├── pages/              # Pages (Registry, Collection, etc.)
+│   ├── services/           # Backend services
+│   └── components/         # Shared UI components
+│
+├── scripts/                # ML pipeline scripts
+│   ├── annotation/         # Auto-annotation
+│   ├── training/           # Training pipeline
+│   └── evaluation/         # Evaluation tools
+│
+├── src/hsr_perception/     # ROS2 package
+│
+├── config/                 # Configuration files
+├── profiles/               # Profile data
+├── models/                 # Trained models
+└── datasets/               # Datasets
+```
+
+---
+
+### Tech Stack
+
+| Category | Technology |
+|----------|------------|
+| Object Detection | YOLOv8 (Ultralytics) |
+| Segmentation | SAM2 (Meta) |
+| GUI | Streamlit |
+| Robotics | ROS2 Humble |
+| Container | Docker + Docker Compose |
+
+---
+
+### Testing
+
+```bash
+# Run all tests
+docker compose run --rm hsr-perception test
+
+# Backend tests only
+docker compose run --rm hsr-perception test tests/backend/ -v
+
+# E2E tests (Playwright)
+cd tests/e2e && npm test
+```
+
+---
+
+### Documentation
+
+- [App Guide (English)](docs/en/app_guide.md)
+- [アプリガイド（日本語）](docs/jp/app_guide.md)
+
+**Guides:**
+- [Registry](docs/en/guides/registry.md) / [Registry (JP)](docs/jp/guides/registry.md)
+- [Collection](docs/en/guides/collection.md) / [Collection (JP)](docs/jp/guides/collection.md)
+- [Annotation](docs/en/guides/annotation.md) / [Annotation (JP)](docs/jp/guides/annotation.md)
+- [Training](docs/en/guides/training.md) / [Training (JP)](docs/jp/guides/training.md)
+- [Evaluation](docs/en/guides/evaluation.md) / [Evaluation (JP)](docs/jp/guides/evaluation.md)
+
+---
+
+### References
 
 - [RoboCup@Home Rulebook](https://github.com/RoboCupAtHome/RuleBook)
 - [Ultralytics YOLOv8 Docs](https://docs.ultralytics.com/)
