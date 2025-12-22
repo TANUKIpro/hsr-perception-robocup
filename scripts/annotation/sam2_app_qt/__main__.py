@@ -84,8 +84,9 @@ Controls:
     # Check model file
     model_path = Path(args.model)
     if not model_path.exists():
-        # Try relative to project root
-        project_root = Path(__file__).parent.parent.parent
+        # Try relative to project root (go up 4 levels from __main__.py)
+        # sam2_app_qt/__main__.py → sam2_app_qt/ → annotation/ → scripts/ → project_root
+        project_root = Path(__file__).parent.parent.parent.parent
         model_name = Path(args.model).name
         model_path = project_root / "models" / model_name
         if not model_path.exists():
