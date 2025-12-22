@@ -143,33 +143,20 @@ def render_video_player(
     if playing_key not in st.session_state:
         st.session_state[playing_key] = False
 
-    # Apply pending frame if exists (from play action)
-    if pending_key in st.session_state:
-        default_frame = st.session_state.pop(pending_key)
-    elif slider_key in st.session_state:
-        default_frame = st.session_state[slider_key]
-    else:
-        default_frame = 0
-
-    # Clamp to valid range
+    # Calculate max frame
     max_frame = max(0, video_info.total_frames - 1)
-    default_frame = max(0, min(default_frame, max_frame))
 
-    # Frame slider (display as 1-indexed)
-    current_frame = st.slider(
-        "Frame",
-        min_value=0,
-        max_value=max_frame,
-        value=default_frame,
-        key=slider_key,
-        format=f"%d / {video_info.total_frames}",
-        label_visibility="collapsed",
-    )
+    # Apply pending frame if exists (from play action)
+    # Must update slider_key directly because Streamlit slider uses session state
+    if pending_key in st.session_state:
+        pending_frame = st.session_state.pop(pending_key)
+        pending_frame = max(0, min(pending_frame, max_frame))
+        st.session_state[slider_key] = pending_frame
 
-    # Playback controls
-    col1, col2 = st.columns([1, 3])
+    # Playback controls and slider on same row: [Play] [----Slider----]
+    col_btn, col_slider = st.columns([1, 5])
 
-    with col1:
+    with col_btn:
         if st.session_state[playing_key]:
             if st.button("Stop", key="video_stop", use_container_width=True):
                 st.session_state[playing_key] = False
@@ -179,14 +166,23 @@ def render_video_player(
                 st.session_state[playing_key] = True
                 st.rerun()
 
-    with col2:
-        # Frame counter display
-        current_time = current_frame / video_info.fps if video_info.fps > 0 else 0
-        status = " (Playing...)" if st.session_state[playing_key] else ""
-        st.markdown(
-            f"**Frame {current_frame + 1} / {video_info.total_frames}**{status}  \n"
-            f"{current_time:.1f}s / {video_info.duration_sec:.1f}s"
+    with col_slider:
+        current_frame = st.slider(
+            "Frame",
+            min_value=0,
+            max_value=max_frame,
+            key=slider_key,
+            format=f"%d / {video_info.total_frames}",
+            label_visibility="collapsed",
         )
+
+    # Frame counter display
+    current_time = current_frame / video_info.fps if video_info.fps > 0 else 0
+    status = " (Playing...)" if st.session_state[playing_key] else ""
+    st.caption(
+        f"Frame {current_frame + 1} / {video_info.total_frames}{status} — "
+        f"{current_time:.1f}s / {video_info.duration_sec:.1f}s"
+    )
 
     st.markdown("---")
 
