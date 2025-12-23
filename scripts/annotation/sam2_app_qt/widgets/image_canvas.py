@@ -59,7 +59,6 @@ class ImageCanvas(QLabel):
             image: RGB image array
         """
         self.current_image = image
-        self._update_display()
 
     def update_display(self, display_image: np.ndarray) -> None:
         """

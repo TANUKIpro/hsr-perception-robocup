@@ -622,6 +622,9 @@ class SAM2AnnotationWindow(QMainWindow):
                 model_path=self.model_path,
                 device=self.device,
             )
+            self.video_predictor.load_model(
+                progress_callback=lambda msg: self.tracking_panel.update_status(f"Tracking: {msg}")
+            )
 
         # Start tracking worker
         self._tracking_worker = TrackingWorker(
