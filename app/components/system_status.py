@@ -21,11 +21,12 @@ def render_system_status():
 
 
 def render_ros2_diagnostics():
-    """Render ROS2 diagnostics."""
+    """Render ROS2 diagnostics and command launcher."""
     st.write("**ROS2 Status:**")
 
     try:
         from services.ros2_bridge import ROS2Bridge
+
         ros2_bridge = ROS2Bridge()
         diagnostics = ros2_bridge.get_diagnostics()
 
@@ -34,7 +35,23 @@ def render_ros2_diagnostics():
             st.write(f"  Topics: {diagnostics.get('topics_count', 'N/A')}")
             st.write(f"  Image Topics: {diagnostics.get('image_topics_count', 'N/A')}")
             st.write(f"  Nodes: {diagnostics.get('nodes_count', 'N/A')}")
-            st.write(f"  Capture Node: {'Running' if diagnostics.get('capture_node_running') else 'Not Found'}")
+            st.write(
+                f"  Capture Node: {'Running' if diagnostics.get('capture_node_running') else 'Not Found'}"
+            )
+
+            # ROS2 Command Launcher
+            st.markdown("---")
+            from components.ros2_command_launcher import render_ros2_command_launcher
+            from services.command_presets_manager import CommandPresetsManager
+            from services.ros2_process_tracker import ROS2ProcessTracker
+
+            presets_manager = CommandPresetsManager()
+            process_tracker = ROS2ProcessTracker(ros2_bridge=ros2_bridge)
+
+            render_ros2_command_launcher(
+                presets_manager=presets_manager,
+                process_tracker=process_tracker,
+            )
         else:
             st.warning("ROS2 Not Available")
 
