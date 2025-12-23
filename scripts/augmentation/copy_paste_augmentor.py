@@ -596,6 +596,7 @@ class CopyPasteAugmentor:
         real_image_count: int,
         class_names: List[str],
         progress_callback: Optional[callable] = None,
+        num_workers: int = 1,
     ) -> Dict:
         """
         Generate a batch of synthetic images using masks directly.
@@ -608,12 +609,26 @@ class CopyPasteAugmentor:
             real_image_count: Number of real images (for ratio calculation)
             class_names: List of class names
             progress_callback: Optional callback(current, total, message)
+            num_workers: Number of parallel workers (default: 1 for sequential,
+                        >1 uses ParallelSyntheticGenerator)
 
         Returns:
             Statistics dictionary
         """
         # Calculate number of synthetic images to generate
         num_synthetic = int(real_image_count * self.config.synthetic_to_real_ratio)
+
+        # Use parallel generation if num_workers > 1
+        if num_workers > 1:
+            return self._generate_batch_parallel(
+                backgrounds_dir=backgrounds_dir,
+                annotated_dir=annotated_dir,
+                output_dir=output_dir,
+                num_synthetic=num_synthetic,
+                class_names=class_names,
+                progress_callback=progress_callback,
+                num_workers=num_workers,
+            )
 
         # Create output directories
         images_out = output_dir / "images"
@@ -1038,6 +1053,76 @@ class CopyPasteAugmentor:
                 return resolution
 
         return None
+
+    def _generate_batch_parallel(
+        self,
+        backgrounds_dir: Path,
+        annotated_dir: Path,
+        output_dir: Path,
+        num_synthetic: int,
+        class_names: List[str],
+        progress_callback: Optional[callable],
+        num_workers: int,
+    ) -> Dict:
+        """
+        Generate synthetic images in parallel using ParallelSyntheticGenerator.
+
+        Args:
+            backgrounds_dir: Directory containing background images
+            annotated_dir: Directory containing annotated class subdirectories
+            output_dir: Output directory for synthetic images
+            num_synthetic: Number of synthetic images to generate
+            class_names: List of class names
+            progress_callback: Optional callback(current, total, message)
+            num_workers: Number of parallel workers
+
+        Returns:
+            Statistics dictionary
+        """
+        # Import here to avoid circular imports at module level
+        from .parallel_generator import ParallelSyntheticGenerator
+
+        # Load backgrounds
+        backgrounds = self._load_images(backgrounds_dir)
+        if not backgrounds:
+            return {"error": "No background images found", "generated": 0}
+
+        # Load object references
+        if progress_callback:
+            progress_callback(0, num_synthetic, "Loading object references...")
+
+        object_refs = self._load_object_references(
+            annotated_dir=annotated_dir,
+            class_names=class_names,
+        )
+        if not object_refs:
+            return {"error": "No mask files found in annotated directory", "generated": 0}
+
+        # Get target resolution
+        target_resolution = self._get_target_resolution(object_refs)
+
+        logger.info(
+            f"Parallel generation: {num_synthetic} images with {num_workers} workers"
+        )
+
+        # Create parallel generator with our config
+        parallel_gen = ParallelSyntheticGenerator(
+            config=self.config,
+            num_workers=num_workers,
+        )
+
+        # Generate in parallel
+        stats = parallel_gen.generate_batch_parallel(
+            backgrounds=backgrounds,
+            object_refs=object_refs,
+            output_dir=output_dir,
+            num_synthetic=num_synthetic,
+            class_names=class_names,
+            target_resolution=target_resolution,
+            progress_callback=progress_callback,
+        )
+
+        return stats
 
 
 def generate_data_yaml(
