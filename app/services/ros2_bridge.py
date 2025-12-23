@@ -557,7 +557,7 @@ class ROS2Bridge:
         """
         Open the capture application with full GUI.
 
-        Launches the Tkinter-based capture application with:
+        Launches the PyQt6-based capture application with:
         - Topic selection from available ROS2 topics
         - Real-time preview with center reticle
         - Single and burst capture controls
@@ -569,7 +569,7 @@ class ROS2Bridge:
         Returns:
             True if successfully launched, False otherwise
         """
-        script_path = Path(__file__).parent.parent.parent / "scripts/capture/capture_app.py"
+        script_path = Path(__file__).parent.parent.parent / "scripts/capture/capture_app_qt.py"
 
         if not script_path.exists():
             return False
@@ -604,7 +604,7 @@ class ROS2Bridge:
         """
         Open the video recording application with full GUI.
 
-        Launches the Tkinter-based recording application with:
+        Launches the PyQt6-based recording application with:
         - Topic selection from available ROS2 topics
         - Real-time preview with center reticle
         - Video recording with countdown
@@ -617,7 +617,7 @@ class ROS2Bridge:
         Returns:
             True if successfully launched, False otherwise
         """
-        script_path = Path(__file__).parent.parent.parent / "scripts/capture/record_app.py"
+        script_path = Path(__file__).parent.parent.parent / "scripts/capture/record_app_qt.py"
 
         if not script_path.exists():
             return False

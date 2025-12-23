@@ -513,7 +513,7 @@ class PathCoordinator:
         """
         Launch SAM2 Interactive Annotation Application.
 
-        Opens a Tkinter-based GUI for semi-automatic object annotation
+        Opens a PyQt6-based GUI for semi-automatic object annotation
         using SAM2 segmentation and video tracking.
 
         Args:
@@ -529,9 +529,11 @@ class PathCoordinator:
         import subprocess
         import sys
 
-        script_path = self.project_root / "scripts/annotation/sam2_interactive_app.py"
+        # SAM2 app is a Python module in scripts/annotation/sam2_app_qt/
+        annotation_dir = self.project_root / "scripts/annotation"
+        module_dir = annotation_dir / "sam2_app_qt"
 
-        if not script_path.exists():
+        if not module_dir.exists():
             return False
 
         # Ensure output directory exists
@@ -539,7 +541,7 @@ class PathCoordinator:
 
         cmd = [
             sys.executable,
-            str(script_path),
+            "-m", "sam2_app_qt",
             "--input-dir", input_dir,
             "--output-dir", output_dir,
             "--class-id", str(class_id),
@@ -548,7 +550,7 @@ class PathCoordinator:
         ]
 
         try:
-            subprocess.Popen(cmd, start_new_session=True)
+            subprocess.Popen(cmd, cwd=str(annotation_dir), start_new_session=True)
             return True
         except Exception:
             return False
