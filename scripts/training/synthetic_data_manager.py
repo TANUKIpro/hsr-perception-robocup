@@ -247,7 +247,12 @@ class SyntheticDataManager:
         with open(yaml_path, "r") as f:
             data_config = yaml.safe_load(f)
 
-        class_names = list(data_config.get("names", {}).values())
+        # Support both list and dict formats for names
+        names_data = data_config.get("names", [])
+        if isinstance(names_data, dict):
+            class_names = list(names_data.values())
+        else:
+            class_names = list(names_data)
         if not class_names and self.verbose:
             print(
                 f"{Fore.YELLOW}No class names found in dataset YAML{Style.RESET_ALL}"

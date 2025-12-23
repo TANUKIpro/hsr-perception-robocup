@@ -215,6 +215,8 @@ def main():
                     "optimizer", "lr0", "lrf", "momentum", "weight_decay",
                     # LLRD (Layer-wise Learning Rate Decay)
                     "llrd_enabled", "llrd_decay_rate",
+                    # SWA (Stochastic Weight Averaging)
+                    "swa_enabled", "swa_start_epoch", "swa_lr",
                     # Performance
                     "workers", "cache", "amp", "imgsz", "patience", "close_mosaic",
                     # Layer freeze (prevents overfitting)
