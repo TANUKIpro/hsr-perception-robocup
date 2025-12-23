@@ -672,6 +672,11 @@ class CopyPasteAugmentor:
             if progress_callback:
                 progress_callback(i + 1, num_synthetic, f"Generating image {i + 1}")
 
+            # Progress display every 100 images (when no callback provided)
+            if not progress_callback and i > 0 and i % 100 == 0:
+                success_rate = (stats["generated"] / i) * 100 if i > 0 else 0
+                print(f"Synthetic progress: {i}/{num_synthetic} ({success_rate:.1f}% success)")
+
             try:
                 # Select random background
                 bg_path = backgrounds[self.rng.randint(0, len(backgrounds))]
@@ -731,7 +736,8 @@ class CopyPasteAugmentor:
                 # Validate result
                 is_valid, issues = self.validate_synthetic_image(result)
                 if not is_valid:
-                    logger.warning(f"Skipping invalid synthetic image: {issues}")
+                    # Use debug level to avoid flooding console with failure messages
+                    logger.debug(f"Skipping invalid synthetic image: {issues}")
                     stats["validation_failures"] += 1
                     stats["failed"] += 1
                     continue
@@ -781,6 +787,15 @@ class CopyPasteAugmentor:
             stats["avg_objects_per_image"] = stats["total_objects_placed"] / stats["generated"]
         else:
             stats["avg_objects_per_image"] = 0.0
+
+        # Print final summary (when no progress callback)
+        if not progress_callback:
+            success_rate = (stats["generated"] / num_synthetic * 100) if num_synthetic > 0 else 0
+            print(f"\n=== Synthetic Generation Complete ===")
+            print(f"  Generated: {stats['generated']}/{num_synthetic}")
+            print(f"  Failed: {stats['failed']}")
+            print(f"  Success rate: {success_rate:.1f}%")
+            print(f"  Avg objects/image: {stats['avg_objects_per_image']:.1f}")
 
         return stats
 
