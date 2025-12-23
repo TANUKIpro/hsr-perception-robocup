@@ -51,6 +51,19 @@ class ExtractedObject:
         }
 
 
+@dataclass
+class ObjectReference:
+    """Lightweight reference to an object file (no image data loaded).
+
+    Used for lazy loading to reduce memory usage during synthetic image generation.
+    """
+
+    image_path: str
+    mask_path: str
+    class_id: int
+    class_name: str
+
+
 class ObjectExtractor:
     """
     Extract objects from images using masks.

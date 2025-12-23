@@ -30,7 +30,7 @@ if str(_scripts_dir) not in sys.path:
 from annotation.annotation_utils import bbox_to_yolo, write_yolo_label
 from common.constants import IMAGE_EXTENSIONS
 
-from .object_extractor import ExtractedObject, ObjectExtractor
+from .object_extractor import ExtractedObject, ObjectExtractor, ObjectReference
 
 
 @dataclass
@@ -626,18 +626,22 @@ class CopyPasteAugmentor:
         if not backgrounds:
             return {"error": "No background images found", "generated": 0}
 
-        # Load objects directly from masks (on-the-fly extraction)
+        # Load lightweight object references (file paths only, no image data)
+        # This reduces memory usage from ~50-100MB to ~few KB
         if progress_callback:
-            progress_callback(0, num_synthetic, "Loading objects from masks...")
+            progress_callback(0, num_synthetic, "Loading object references...")
 
-        all_objects, target_resolution = self._load_objects_from_masks(
+        object_refs = self._load_object_references(
             annotated_dir=annotated_dir,
             class_names=class_names,
-            alpha_blur_sigma=self.config.edge_blur_sigma,
-            padding=5,
         )
-        if not all_objects:
+        if not object_refs:
             return {"error": "No mask files found in annotated directory", "generated": 0}
+
+        # Get target resolution from first image (loads and releases immediately)
+        target_resolution = self._get_target_resolution(object_refs)
+
+        logger.info(f"Loaded {len(object_refs)} object references (lazy loading enabled)")
 
         stats = {
             "generated": 0,
@@ -668,12 +672,46 @@ class CopyPasteAugmentor:
                         background, (target_w, target_h), interpolation=cv2.INTER_LINEAR
                     )
 
-                # Generate synthetic image
+                # Lazy loading: Sample and load only the needed objects for this image
+                num_objects_to_place = self.rng.randint(
+                    self.config.min_objects_per_image, self.config.max_objects_per_image + 1
+                )
+                num_to_sample = min(num_objects_to_place, len(object_refs))
+
+                # Skip if no objects to sample
+                if num_to_sample == 0:
+                    stats["failed"] += 1
+                    continue
+
+                # Randomly select object references (without replacement)
+                selected_indices = self.rng.choice(
+                    len(object_refs), size=num_to_sample, replace=False
+                )
+
+                # Load selected objects on-demand
+                loaded_objects = []
+                for idx in selected_indices:
+                    obj_tuple = self._load_single_object(
+                        ref=object_refs[idx],
+                        alpha_blur_sigma=self.config.edge_blur_sigma,
+                        padding=5,
+                    )
+                    if obj_tuple is not None:
+                        loaded_objects.append(obj_tuple)
+
+                if not loaded_objects:
+                    stats["failed"] += 1
+                    continue
+
+                # Generate synthetic image with loaded objects
                 result = self.generate_synthetic_image(
                     background=background,
-                    objects=all_objects,
+                    objects=loaded_objects,
                     background_path=str(bg_path),
                 )
+
+                # Immediately release loaded objects to free memory
+                del loaded_objects
 
                 # Validate result
                 is_valid, issues = self.validate_synthetic_image(result)
@@ -860,6 +898,146 @@ class CopyPasteAugmentor:
                     all_objects.append((obj, str(mask_path)))
 
         return all_objects, target_resolution
+
+    def _load_object_references(
+        self,
+        annotated_dir: Path,
+        class_names: List[str],
+    ) -> List[ObjectReference]:
+        """
+        Load lightweight object references (file paths only, no image data).
+
+        This method collects file paths without loading actual image data,
+        enabling lazy loading during synthetic image generation to reduce
+        memory usage.
+
+        Args:
+            annotated_dir: Directory containing annotated class subdirectories
+            class_names: List of class names to load
+
+        Returns:
+            List of ObjectReference instances (lightweight, ~100 bytes each)
+        """
+        object_refs = []
+
+        for class_id, class_name in enumerate(class_names):
+            class_dir = annotated_dir / class_name
+            masks_dir = class_dir / "masks"
+            images_dir = class_dir / "images"
+
+            if not masks_dir.exists():
+                continue
+
+            # Try both naming conventions: *_mask.png and *.png
+            mask_patterns = ["*_mask.png", "*.png"]
+            mask_files = set()
+            for pattern in mask_patterns:
+                mask_files.update(masks_dir.glob(pattern))
+
+            for mask_path in mask_files:
+                # Strip "_mask" suffix if present to find corresponding image
+                img_stem = mask_path.stem
+                if img_stem.endswith("_mask"):
+                    img_stem = img_stem[:-5]
+
+                img_path = None
+
+                # Check images directory
+                if images_dir.exists():
+                    for ext in [".jpg", ".jpeg", ".png"]:
+                        candidate = images_dir / f"{img_stem}{ext}"
+                        if candidate.exists():
+                            img_path = candidate
+                            break
+
+                if img_path is None:
+                    continue
+
+                # Store only file paths, no image data loaded
+                object_refs.append(
+                    ObjectReference(
+                        image_path=str(img_path),
+                        mask_path=str(mask_path),
+                        class_id=class_id,
+                        class_name=class_name,
+                    )
+                )
+
+        return object_refs
+
+    def _load_single_object(
+        self,
+        ref: ObjectReference,
+        alpha_blur_sigma: float = 2.0,
+        padding: int = 5,
+    ) -> Optional[Tuple[ExtractedObject, str]]:
+        """
+        Load a single object on-demand from its reference.
+
+        Args:
+            ref: ObjectReference containing file paths
+            alpha_blur_sigma: Gaussian blur sigma for edge softening
+            padding: Padding around object when cropping
+
+        Returns:
+            Tuple of (ExtractedObject, mask_path) or None if loading fails
+        """
+        image_bgr = cv2.imread(ref.image_path)
+        mask_gray = cv2.imread(ref.mask_path, cv2.IMREAD_GRAYSCALE)
+
+        if image_bgr is None or mask_gray is None:
+            return None
+
+        image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
+        mask_bool = mask_gray > 127
+
+        extractor = ObjectExtractor(
+            alpha_blur_sigma=alpha_blur_sigma,
+            padding=padding,
+        )
+
+        obj = extractor.extract_object(
+            image_rgb=image_rgb,
+            mask=mask_bool,
+            class_id=ref.class_id,
+            class_name=ref.class_name,
+            source_path=ref.image_path,
+        )
+
+        # Explicitly release intermediate image data to free memory
+        del image_bgr, image_rgb, mask_gray, mask_bool
+
+        if obj is None:
+            return None
+
+        return (obj, ref.mask_path)
+
+    def _get_target_resolution(
+        self,
+        object_refs: List[ObjectReference],
+    ) -> Optional[Tuple[int, int]]:
+        """
+        Get target resolution from the first valid object reference.
+
+        Loads only one image to determine resolution, then releases memory.
+
+        Args:
+            object_refs: List of object references
+
+        Returns:
+            Tuple of (height, width) or None if no valid images
+        """
+        if not object_refs:
+            return None
+
+        for ref in object_refs:
+            img = cv2.imread(ref.image_path)
+            if img is not None:
+                resolution = img.shape[:2]  # (height, width)
+                del img  # Immediately release memory
+                return resolution
+
+        return None
 
 
 def generate_data_yaml(
