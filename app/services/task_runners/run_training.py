@@ -374,6 +374,11 @@ def main():
         llrd_enabled = config.pop("llrd_enabled", False)
         llrd_decay_rate = config.pop("llrd_decay_rate", 0.9)
 
+        # Extract SWA parameters from config (custom implementation, not YOLO native)
+        swa_enabled = config.pop("swa_enabled", False)
+        swa_start_epoch = config.pop("swa_start_epoch", 10)
+        swa_lr = config.pop("swa_lr", 0.0005)
+
         try:
             os.chdir(dataset_dir)
             print(f"Changed working directory to: {dataset_dir}")
