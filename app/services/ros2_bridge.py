@@ -696,3 +696,65 @@ class ROS2Bridge:
             return True
         except Exception:
             return False
+
+    def launch_command_background(
+        self,
+        command: str,
+        log_file: Optional[str] = None,
+    ) -> Optional[subprocess.Popen]:
+        """
+        Launch arbitrary command in background with ROS2 environment sourced.
+
+        This method is designed for launching ROS2 commands from user-defined
+        presets. The process is detached from the parent process group to
+        ensure it continues running even if the Streamlit app restarts.
+
+        Args:
+            command: Full command to execute (e.g., "ros2 launch pkg file.launch.py")
+            log_file: Optional path to log file for stdout/stderr
+
+        Returns:
+            Popen object if successful, None otherwise
+
+        Example:
+            process = bridge.launch_command_background(
+                "ros2 launch hsr_perception capture.launch.py",
+                log_file="/tmp/capture.log"
+            )
+            if process:
+                print(f"Started with PID: {process.pid}")
+        """
+        # Build command with ROS2 environment sourced
+        full_cmd = f"source {self.source_script} 2>/dev/null && {command}"
+
+        stdout_handle = None
+        try:
+            # Setup output redirection
+            if log_file:
+                # Line-buffered for real-time log viewing
+                stdout_handle = open(log_file, "w", buffering=1)
+                stderr_handle = subprocess.STDOUT
+            else:
+                stdout_handle = subprocess.DEVNULL
+                stderr_handle = subprocess.DEVNULL
+
+            # Launch in background with new session (detached from parent)
+            process = subprocess.Popen(
+                ["bash", "-c", full_cmd],
+                stdout=stdout_handle,
+                stderr=stderr_handle,
+                start_new_session=True,  # Detach from parent process group
+                close_fds=True,  # Close unused file descriptors in child
+            )
+
+            return process
+
+        except Exception:
+            return None
+        finally:
+            # Close file handle in parent process (child has its own copy)
+            if stdout_handle is not None and stdout_handle != subprocess.DEVNULL:
+                try:
+                    stdout_handle.close()
+                except Exception:
+                    pass
