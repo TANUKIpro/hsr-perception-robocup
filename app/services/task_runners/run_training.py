@@ -20,6 +20,7 @@ sys.path.insert(0, str(project_root / "scripts" / "training"))
 sys.path.insert(0, str(project_root / "scripts"))
 
 from app.services.task_manager import update_task_status
+from training.synthetic_data_manager import SYNTHETIC_CONFIG_KEYS
 
 
 class TrainingProgressCallback:
@@ -215,6 +216,8 @@ def main():
                     "optimizer", "lr0", "lrf", "momentum", "weight_decay",
                     # LLRD (Layer-wise Learning Rate Decay)
                     "llrd_enabled", "llrd_decay_rate",
+                    # SWA (Stochastic Weight Averaging)
+                    "swa_enabled", "swa_start_epoch", "swa_lr",
                     # Performance
                     "workers", "cache", "amp", "imgsz", "patience", "close_mosaic",
                     # Layer freeze (prevents overfitting)
@@ -238,21 +241,8 @@ def main():
             except Exception as e:
                 print(f"Warning: Error applying advanced parameters: {e}")
 
-        # Keys that should NOT be passed to YOLO's train() method
-        SYNTHETIC_CONFIG_KEYS = {
-            "dynamic_synthetic_enabled",
-            "backgrounds_dir",
-            "annotated_dir",
-            "synthetic_ratio",
-            "synthetic_scale_range",
-            "synthetic_rotation_range",
-            "synthetic_white_balance",
-            "synthetic_white_balance_strength",
-            "synthetic_edge_blur",
-            "synthetic_max_objects",
-        }
-
         # Apply synthetic config (stored separately, not added to YOLO config)
+        # SYNTHETIC_CONFIG_KEYS is imported from training.synthetic_data_manager
         synthetic_config = {}
         if args.synthetic_config:
             try:
@@ -371,6 +361,11 @@ def main():
         # Extract LLRD parameters from config
         llrd_enabled = config.pop("llrd_enabled", False)
         llrd_decay_rate = config.pop("llrd_decay_rate", 0.9)
+
+        # Extract SWA parameters from config (custom implementation, not YOLO native)
+        swa_enabled = config.pop("swa_enabled", False)
+        swa_start_epoch = config.pop("swa_start_epoch", 10)
+        swa_lr = config.pop("swa_lr", 0.0005)
 
         try:
             os.chdir(dataset_dir)
