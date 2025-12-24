@@ -14,6 +14,7 @@ import logging
 import sys
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -21,6 +22,69 @@ import cv2
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# LRU Cache for Image I/O Optimization
+# =============================================================================
+# These cached functions reduce redundant disk reads for frequently accessed
+# background and object images during synthetic image generation.
+
+
+@lru_cache(maxsize=32)
+def _cached_load_background(path: str) -> Optional[np.ndarray]:
+    """
+    Load background image with caching.
+
+    Args:
+        path: Path to background image file
+
+    Returns:
+        BGR image array or None if loading fails
+
+    Note:
+        Caller should copy the returned array if modifications are needed,
+        as the cached array should not be modified in place.
+    """
+    img = cv2.imread(path)
+    return img
+
+
+@lru_cache(maxsize=128)
+def _cached_load_object_images(image_path: str, mask_path: str) -> Optional[tuple]:
+    """
+    Load object image and mask with caching.
+
+    Args:
+        image_path: Path to object image file
+        mask_path: Path to mask image file
+
+    Returns:
+        Tuple of (BGR image, grayscale mask) or None if loading fails
+
+    Note:
+        Caller should copy returned arrays if modifications are needed.
+    """
+    image_bgr = cv2.imread(image_path)
+    mask_gray = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+    if image_bgr is None or mask_gray is None:
+        return None
+    return (image_bgr, mask_gray)
+
+
+def clear_image_cache():
+    """Clear all image caches to free memory."""
+    _cached_load_background.cache_clear()
+    _cached_load_object_images.cache_clear()
+
+
+def get_cache_stats() -> dict:
+    """Get cache statistics for debugging."""
+    return {
+        "background": _cached_load_background.cache_info()._asdict(),
+        "object": _cached_load_object_images.cache_info()._asdict(),
+    }
+
 
 # Add scripts directory to path for imports
 _scripts_dir = Path(__file__).parent.parent
@@ -680,7 +744,13 @@ class CopyPasteAugmentor:
             try:
                 # Select random background
                 bg_path = backgrounds[self.rng.randint(0, len(backgrounds))]
-                background = cv2.imread(str(bg_path))
+                # Use cached loading to reduce I/O
+                cached_bg = _cached_load_background(str(bg_path))
+                if cached_bg is None:
+                    stats["failed"] += 1
+                    continue
+                # Copy to avoid modifying cached array
+                background = cached_bg.copy()
                 if background is None:
                     stats["failed"] += 1
                     continue
@@ -1012,11 +1082,14 @@ class CopyPasteAugmentor:
         Returns:
             Tuple of (ExtractedObject, mask_path) or None if loading fails
         """
-        image_bgr = cv2.imread(ref.image_path)
-        mask_gray = cv2.imread(ref.mask_path, cv2.IMREAD_GRAYSCALE)
-
-        if image_bgr is None or mask_gray is None:
+        # Use cached loading to reduce I/O for frequently used objects
+        cached_result = _cached_load_object_images(ref.image_path, ref.mask_path)
+        if cached_result is None:
             return None
+
+        # Copy to avoid modifying cached arrays
+        image_bgr = cached_result[0].copy()
+        mask_gray = cached_result[1].copy()
 
         image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
         mask_bool = mask_gray > 127

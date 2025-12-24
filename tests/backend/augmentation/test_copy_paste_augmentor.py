@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 
 # Add scripts directory to path
-_repo_root = Path(__file__).parent.parent.parent
+_repo_root = Path(__file__).parent.parent.parent.parent
 _scripts_dir = _repo_root / "scripts"
 if str(_scripts_dir) not in sys.path:
     sys.path.insert(0, str(_scripts_dir))

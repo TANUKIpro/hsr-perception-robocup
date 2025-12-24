@@ -69,6 +69,7 @@ COMPETITION_CONFIG = {
     "synthetic_white_balance_strength": 0.7,
     "synthetic_edge_blur": 2.0,
     "synthetic_max_objects": 3,
+    "synthetic_num_workers": 0,  # 0 = auto (cpu_count // 2), >0 = explicit worker count
     "backgrounds_dir": None,  # Passed from UI
     "annotated_dir": None,  # Passed from UI
 }

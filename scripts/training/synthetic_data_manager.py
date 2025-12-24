@@ -3,6 +3,9 @@ Dynamic synthetic data generation for training.
 
 Manages Copy-Paste augmentation for generating synthetic training images.
 """
+import hashlib
+import json
+import os
 import shutil
 import sys
 import time
@@ -44,7 +47,7 @@ class SyntheticConfig:
     white_balance_strength: float = 0.7
     edge_blur: float = 2.0
     max_objects: int = 3
-    num_workers: int = 1  # 1 = sequential, >1 = parallel processing
+    num_workers: int = 0  # 0 = auto (cpu_count // 2), >0 = explicit worker count
 
     @classmethod
     def from_dict(cls, config: Dict) -> "SyntheticConfig":
@@ -61,13 +64,18 @@ class SyntheticConfig:
         annotated_dir = config.get("annotated_dir")
 
         # Validate and sanitize num_workers
-        num_workers_raw = config.get("synthetic_num_workers", 1)
+        # 0 = auto mode (use cpu_count // 2), >0 = explicit worker count
+        num_workers_raw = config.get("synthetic_num_workers", 0)
         try:
             num_workers = int(num_workers_raw)
-            if num_workers < 1:
+            if num_workers == 0:
+                # Auto mode: use half of CPU cores (at least 1)
+                num_workers = max(1, (os.cpu_count() or 4) // 2)
+            elif num_workers < 0:
                 num_workers = 1
         except (TypeError, ValueError):
-            num_workers = 1
+            # Fallback to auto mode
+            num_workers = max(1, (os.cpu_count() or 4) // 2)
 
         return cls(
             enabled=config.get("dynamic_synthetic_enabled", False),
@@ -106,6 +114,207 @@ class SyntheticDataManager:
         """
         self.config = config
         self.verbose = verbose
+
+    def _compute_config_hash(self, dataset_path: Path) -> str:
+        """
+        Compute a hash of the synthetic generation configuration.
+
+        The hash includes all parameters that affect the generated images,
+        allowing cache invalidation when configuration changes.
+
+        Args:
+            dataset_path: Path to dataset directory
+
+        Returns:
+            12-character hash string
+        """
+        # Collect file lists from source directories
+        backgrounds_files = []
+        annotated_files = []
+
+        if self.config.backgrounds_dir and self.config.backgrounds_dir.exists():
+            backgrounds_files = sorted([
+                f.name for f in self.config.backgrounds_dir.iterdir()
+                if f.is_file() and f.suffix.lower() in {".jpg", ".jpeg", ".png"}
+            ])
+
+        if self.config.annotated_dir and self.config.annotated_dir.exists():
+            # Include class directories and their contents
+            for class_dir in sorted(self.config.annotated_dir.iterdir()):
+                if class_dir.is_dir():
+                    masks_dir = class_dir / "masks"
+                    if masks_dir.exists():
+                        annotated_files.extend([
+                            f"{class_dir.name}/{f.name}"
+                            for f in sorted(masks_dir.iterdir())
+                            if f.is_file()
+                        ])
+
+        # Count training images
+        train_images_dir = dataset_path / "images" / "train"
+        real_count = len(list(train_images_dir.glob("*"))) if train_images_dir.exists() else 0
+
+        config_dict = {
+            "backgrounds": backgrounds_files,
+            "annotated": annotated_files,
+            "real_count": real_count,
+            "ratio": self.config.ratio,
+            "scale_range": list(self.config.scale_range),
+            "rotation_range": list(self.config.rotation_range),
+            "white_balance": self.config.white_balance,
+            "white_balance_strength": self.config.white_balance_strength,
+            "edge_blur": self.config.edge_blur,
+            "max_objects": self.config.max_objects,
+        }
+
+        # Compute hash
+        config_json = json.dumps(config_dict, sort_keys=True)
+        return hashlib.md5(config_json.encode()).hexdigest()[:12]
+
+    def _get_cache_dir(self, dataset_path: Path) -> Path:
+        """Get the cache directory path for current configuration."""
+        config_hash = self._compute_config_hash(dataset_path)
+        return dataset_path / f".synthetic_cache_{config_hash}"
+
+    def _check_cache(self, dataset_path: Path) -> Optional[Path]:
+        """
+        Check if valid cache exists for current configuration.
+
+        Args:
+            dataset_path: Path to dataset directory
+
+        Returns:
+            Path to cache directory if valid, None otherwise
+        """
+        cache_dir = self._get_cache_dir(dataset_path)
+        manifest_path = cache_dir / "manifest.json"
+
+        if not manifest_path.exists():
+            return None
+
+        try:
+            with open(manifest_path) as f:
+                manifest = json.load(f)
+
+            # Verify cache integrity
+            images_dir = cache_dir / "images"
+            labels_dir = cache_dir / "labels"
+
+            if not images_dir.exists() or not labels_dir.exists():
+                return None
+
+            expected_count = manifest.get("image_count", 0)
+            actual_count = len(list(images_dir.glob("*")))
+
+            if actual_count >= expected_count * 0.9:  # Allow 10% tolerance
+                return cache_dir
+
+        except (json.JSONDecodeError, OSError):
+            pass
+
+        return None
+
+    def _restore_from_cache(
+        self, cache_dir: Path, dataset_path: Path
+    ) -> SyntheticGenerationResult:
+        """
+        Restore synthetic images from cache to training set.
+
+        Args:
+            cache_dir: Path to cache directory
+            dataset_path: Path to dataset directory
+
+        Returns:
+            SyntheticGenerationResult with count of images restored
+        """
+        train_images_dir = dataset_path / "images" / "train"
+        train_labels_dir = dataset_path / "labels" / "train"
+
+        train_images_dir.mkdir(parents=True, exist_ok=True)
+        train_labels_dir.mkdir(parents=True, exist_ok=True)
+
+        cache_images_dir = cache_dir / "images"
+        cache_labels_dir = cache_dir / "labels"
+
+        added = 0
+        for image_path in cache_images_dir.glob("*"):
+            if not image_path.is_file():
+                continue
+
+            label_path = cache_labels_dir / f"{image_path.stem}.txt"
+            if not label_path.exists():
+                continue
+
+            # Use cached_ prefix to distinguish from newly generated
+            new_name = f"cached_synth_{image_path.stem}"
+            image_dest = train_images_dir / f"{new_name}{image_path.suffix}"
+            label_dest = train_labels_dir / f"{new_name}.txt"
+
+            if not image_dest.exists():
+                shutil.copy2(image_path, image_dest)
+                shutil.copy2(label_path, label_dest)
+                added += 1
+
+        return SyntheticGenerationResult(images_added=added, output_dir=cache_dir)
+
+    def _save_to_cache(
+        self, synthetic_dir: Path, dataset_path: Path, image_count: int
+    ) -> None:
+        """
+        Save generated synthetic images to cache for future use.
+
+        Args:
+            synthetic_dir: Directory containing generated synthetic images
+            dataset_path: Path to dataset directory
+            image_count: Number of images generated
+        """
+        cache_dir = self._get_cache_dir(dataset_path)
+
+        try:
+            # Create cache directory
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            cache_images_dir = cache_dir / "images"
+            cache_labels_dir = cache_dir / "labels"
+            cache_images_dir.mkdir(exist_ok=True)
+            cache_labels_dir.mkdir(exist_ok=True)
+
+            # Copy images and labels to cache (from train directory)
+            train_images_dir = dataset_path / "images" / "train"
+            train_labels_dir = dataset_path / "labels" / "train"
+
+            cached_count = 0
+            for image_path in train_images_dir.glob("dynamic_synth_*"):
+                if not image_path.is_file():
+                    continue
+
+                label_path = train_labels_dir / f"{image_path.stem}.txt"
+                if label_path.exists():
+                    # Remove prefix for cache storage
+                    original_name = image_path.name.replace("dynamic_synth_", "")
+                    shutil.copy2(image_path, cache_images_dir / original_name)
+                    shutil.copy2(
+                        label_path,
+                        cache_labels_dir / f"{image_path.stem.replace('dynamic_synth_', '')}.txt"
+                    )
+                    cached_count += 1
+
+            # Write manifest
+            manifest = {
+                "image_count": cached_count,
+                "config_hash": self._compute_config_hash(dataset_path),
+                "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "ratio": self.config.ratio,
+            }
+
+            with open(cache_dir / "manifest.json", "w") as f:
+                json.dump(manifest, f, indent=2)
+
+            if self.verbose:
+                print(f"{Fore.GREEN}[Cache] Saved {cached_count} images to cache{Style.RESET_ALL}")
+
+        except OSError as e:
+            if self.verbose:
+                print(f"{Fore.YELLOW}[Cache] Failed to save cache: {e}{Style.RESET_ALL}")
 
     def generate(self, dataset_path: Path) -> SyntheticGenerationResult:
         """
@@ -185,6 +394,22 @@ class SyntheticDataManager:
                     f"{Style.RESET_ALL}"
                 )
             return SyntheticGenerationResult(images_added=0)
+
+        # Check cache before generating
+        cached_dir = self._check_cache(dataset_path)
+        if cached_dir:
+            if self.verbose:
+                print(
+                    f"{Fore.GREEN}[Cache] Found valid cache, restoring from: "
+                    f"{cached_dir.name}{Style.RESET_ALL}"
+                )
+            result = self._restore_from_cache(cached_dir, dataset_path)
+            if self.verbose:
+                print(
+                    f"{Fore.GREEN}[Cache] Restored {result.images_added} images from cache"
+                    f"{Style.RESET_ALL}"
+                )
+            return result
 
         # Generate synthetic images
         output_dir = dataset_path / "synthetic_dynamic"
@@ -273,6 +498,10 @@ class SyntheticDataManager:
                     f"{Fore.GREEN}[DEBUG] Merge complete. Added {added} dynamic synthetic images to training set"
                     f"{Style.RESET_ALL}"
                 )
+
+            # Save to cache for future use
+            if added > 0:
+                self._save_to_cache(output_dir, dataset_path, added)
 
             return SyntheticGenerationResult(
                 images_added=added,
@@ -443,14 +672,29 @@ class SyntheticDataManager:
             label_dest = train_labels_dir / f"{new_name}.txt"
 
             if not image_dest.exists():
-                shutil.copy2(image_path, image_dest)
-                shutil.copy2(label_path, label_dest)
+                # Use move instead of copy for better performance
+                # (rename operation on same filesystem is nearly instant)
+                shutil.move(str(image_path), str(image_dest))
+                shutil.move(str(label_path), str(label_dest))
                 added += 1
                 if self.verbose and added <= 5:  # Only log first 5 to avoid spam
-                    print(f"  Copied: {image_path.name} -> {image_dest.name}")
+                    print(f"  Moved: {image_path.name} -> {image_dest.name}")
 
         if self.verbose:
             print(f"[DEBUG] Merge complete: {added} images added")
+
+        # Clean up the intermediate synthetic_dynamic directory
+        try:
+            if images_dir.exists() and not any(images_dir.iterdir()):
+                images_dir.rmdir()
+            if labels_dir.exists() and not any(labels_dir.iterdir()):
+                labels_dir.rmdir()
+            if synthetic_dir.exists() and not any(synthetic_dir.iterdir()):
+                synthetic_dir.rmdir()
+                if self.verbose:
+                    print(f"[DEBUG] Cleaned up intermediate directory: {synthetic_dir}")
+        except OSError:
+            pass  # Ignore if directory is not empty or cannot be removed
 
         return added
 
