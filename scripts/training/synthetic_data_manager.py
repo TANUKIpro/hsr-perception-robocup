@@ -18,7 +18,9 @@ from colorama import Fore, Style
 
 
 # Keys that should NOT be passed to YOLO's train() method
+# Includes synthetic generation, LLRD, and SWA parameters
 SYNTHETIC_CONFIG_KEYS = {
+    # Synthetic generation parameters
     "dynamic_synthetic_enabled",
     "backgrounds_dir",
     "annotated_dir",
@@ -30,6 +32,13 @@ SYNTHETIC_CONFIG_KEYS = {
     "synthetic_edge_blur",
     "synthetic_max_objects",
     "synthetic_num_workers",
+    # LLRD (Layer-wise Learning Rate Decay) parameters
+    "llrd_enabled",
+    "llrd_decay_rate",
+    # SWA (Stochastic Weight Averaging) parameters
+    "swa_enabled",
+    "swa_start_epoch",
+    "swa_lr",
 }
 
 

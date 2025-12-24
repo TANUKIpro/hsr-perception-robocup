@@ -65,6 +65,7 @@ class TestSyntheticConfigKeys:
         from training.quick_finetune import SYNTHETIC_CONFIG_KEYS
 
         expected_keys = [
+            # Synthetic generation parameters
             "dynamic_synthetic_enabled",
             "backgrounds_dir",
             "annotated_dir",
@@ -75,6 +76,14 @@ class TestSyntheticConfigKeys:
             "synthetic_white_balance_strength",
             "synthetic_edge_blur",
             "synthetic_max_objects",
+            "synthetic_num_workers",
+            # LLRD parameters
+            "llrd_enabled",
+            "llrd_decay_rate",
+            # SWA parameters
+            "swa_enabled",
+            "swa_start_epoch",
+            "swa_lr",
         ]
 
         for key in expected_keys:

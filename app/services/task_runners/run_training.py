@@ -20,6 +20,7 @@ sys.path.insert(0, str(project_root / "scripts" / "training"))
 sys.path.insert(0, str(project_root / "scripts"))
 
 from app.services.task_manager import update_task_status
+from training.synthetic_data_manager import SYNTHETIC_CONFIG_KEYS
 
 
 class TrainingProgressCallback:
@@ -240,21 +241,8 @@ def main():
             except Exception as e:
                 print(f"Warning: Error applying advanced parameters: {e}")
 
-        # Keys that should NOT be passed to YOLO's train() method
-        SYNTHETIC_CONFIG_KEYS = {
-            "dynamic_synthetic_enabled",
-            "backgrounds_dir",
-            "annotated_dir",
-            "synthetic_ratio",
-            "synthetic_scale_range",
-            "synthetic_rotation_range",
-            "synthetic_white_balance",
-            "synthetic_white_balance_strength",
-            "synthetic_edge_blur",
-            "synthetic_max_objects",
-        }
-
         # Apply synthetic config (stored separately, not added to YOLO config)
+        # SYNTHETIC_CONFIG_KEYS is imported from training.synthetic_data_manager
         synthetic_config = {}
         if args.synthetic_config:
             try:
