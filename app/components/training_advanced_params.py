@@ -231,6 +231,9 @@ def _load_preset(preset_name: str) -> None:
 
     preset = PRESETS[preset_name]
     for key, value in preset.items():
+        # swa_start_epoch: ensure value is within widget constraints (min=5, max=30)
+        if key == "swa_start_epoch":
+            value = max(5, min(30, value))
         st.session_state[f"adv_{key}"] = value
 
 
@@ -324,6 +327,7 @@ def _render_augmentation_tab() -> Dict[str, float]:
             "Hue",
             min_value=0.0,
             max_value=0.1,
+            value=st.session_state.get("adv_hsv_h", PRESETS["Competition"]["hsv_h"]),
             step=0.005,
             help="Hue shift range. Helps adapt to lighting changes.",
             key="adv_hsv_h",
@@ -333,6 +337,7 @@ def _render_augmentation_tab() -> Dict[str, float]:
             "Saturation",
             min_value=0.0,
             max_value=1.0,
+            value=st.session_state.get("adv_hsv_s", PRESETS["Competition"]["hsv_s"]),
             step=0.05,
             help="Saturation shift range. Adjusts color vividness.",
             key="adv_hsv_s",
@@ -342,6 +347,7 @@ def _render_augmentation_tab() -> Dict[str, float]:
             "Value",
             min_value=0.0,
             max_value=1.0,
+            value=st.session_state.get("adv_hsv_v", PRESETS["Competition"]["hsv_v"]),
             step=0.05,
             help="Value (brightness) shift range.",
             key="adv_hsv_v",
@@ -367,6 +373,7 @@ def _render_augmentation_tab() -> Dict[str, float]:
             "Rotation",
             min_value=0.0,
             max_value=45.0,
+            value=st.session_state.get("adv_degrees", PRESETS["Competition"]["degrees"]),
             step=1.0,
             help="Rotation angle range in degrees.",
             key="adv_degrees",
@@ -376,6 +383,7 @@ def _render_augmentation_tab() -> Dict[str, float]:
             "Translation",
             min_value=0.0,
             max_value=0.5,
+            value=st.session_state.get("adv_translate", PRESETS["Competition"]["translate"]),
             step=0.05,
             help="Translation range as fraction of image size.",
             key="adv_translate",
@@ -385,6 +393,7 @@ def _render_augmentation_tab() -> Dict[str, float]:
             "Scale",
             min_value=0.0,
             max_value=1.0,
+            value=st.session_state.get("adv_scale", PRESETS["Competition"]["scale"]),
             step=0.05,
             help="Scale range (0.5 means 0.5x-1.5x).",
             key="adv_scale",
@@ -394,6 +403,7 @@ def _render_augmentation_tab() -> Dict[str, float]:
             "Shear",
             min_value=0.0,
             max_value=10.0,
+            value=st.session_state.get("adv_shear", PRESETS["Competition"]["shear"]),
             step=0.5,
             help="Shear angle range in degrees.",
             key="adv_shear",
@@ -419,6 +429,7 @@ def _render_augmentation_tab() -> Dict[str, float]:
             "Flip Vertical",
             min_value=0.0,
             max_value=1.0,
+            value=st.session_state.get("adv_flipud", PRESETS["Competition"]["flipud"]),
             step=0.1,
             help="Vertical flip probability. Usually 0 for object detection.",
             key="adv_flipud",
@@ -428,6 +439,7 @@ def _render_augmentation_tab() -> Dict[str, float]:
             "Flip Horizontal",
             min_value=0.0,
             max_value=1.0,
+            value=st.session_state.get("adv_fliplr", PRESETS["Competition"]["fliplr"]),
             step=0.1,
             help="Horizontal flip probability.",
             key="adv_fliplr",
@@ -437,6 +449,7 @@ def _render_augmentation_tab() -> Dict[str, float]:
             "Mosaic",
             min_value=0.0,
             max_value=1.0,
+            value=st.session_state.get("adv_mosaic", PRESETS["Competition"]["mosaic"]),
             step=0.1,
             help="Mosaic augmentation probability (combines 4 images).",
             key="adv_mosaic",
@@ -446,6 +459,7 @@ def _render_augmentation_tab() -> Dict[str, float]:
             "MixUp",
             min_value=0.0,
             max_value=1.0,
+            value=st.session_state.get("adv_mixup", PRESETS["Competition"]["mixup"]),
             step=0.05,
             help="MixUp augmentation probability (blends 2 images).",
             key="adv_mixup",
@@ -472,9 +486,13 @@ def _render_optimizer_tab() -> Dict[str, Any]:
 
     col1, col2, col3 = st.columns(3)
     with col1:
+        optimizer_options = ["AdamW", "Adam", "SGD", "RMSProp"]
+        current_optimizer = st.session_state.get("adv_optimizer", PRESETS["Competition"]["optimizer"])
+        optimizer_index = optimizer_options.index(current_optimizer) if current_optimizer in optimizer_options else 0
         params["optimizer"] = st.selectbox(
             "Optimizer",
-            options=["AdamW", "Adam", "SGD", "RMSProp"],
+            options=optimizer_options,
+            index=optimizer_index,
             help="Optimization algorithm. AdamW recommended for fine-tuning.",
             key="adv_optimizer",
         )
@@ -483,6 +501,7 @@ def _render_optimizer_tab() -> Dict[str, Any]:
             "Initial LR",
             min_value=0.0001,
             max_value=0.1,
+            value=st.session_state.get("adv_lr0", PRESETS["Competition"]["lr0"]),
             step=0.0001,
             format="%.4f",
             help="Initial learning rate. Lower for fine-tuning.",
@@ -493,6 +512,7 @@ def _render_optimizer_tab() -> Dict[str, Any]:
             "Final LR Scale",
             min_value=0.001,
             max_value=1.0,
+            value=st.session_state.get("adv_lrf", PRESETS["Competition"]["lrf"]),
             step=0.001,
             format="%.3f",
             help="Final learning rate = lr0 * lrf",
@@ -519,6 +539,7 @@ def _render_optimizer_tab() -> Dict[str, Any]:
             "Momentum",
             min_value=0.8,
             max_value=0.99,
+            value=st.session_state.get("adv_momentum", PRESETS["Competition"]["momentum"]),
             step=0.001,
             format="%.3f",
             help="Momentum coefficient for SGD/AdamW.",
@@ -529,6 +550,7 @@ def _render_optimizer_tab() -> Dict[str, Any]:
             "Weight Decay",
             min_value=0.0,
             max_value=0.01,
+            value=st.session_state.get("adv_weight_decay", PRESETS["Competition"]["weight_decay"]),
             step=0.0001,
             format="%.4f",
             help="L2 regularization strength.",
@@ -553,6 +575,7 @@ def _render_optimizer_tab() -> Dict[str, Any]:
     with col1:
         params["llrd_enabled"] = st.checkbox(
             "Enable LLRD",
+            value=st.session_state.get("adv_llrd_enabled", PRESETS["Competition"]["llrd_enabled"]),
             help="Apply different learning rates to different network depths. "
                  "Detection head gets the highest LR, backbone gets the lowest. "
                  "Recommended for fine-tuning to improve generalization (+1-3% mAP).",
@@ -564,6 +587,7 @@ def _render_optimizer_tab() -> Dict[str, Any]:
             "Decay Rate",
             min_value=0.7,
             max_value=0.99,
+            value=st.session_state.get("adv_llrd_decay_rate", PRESETS["Competition"]["llrd_decay_rate"]),
             step=0.01,
             format="%.2f",
             disabled=not llrd_enabled,
@@ -590,6 +614,7 @@ def _render_optimizer_tab() -> Dict[str, Any]:
     with col1:
         params["swa_enabled"] = st.checkbox(
             "Enable SWA",
+            value=st.session_state.get("adv_swa_enabled", PRESETS["Competition"]["swa_enabled"]),
             help="Average model weights during final epochs for better generalization. "
                  "SWA finds flatter minima that generalize better to unseen data. "
                  "Recommended for fine-tuning (+1-2% mAP).",
@@ -597,13 +622,16 @@ def _render_optimizer_tab() -> Dict[str, Any]:
         )
     with col2:
         swa_enabled = st.session_state.get("adv_swa_enabled", False)
-        # Fix invalid session_state value before rendering widget
-        if st.session_state.get("adv_swa_start_epoch", 10) < 5:
-            st.session_state["adv_swa_start_epoch"] = 10
+        # Get default value, ensuring it's within min_value constraint
+        swa_start_default = max(5, PRESETS["Competition"]["swa_start_epoch"])
+        swa_start_value = st.session_state.get("adv_swa_start_epoch", swa_start_default)
+        # Ensure value is within valid range
+        swa_start_value = max(5, min(30, swa_start_value))
         params["swa_start_epoch"] = st.number_input(
             "Start (last N epochs)",
             min_value=5,
             max_value=30,
+            value=swa_start_value,
             step=1,
             disabled=not swa_enabled,
             help="Start averaging weights at (total_epochs - N). "
@@ -615,6 +643,7 @@ def _render_optimizer_tab() -> Dict[str, Any]:
             "SWA Learning Rate",
             min_value=0.0001,
             max_value=0.01,
+            value=st.session_state.get("adv_swa_lr", PRESETS["Competition"]["swa_lr"]),
             step=0.0001,
             format="%.4f",
             disabled=not swa_enabled,
@@ -647,6 +676,7 @@ def _render_performance_tab() -> Dict[str, Any]:
             "Dataloader Workers",
             min_value=0,
             max_value=16,
+            value=st.session_state.get("adv_workers", PRESETS["Competition"]["workers"]),
             step=1,
             help="Number of parallel data loading workers.",
             key="adv_workers",
@@ -654,12 +684,14 @@ def _render_performance_tab() -> Dict[str, Any]:
     with col2:
         params["cache"] = st.checkbox(
             "Cache Images in RAM",
+            value=st.session_state.get("adv_cache", PRESETS["Competition"]["cache"]),
             help="Cache images in memory for faster training.",
             key="adv_cache",
         )
     with col3:
         params["amp"] = st.checkbox(
             "Auto Mixed Precision",
+            value=st.session_state.get("adv_amp", PRESETS["Competition"]["amp"]),
             help="Use FP16+FP32 mixed precision for faster training.",
             key="adv_amp",
         )
@@ -680,9 +712,13 @@ def _render_performance_tab() -> Dict[str, Any]:
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
+        imgsz_options = [320, 416, 480, 512, 640, 800, 1024]
+        current_imgsz = st.session_state.get("adv_imgsz", PRESETS["Competition"]["imgsz"])
+        imgsz_index = imgsz_options.index(current_imgsz) if current_imgsz in imgsz_options else 4  # default to 640
         params["imgsz"] = st.selectbox(
             "Image Size",
-            options=[320, 416, 480, 512, 640, 800, 1024],
+            options=imgsz_options,
+            index=imgsz_index,
             help="Input image size. Larger = more accurate but slower.",
             key="adv_imgsz",
         )
@@ -691,6 +727,7 @@ def _render_performance_tab() -> Dict[str, Any]:
             "Early Stop Patience",
             min_value=1,
             max_value=50,
+            value=st.session_state.get("adv_patience", PRESETS["Competition"]["patience"]),
             step=1,
             help="Stop training if no improvement for N epochs.",
             key="adv_patience",
@@ -700,6 +737,7 @@ def _render_performance_tab() -> Dict[str, Any]:
             "Close Mosaic",
             min_value=0,
             max_value=30,
+            value=st.session_state.get("adv_close_mosaic", PRESETS["Competition"]["close_mosaic"]),
             step=1,
             help="Disable mosaic for last N epochs.",
             key="adv_close_mosaic",
@@ -709,6 +747,7 @@ def _render_performance_tab() -> Dict[str, Any]:
             "Freeze Layers",
             min_value=0,
             max_value=20,
+            value=st.session_state.get("adv_freeze", PRESETS["Competition"]["freeze"]),
             step=1,
             help="Freeze first N backbone layers. Prevents overfitting on small datasets.",
             key="adv_freeze",
@@ -736,6 +775,7 @@ def _render_checkpoint_tab() -> Dict[str, Any]:
     with col1:
         params["save"] = st.checkbox(
             "Save Checkpoints",
+            value=st.session_state.get("adv_save", PRESETS["Competition"]["save"]),
             help="Save model checkpoints during training.",
             key="adv_save",
         )
@@ -746,6 +786,7 @@ def _render_checkpoint_tab() -> Dict[str, Any]:
             "Save Every N Epochs",
             min_value=1,
             max_value=20,
+            value=st.session_state.get("adv_save_period", PRESETS["Competition"]["save_period"]),
             step=1,
             disabled=not save_enabled,
             help="Save checkpoint every N epochs.",
@@ -754,6 +795,7 @@ def _render_checkpoint_tab() -> Dict[str, Any]:
     with col3:
         params["exist_ok"] = st.checkbox(
             "Overwrite Existing",
+            value=st.session_state.get("adv_exist_ok", PRESETS["Competition"]["exist_ok"]),
             help="Allow overwriting existing run directory.",
             key="adv_exist_ok",
         )
@@ -783,6 +825,7 @@ def _render_overfitting_prevention_tab() -> Dict[str, Any]:
             "Label Smoothing",
             min_value=0.0,
             max_value=0.2,
+            value=st.session_state.get("adv_label_smoothing", PRESETS["Competition"]["label_smoothing"]),
             step=0.01,
             help="Apply label smoothing to prevent overconfident predictions. "
                  "Recommended: 0.05-0.1 for small datasets (<500 images).",
@@ -791,6 +834,7 @@ def _render_overfitting_prevention_tab() -> Dict[str, Any]:
     with col2:
         params["cos_lr"] = st.checkbox(
             "Cosine LR Schedule",
+            value=st.session_state.get("adv_cos_lr", PRESETS["Competition"]["cos_lr"]),
             help="Use cosine annealing learning rate schedule for smoother convergence. "
                  "Helps prevent overfitting by gradually reducing learning rate.",
             key="adv_cos_lr",
@@ -812,6 +856,7 @@ def _render_overfitting_prevention_tab() -> Dict[str, Any]:
 
     params["multi_scale"] = st.checkbox(
         "Multi-scale Training",
+        value=st.session_state.get("adv_multi_scale", PRESETS["Competition"]["multi_scale"]),
         help="Vary image size ±50% during training for better scale invariance. "
              "Warning: Increases VRAM usage significantly. Not recommended for GPUs < 8GB.",
         key="adv_multi_scale",
