@@ -87,6 +87,13 @@ from .validation import (
     validate_model_path,
 )
 
+from .model_utils import (
+    resolve_model_path,
+    get_pretrained_model_path,
+    get_finetuned_model_path,
+    is_model_cached,
+)
+
 __all__ = [
     # Constants
     "IMAGE_EXTENSIONS",
@@ -149,4 +156,9 @@ __all__ = [
     "validate_dataset_yaml",
     "validate_yolo_annotation",
     "validate_model_path",
+    # Model utilities
+    "resolve_model_path",
+    "get_pretrained_model_path",
+    "get_finetuned_model_path",
+    "is_model_cached",
 ]

@@ -301,7 +301,9 @@ def main():
 
         # Load YOLO model and add callbacks
         from ultralytics import YOLO
-        base_model = args.model or config.get("model", "yolov8m.pt")
+        from scripts.common.model_utils import resolve_model_path
+        base_model_name = args.model or config.get("model", "yolov8m.pt")
+        base_model = resolve_model_path(base_model_name, verbose=True)
         model = YOLO(base_model)
 
         # Create and register progress callback

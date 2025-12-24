@@ -31,6 +31,7 @@ if str(_scripts_dir) not in sys.path:
 
 from common.device_utils import log_gpu_status
 from common.constants import TARGET_MAP50
+from common.model_utils import resolve_model_path
 
 # Import extracted modules - use try/except for both direct execution and module import
 try:
@@ -394,9 +395,10 @@ class CompetitionTrainer:
                     verbose=verbose,
                 )
             else:
-                # Standard training path
-                print(f"\nLoading base model: {self.base_model}")
-                model = YOLO(self.base_model)
+                # Standard training path - resolve model path to use cached version
+                resolved_model = resolve_model_path(self.base_model, verbose=True)
+                print(f"\nLoading base model: {resolved_model}")
+                model = YOLO(resolved_model)
 
                 # Setup TensorBoard
                 self._setup_tensorboard(model)

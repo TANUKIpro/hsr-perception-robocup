@@ -171,10 +171,26 @@ RUN chmod +x /entrypoint.sh
 # =============================================================================
 # Layer 11: Pre-download ML Models
 # =============================================================================
+# Download models to /opt/model-cache/ (not affected by volume mounts)
+# These will be copied to /workspace/models/pretrained/ at container startup
+
+RUN mkdir -p /opt/model-cache
+
 # YOLOv8 models - download to cache for offline use
-# yolov8m.pt: Default model for competition (medium size, good accuracy/speed balance)
-# yolov8n.pt: Nano model for quick testing
-RUN python3 -c "from ultralytics import YOLO; YOLO('yolov8m.pt'); YOLO('yolov8n.pt')"
+# All models used by GPU auto-scaling are pre-downloaded:
+# - yolov8n.pt: Nano (minimal GPU, <4GB)
+# - yolov8s.pt: Small (budget GPU, 4-6GB)
+# - yolov8m.pt: Medium (standard GPU, 6-8GB) - default
+# - yolov8l.pt: Large (performance GPU, 8-12GB)
+RUN cd /opt/model-cache && \
+    python3 -c "from ultralytics import YOLO; YOLO('yolov8n.pt'); YOLO('yolov8s.pt'); YOLO('yolov8m.pt'); YOLO('yolov8l.pt')" && \
+    ls -la /opt/model-cache/
+
+# SAM2 model - download for offline annotation
+# sam2.1_hiera_base_plus.pt: Base+ model (~324MB, good balance of speed/accuracy)
+RUN wget -q --show-progress -O /opt/model-cache/sam2.1_hiera_base_plus.pt \
+    "https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_base_plus.pt" && \
+    ls -la /opt/model-cache/
 
 # =============================================================================
 # Environment Variables

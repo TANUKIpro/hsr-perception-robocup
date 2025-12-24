@@ -83,6 +83,37 @@ print_info() {
 }
 
 # =============================================================================
+# Pre-cached Model Sync
+# =============================================================================
+# Copy pre-downloaded models from /opt/model-cache/ to /workspace/models/pretrained/
+# This ensures models downloaded during docker build are available at runtime
+
+sync_pretrained_models() {
+    local cache_dir="/opt/model-cache"
+    local target_dir="/workspace/models/pretrained"
+
+    if [ -d "$cache_dir" ]; then
+        # Ensure target directory exists
+        mkdir -p "$target_dir"
+
+        for model in "$cache_dir"/*.pt; do
+            if [ -f "$model" ]; then
+                local model_name=$(basename "$model")
+                local target_path="$target_dir/$model_name"
+
+                if [ ! -f "$target_path" ]; then
+                    echo "  Copying cached model: $model_name"
+                    cp "$model" "$target_path"
+                fi
+            fi
+        done
+    fi
+}
+
+# Sync models before starting any service
+sync_pretrained_models
+
+# =============================================================================
 # Command Handlers
 # =============================================================================
 

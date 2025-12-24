@@ -33,6 +33,7 @@ from common.constants import (
     SAM2_DEFAULT_MIN_MASK_REGION_AREA,
 )
 from common.config_utils import get_sam2_model_config
+from common.model_utils import resolve_model_path
 
 
 class SAM2Annotator(BaseAnnotator):
@@ -91,12 +92,14 @@ class SAM2Annotator(BaseAnnotator):
                 "pip install git+https://github.com/facebookresearch/segment-anything-2.git"
             )
 
-        print(f"Loading SAM2 model: {self.model_path}")
+        # Resolve model path to use cached version
+        resolved_path = resolve_model_path(self.model_path, verbose=True)
+        print(f"Loading SAM2 model: {resolved_path}")
 
         # Determine model config using shared utility
-        model_cfg = get_sam2_model_config(self.model_path)
+        model_cfg = get_sam2_model_config(resolved_path)
 
-        self.model = build_sam2(model_cfg, self.model_path, device=self.device)
+        self.model = build_sam2(model_cfg, resolved_path, device=self.device)
 
         self.mask_generator = SAM2AutomaticMaskGenerator(
             model=self.model,
