@@ -436,7 +436,7 @@ class ParallelSyntheticGenerator:
                                 stats["per_class"][class_name] += count
                     else:
                         stats["failed"] += 1
-                        logger.warning(f"Task {result.task_id} failed: {result.error}")
+                        logger.debug(f"Task {result.task_id} failed: {result.error}")
 
                     # Progress callback
                     if progress_callback:
