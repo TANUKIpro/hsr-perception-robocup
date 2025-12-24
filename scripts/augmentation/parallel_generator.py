@@ -121,10 +121,18 @@ def worker_generate_single(
                 loaded_objects.append(obj_tuple)
 
         if not loaded_objects:
+            # Provide detailed error information for debugging
+            tried_indices = task.object_ref_indices
+            tried_paths = [
+                object_refs[idx].mask_path
+                for idx in tried_indices
+                if idx < len(object_refs)
+            ][:3]  # Show up to 3 paths
             return GenerationResult(
                 task_id=task.task_id,
                 success=False,
-                error="No objects could be loaded"
+                error=f"No objects could be loaded from {len(tried_indices)} refs. "
+                      f"Sample paths: {tried_paths}"
             )
 
         # Generate synthetic image
@@ -437,6 +445,13 @@ class ParallelSyntheticGenerator:
                             num_synthetic,
                             f"Generated {stats['generated']}/{num_synthetic}"
                         )
+                    # Fallback progress display every 100 images (when no callback)
+                    elif completed > 0 and completed % 100 == 0:
+                        success_rate = (stats["generated"] / completed) * 100
+                        print(
+                            f"Synthetic progress: {completed}/{num_synthetic} "
+                            f"({success_rate:.1f}% success)"
+                        )
 
                 except Exception as e:
                     stats["failed"] += 1
@@ -457,6 +472,17 @@ class ParallelSyntheticGenerator:
             f"Generation complete: {stats['generated']} succeeded, "
             f"{stats['failed']} failed"
         )
+
+        # Print final summary (when no progress callback)
+        if not progress_callback:
+            success_rate = (
+                (stats["generated"] / num_synthetic * 100) if num_synthetic > 0 else 0
+            )
+            print(f"\n=== Synthetic Generation Complete ===")
+            print(f"  Generated: {stats['generated']}/{num_synthetic}")
+            print(f"  Failed: {stats['failed']}")
+            print(f"  Success rate: {success_rate:.1f}%")
+            print(f"  Avg objects/image: {stats['avg_objects_per_image']:.1f}")
 
         return stats
 

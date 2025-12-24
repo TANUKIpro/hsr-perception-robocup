@@ -1011,6 +1011,8 @@ class CopyPasteAugmentor:
         enabling lazy loading during synthetic image generation to reduce
         memory usage.
 
+        Pre-validates masks to filter out empty/invalid ones upfront.
+
         Args:
             annotated_dir: Directory containing annotated class subdirectories
             class_names: List of class names to load
@@ -1019,6 +1021,8 @@ class CopyPasteAugmentor:
             List of ObjectReference instances (lightweight, ~100 bytes each)
         """
         object_refs = []
+        skipped_count = 0
+        total_masks_found = 0
 
         for class_id, class_name in enumerate(class_names):
             class_dir = annotated_dir / class_name
@@ -1034,11 +1038,36 @@ class CopyPasteAugmentor:
             for pattern in mask_patterns:
                 mask_files.update(masks_dir.glob(pattern))
 
+            total_masks_found += len(mask_files)
+
             for mask_path in mask_files:
                 # Strip "_mask" suffix if present to find corresponding image
                 img_stem = mask_path.stem
                 if img_stem.endswith("_mask"):
                     img_stem = img_stem[:-5]
+
+                # Pre-validate mask: check if readable and contains valid object pixels
+                try:
+                    mask_test = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
+                    if mask_test is None:
+                        logger.debug(f"Skipping unreadable mask: {mask_path}")
+                        skipped_count += 1
+                        continue
+
+                    # Check for minimum object pixels (at least 100 pixels)
+                    object_pixels = np.count_nonzero(mask_test > 127)
+                    if object_pixels < 100:
+                        logger.debug(
+                            f"Skipping small/empty mask: {mask_path} ({object_pixels}px)"
+                        )
+                        skipped_count += 1
+                        continue
+
+                    del mask_test  # Immediately release memory
+                except Exception as e:
+                    logger.debug(f"Skipping invalid mask {mask_path}: {e}")
+                    skipped_count += 1
+                    continue
 
                 img_path = None
 
@@ -1051,6 +1080,7 @@ class CopyPasteAugmentor:
                             break
 
                 if img_path is None:
+                    skipped_count += 1
                     continue
 
                 # Store only file paths, no image data loaded
@@ -1062,6 +1092,12 @@ class CopyPasteAugmentor:
                         class_name=class_name,
                     )
                 )
+
+        if skipped_count > 0:
+            logger.info(
+                f"Loaded {len(object_refs)} valid object references "
+                f"(skipped {skipped_count} invalid masks out of {total_masks_found} total)"
+            )
 
         return object_refs
 
