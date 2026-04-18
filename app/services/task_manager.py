@@ -39,7 +39,7 @@ class TaskInfo:
     """
 
     task_id: str
-    task_type: str  # "annotation", "training", "evaluation"
+    task_type: str  # "training" or "evaluation"
     status: TaskStatus
     progress: float  # 0.0 to 1.0
     current_step: str
@@ -146,8 +146,7 @@ class TaskManager:
         else:
             self._path_coordinator = path_coordinator
 
-        # Get tasks directory from coordinator (profile-aware)
-        self.tasks_dir = self._path_coordinator.get_path("app_tasks_dir")
+        self.tasks_dir = self._path_coordinator.get_path("tasks_dir")
         self.tasks_dir.mkdir(parents=True, exist_ok=True)
 
         # Project root for finding scripts
@@ -287,88 +286,6 @@ class TaskManager:
 
         return process
 
-    # ========== Annotation ==========
-
-    def start_annotation(
-        self,
-        method: str,
-        input_dir: str,
-        output_dir: str,
-        class_config: str,
-        background_path: Optional[str] = None,
-        train_val_split: float = 0.80,
-        min_area: int = 500,
-        group_continuous_frames: bool = True,
-        group_interval_sec: float = 2.0,
-    ) -> str:
-        """
-        Start annotation task.
-
-        Args:
-            method: Annotation method ("background" or "sam2")
-            input_dir: Input directory with raw captures
-            output_dir: Output directory for annotated dataset
-            class_config: Path to class configuration JSON
-            background_path: Background image path (required for background method)
-            train_val_split: Train/val split ratio (default: 0.80)
-            min_area: Minimum contour area for background method
-            group_continuous_frames: Group continuous frames to prevent data leakage
-            group_interval_sec: Max seconds between frames in same group
-
-        Returns:
-            Task ID
-
-        Raises:
-            ValueError: If method is "background" and background_path is not provided
-        """
-        if method == "background" and not background_path:
-            raise ValueError("Background path required for background method")
-
-        task_id = self._generate_task_id("annotation")
-
-        task = TaskInfo(
-            task_id=task_id,
-            task_type="annotation",
-            status=TaskStatus.PENDING,
-            progress=0.0,
-            current_step="Initializing...",
-            started_at=datetime.now().isoformat(),
-            extra_data={
-                "method": method,
-                "input_dir": input_dir,
-                "output_dir": output_dir,
-                "group_frames": group_continuous_frames,
-            }
-        )
-        self._save_status(task)
-
-        # Build command
-        runner_script = self.project_root / "app" / "services" / "task_runners" / "run_annotation.py"
-        cmd = [
-            sys.executable,
-            str(runner_script),
-            "--task-id", task_id,
-            "--tasks-dir", str(self.tasks_dir),
-            "--method", method,
-            "--input-dir", input_dir,
-            "--output-dir", output_dir,
-            "--class-config", class_config,
-            "--split", str(train_val_split),
-            "--min-area", str(min_area),
-            "--group-interval", str(group_interval_sec),
-        ]
-
-        if background_path:
-            cmd.extend(["--background", background_path])
-
-        if group_continuous_frames:
-            cmd.append("--group-frames")
-        else:
-            cmd.append("--no-group-frames")
-
-        self._launch_subprocess(cmd, task)
-        return task_id
-
     # ========== Training ==========
 
     def start_training(
@@ -383,10 +300,8 @@ class TaskManager:
         enable_tensorboard: bool = True,
         tensorboard_port: int = 6006,
         advanced_params: Optional[Dict[str, Any]] = None,
-        synthetic_config: Optional[Dict[str, Any]] = None,
     ) -> str:
-        """
-        Start training task.
+        """Start training task.
 
         Args:
             dataset_yaml: Path to dataset YAML configuration
@@ -399,8 +314,6 @@ class TaskManager:
             enable_tensorboard: Enable TensorBoard monitoring
             tensorboard_port: Port for TensorBoard server
             advanced_params: Advanced training parameters from UI (overrides auto-scaling)
-            synthetic_config: Dynamic Copy-Paste synthetic generation configuration
-                             (backgrounds_dir, annotated_dir, synthetic_ratio, etc.)
 
         Returns:
             Task ID
@@ -422,7 +335,6 @@ class TaskManager:
                 "auto_scale": auto_scale,
                 "enable_tensorboard": enable_tensorboard,
                 "advanced_params": advanced_params,
-                "synthetic_config": synthetic_config,
             }
         )
         self._save_status(task)
@@ -466,10 +378,6 @@ class TaskManager:
         # Advanced parameters (JSON encoded)
         if advanced_params:
             cmd.extend(["--advanced-params", json.dumps(advanced_params)])
-
-        # Synthetic config (JSON encoded)
-        if synthetic_config:
-            cmd.extend(["--synthetic-config", json.dumps(synthetic_config)])
 
         self._launch_subprocess(cmd, task)
         return task_id

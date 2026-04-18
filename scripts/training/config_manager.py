@@ -60,18 +60,6 @@ COMPETITION_CONFIG = {
     # Disabled by default for backward compatibility
     "llrd_enabled": False,
     "llrd_decay_rate": 0.9,  # LR decay factor per layer (0.0-1.0]
-    # Dynamic Copy-Paste settings
-    "dynamic_synthetic_enabled": True,  # Enable by default (user requirement)
-    "synthetic_ratio": 2.0,
-    "synthetic_scale_range": (0.5, 1.5),
-    "synthetic_rotation_range": (-15.0, 15.0),
-    "synthetic_white_balance": True,
-    "synthetic_white_balance_strength": 0.7,
-    "synthetic_edge_blur": 2.0,
-    "synthetic_max_objects": 3,
-    "synthetic_num_workers": 0,  # 0 = auto (cpu_count // 2), >0 = explicit worker count
-    "backgrounds_dir": None,  # Passed from UI
-    "annotated_dir": None,  # Passed from UI
 }
 
 # Fast training configuration (for testing or limited GPU)
@@ -167,30 +155,6 @@ class ConfigBuilder:
         self.config["swa_enabled"] = enabled
         self.config["swa_start_epoch"] = start_epoch
         self.config["swa_lr"] = lr
-        return self
-
-    def with_synthetic(
-        self,
-        enabled: bool = True,
-        backgrounds_dir: Optional[str] = None,
-        annotated_dir: Optional[str] = None,
-        ratio: float = 2.0,
-    ) -> "ConfigBuilder":
-        """
-        Configure dynamic Copy-Paste synthetic data generation.
-
-        Args:
-            enabled: Whether to enable synthetic generation
-            backgrounds_dir: Directory containing background images
-            annotated_dir: Directory containing annotated images
-            ratio: Synthetic to real image ratio
-        """
-        self.config["dynamic_synthetic_enabled"] = enabled
-        if backgrounds_dir:
-            self.config["backgrounds_dir"] = backgrounds_dir
-        if annotated_dir:
-            self.config["annotated_dir"] = annotated_dir
-        self.config["synthetic_ratio"] = ratio
         return self
 
     def with_freeze(self, layers: int) -> "ConfigBuilder":

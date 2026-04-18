@@ -1,156 +1,73 @@
-"""
-Common Sidebar Component
+"""Common sidebar rendered on every Streamlit page.
 
-Provides consistent sidebar UI across all pages including:
-- Profile selector
-- Quick stats (Total Objects, Collection Progress)
-- Active task indicator
+Minimal sidebar for the train + evaluate pipeline: shows the active task
+count and the pybullet_hsr dataset source. Profile / Registry concepts
+were removed along with the collection pipeline.
 """
+
+import sys
+from pathlib import Path
 
 import streamlit as st
-from pathlib import Path
-import sys
 
-# Add app directory to path
 app_dir = Path(__file__).parent.parent
 if str(app_dir) not in sys.path:
     sys.path.insert(0, str(app_dir))
 
-from services.profile_manager import ProfileManager
-from services.path_coordinator import PathCoordinator
+from services.path_coordinator import (
+    PYBULLET_HSR_ANNOTATION_ROOT,
+    PYBULLET_HSR_ROOT,
+    PathCoordinator,
+)
 from services.task_manager import TaskManager
 from services.ui_settings_manager import UISettingsManager
-from object_registry import ObjectRegistry
 
 
 def _ensure_session_state() -> None:
-    """Ensure all required session state variables are initialized."""
-    if "profile_manager" not in st.session_state:
-        st.session_state.profile_manager = ProfileManager()
-
+    """Initialize session-state singletons if missing."""
     if "path_coordinator" not in st.session_state:
-        st.session_state.path_coordinator = PathCoordinator(
-            profile_manager=st.session_state.profile_manager
-        )
-
-    if "registry" not in st.session_state:
-        st.session_state.registry = ObjectRegistry(
-            path_coordinator=st.session_state.path_coordinator
-        )
+        st.session_state.path_coordinator = PathCoordinator()
 
     if "task_manager" not in st.session_state:
         st.session_state.task_manager = TaskManager(
             path_coordinator=st.session_state.path_coordinator
         )
 
-    # UI Settings Manager for persisting UI parameters
     if "ui_settings_manager" not in st.session_state:
         st.session_state.ui_settings_manager = UISettingsManager(
             path_coordinator=st.session_state.path_coordinator
         )
 
-    # Load UI settings on first run
     if "_ui_settings_loaded" not in st.session_state:
         st.session_state.ui_settings_manager.load_to_session_state()
-
-    if "current_object_id" not in st.session_state:
-        st.session_state.current_object_id = None
-
-
-def _reinitialize_services() -> None:
-    """Reinitialize all services after profile switch."""
-    st.session_state.path_coordinator = PathCoordinator(
-        profile_manager=st.session_state.profile_manager
-    )
-    st.session_state.registry = ObjectRegistry(
-        path_coordinator=st.session_state.path_coordinator
-    )
-    st.session_state.task_manager = TaskManager(
-        path_coordinator=st.session_state.path_coordinator
-    )
-
-    # Reinitialize UI Settings Manager and reload settings for new profile
-    st.session_state.ui_settings_manager = UISettingsManager(
-        path_coordinator=st.session_state.path_coordinator
-    )
-    # Force reload of UI settings
-    st.session_state._ui_settings_loaded = False
-    st.session_state.ui_settings_manager.load_to_session_state()
-
-
-def _render_profile_selector() -> None:
-    """Render profile selector in sidebar."""
-    profile_manager = st.session_state.profile_manager
-
-    profiles = profile_manager.get_all_profiles()
-    active_profile = profile_manager.get_active_profile()
-
-    # Create options
-    profile_options = {p.display_name: p.id for p in profiles}
-    profile_names = list(profile_options.keys())
-
-    # Find current index
-    current_idx = 0
-    for i, p_id in enumerate(profile_options.values()):
-        if p_id == active_profile.id:
-            current_idx = i
-            break
-
-    selected_name = st.sidebar.selectbox(
-        "Profile",
-        profile_names,
-        index=current_idx,
-        key="profile_selector"
-    )
-
-    selected_id = profile_options[selected_name]
-
-    # Handle profile switch
-    if selected_id != active_profile.id:
-        profile_manager.set_active_profile(selected_id)
-        _reinitialize_services()
-        st.rerun()
+        st.session_state._ui_settings_loaded = True
 
 
 def render_common_sidebar() -> None:
-    """
-    Render common sidebar for all pages.
-
-    Includes:
-    - Title
-    - Profile selector
-    - Quick stats
-    - Active task indicator
-    """
-    # Ensure session state is initialized
+    """Render the minimal sidebar used across pages."""
     _ensure_session_state()
 
-    # Title
-    st.sidebar.title("HSR Object Manager")
-
-    # Profile selector
-    _render_profile_selector()
+    st.sidebar.title("HSR Perception")
+    st.sidebar.caption("Training + Evaluation")
 
     st.sidebar.markdown("---")
+    st.sidebar.markdown("**pybullet_hsr source**")
+    st.sidebar.code(str(PYBULLET_HSR_ROOT), language="text")
+    coordinator: PathCoordinator = st.session_state.path_coordinator
+    if PYBULLET_HSR_ANNOTATION_ROOT.is_dir():
+        dumps = coordinator.get_available_pybullet_hsr_dumps()
+        if dumps:
+            st.sidebar.success(f"{len(dumps)} dump(s) with manifest")
+        else:
+            st.sidebar.warning(
+                "No manifest-bearing dumps found. Run pybullet_hsr's "
+                "scripts/write_manifest.py on an existing dump."
+            )
+    else:
+        st.sidebar.warning("annotation_data/ missing — set PYBULLET_HSR_ROOT")
 
-    # Quick stats
-    registry = st.session_state.registry
-
-    # Update collection counts before displaying
-    registry.update_all_collection_counts()
-
-    stats = registry.get_collection_stats()
-
-    st.sidebar.metric("Total Objects", stats["total_objects"])
-    st.sidebar.metric(
-        "Collection Progress",
-        f"{stats['total_collected']}/{stats['total_target']}",
-        f"{stats['progress_percent']:.1f}%"
-    )
-
-    # Active task indicator
     task_manager = st.session_state.task_manager
     active_tasks = task_manager.get_active_tasks()
     if active_tasks:
         st.sidebar.markdown("---")
-        st.sidebar.warning(f"🔄 {len(active_tasks)} task(s) running")
+        st.sidebar.warning(f"{len(active_tasks)} task(s) running")

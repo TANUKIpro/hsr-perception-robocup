@@ -50,13 +50,6 @@ from common.constants import (
     TENSORBOARD_DEFAULT_PORT,
     TENSORBOARD_FLUSH_SECS,
     TENSORBOARD_LOG_FREQUENCY,
-    # Copy-paste augmentation
-    DEFAULT_ALPHA_BLUR_SIGMA,
-    DEFAULT_SCALE_RANGE,
-    DEFAULT_ROTATION_RANGE,
-    DEFAULT_SYNTHETIC_RATIO,
-    DEFAULT_MAX_OBJECTS_PER_IMAGE,
-    DEFAULT_OVERLAP_IOU_THRESHOLD,
 )
 
 
@@ -265,38 +258,3 @@ class TestTensorBoardSettings:
         assert TENSORBOARD_LOG_FREQUENCY > 0
 
 
-class TestCopyPasteAugmentationDefaults:
-    """Copy-Paste拡張デフォルト値のテスト"""
-
-    def test_alpha_blur_sigma(self):
-        """アルファブラーシグマの確認"""
-        assert DEFAULT_ALPHA_BLUR_SIGMA == 2.0
-        assert DEFAULT_ALPHA_BLUR_SIGMA > 0
-
-    def test_scale_range(self):
-        """スケール範囲の確認"""
-        assert DEFAULT_SCALE_RANGE == (0.5, 1.5)
-        assert DEFAULT_SCALE_RANGE[0] < DEFAULT_SCALE_RANGE[1]
-        assert DEFAULT_SCALE_RANGE[0] > 0
-
-    def test_rotation_range(self):
-        """回転範囲の確認"""
-        assert DEFAULT_ROTATION_RANGE == (-15.0, 15.0)
-        assert DEFAULT_ROTATION_RANGE[0] < DEFAULT_ROTATION_RANGE[1]
-        # 対称的な範囲
-        assert DEFAULT_ROTATION_RANGE[0] == -DEFAULT_ROTATION_RANGE[1]
-
-    def test_synthetic_ratio(self):
-        """合成比率の確認"""
-        assert DEFAULT_SYNTHETIC_RATIO == 2.0
-        assert DEFAULT_SYNTHETIC_RATIO > 0
-
-    def test_objects_per_image(self):
-        """画像あたりオブジェクト数の確認"""
-        assert DEFAULT_MAX_OBJECTS_PER_IMAGE == 3
-        assert DEFAULT_MAX_OBJECTS_PER_IMAGE > 0
-
-    def test_overlap_threshold(self):
-        """オーバーラップ閾値の確認"""
-        assert DEFAULT_OVERLAP_IOU_THRESHOLD == 0.1
-        assert 0.0 <= DEFAULT_OVERLAP_IOU_THRESHOLD <= 1.0

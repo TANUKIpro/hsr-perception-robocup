@@ -30,13 +30,6 @@ from .model_operations import (
     validate_model,
     export_model,
 )
-from .synthetic_data_manager import (
-    SyntheticConfig,
-    SyntheticDataManager,
-    SyntheticGenerationResult,
-    SYNTHETIC_CONFIG_KEYS,
-    filter_synthetic_keys,
-)
 from .training_executor import (
     TrainingExecutor,
     TrainingResult,
@@ -103,11 +96,6 @@ __all__ = [
     "ModelExporter",
     "validate_model",
     "export_model",
-    "SyntheticConfig",
-    "SyntheticDataManager",
-    "SyntheticGenerationResult",
-    "SYNTHETIC_CONFIG_KEYS",
-    "filter_synthetic_keys",
     "TrainingExecutor",
     "TrainingResult",
     # GPU scaling

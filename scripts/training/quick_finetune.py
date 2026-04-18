@@ -42,11 +42,6 @@ try:
     from .memory_utils import full_training_cleanup, log_memory_snapshot
     from .model_operations import ModelExporter, ModelValidator
     from .swa_trainer import SWACallback, create_swa_callback, register_swa_callbacks
-    from .synthetic_data_manager import (
-        SYNTHETIC_CONFIG_KEYS,
-        SyntheticConfig,
-        SyntheticDataManager,
-    )
     from .tensorboard_monitor import (
         CompetitionTensorBoardCallback,
         TensorBoardServer,
@@ -62,11 +57,6 @@ except ImportError:
     from memory_utils import full_training_cleanup, log_memory_snapshot
     from model_operations import ModelExporter, ModelValidator
     from swa_trainer import SWACallback, create_swa_callback, register_swa_callbacks
-    from synthetic_data_manager import (
-        SYNTHETIC_CONFIG_KEYS,
-        SyntheticConfig,
-        SyntheticDataManager,
-    )
     from tensorboard_monitor import (
         CompetitionTensorBoardCallback,
         TensorBoardServer,
@@ -83,7 +73,6 @@ class CompetitionTrainer:
     This is a facade class that orchestrates the training pipeline using
     extracted modules:
     - DatasetValidator: Dataset validation
-    - SyntheticDataManager: Copy-Paste augmentation
     - TrainingExecutor: Core training logic
     - ModelValidator/ModelExporter: Model operations
     """
@@ -305,13 +294,6 @@ class CompetitionTrainer:
         if self.swa_callback is not None:
             register_swa_callbacks(model, self.swa_callback)
 
-    def _generate_dynamic_synthetic(self, dataset_path: Path) -> int:
-        """Generate dynamic Copy-Paste synthetic images using SyntheticDataManager."""
-        synthetic_config = SyntheticConfig.from_dict(self.config)
-        manager = SyntheticDataManager(synthetic_config, verbose=True)
-        result = manager.generate(dataset_path)
-        return result.images_added
-
     def get_tensorboard_url(self) -> str:
         """Get TensorBoard URL if available."""
         return self.tensorboard_url
@@ -359,12 +341,6 @@ class CompetitionTrainer:
 
         # Prepare output directory
         self.output_dir.mkdir(parents=True, exist_ok=True)
-
-        # Generate dynamic Copy-Paste synthetic images before training
-        dataset_path = Path(dataset_yaml).parent
-        synthetic_added = self._generate_dynamic_synthetic(dataset_path)
-        if synthetic_added > 0:
-            print(f"{Fore.GREEN}Generated {synthetic_added} dynamic synthetic images{Style.RESET_ALL}")
 
         # Check if LLRD is enabled
         use_llrd = self.config.get("llrd_enabled", False)
@@ -416,15 +392,13 @@ class CompetitionTrainer:
 
                     while True:
                         try:
-                            # Filter out synthetic keys before passing to YOLO
-                            yolo_config = {k: v for k, v in current_config.items() if k not in SYNTHETIC_CONFIG_KEYS}
                             results = model.train(
                                 data=dataset_yaml,
                                 project=str(self.output_dir),
                                 name=self.run_name,
                                 resume=resume,
                                 verbose=verbose,
-                                **yolo_config,
+                                **current_config,
                             )
                             break  # Success
 
@@ -467,15 +441,13 @@ class CompetitionTrainer:
                             else:
                                 raise
                 else:
-                    # Filter out synthetic keys before passing to YOLO
-                    yolo_config = {k: v for k, v in self.config.items() if k not in SYNTHETIC_CONFIG_KEYS}
                     results = model.train(
                         data=dataset_yaml,
                         project=str(self.output_dir),
                         name=self.run_name,
                         resume=resume,
                         verbose=verbose,
-                        **yolo_config,
+                        **self.config,
                     )
 
             training_time = (time.time() - start_time) / 60  # minutes
@@ -682,34 +654,6 @@ Examples:
         help="LLRD decay rate per layer (default: 0.9)",
     )
 
-    # Dynamic Copy-Paste options
-    parser.add_argument(
-        "--dynamic-synthetic",
-        action="store_true",
-        help="Enable dynamic Copy-Paste synthetic image generation (default: enabled)",
-    )
-    parser.add_argument(
-        "--no-dynamic-synthetic",
-        action="store_true",
-        help="Disable dynamic Copy-Paste synthetic image generation",
-    )
-    parser.add_argument(
-        "--backgrounds-dir",
-        type=str,
-        help="Directory containing background images for Copy-Paste",
-    )
-    parser.add_argument(
-        "--annotated-dir",
-        type=str,
-        help="Directory containing annotated images for Copy-Paste",
-    )
-    parser.add_argument(
-        "--synthetic-ratio",
-        type=float,
-        default=2.0,
-        help="Synthetic to real image ratio (default: 2.0)",
-    )
-
     args = parser.parse_args()
 
     # Determine configuration
@@ -741,22 +685,8 @@ Examples:
         config["llrd_enabled"] = True
         config["llrd_decay_rate"] = args.llrd_decay_rate
 
-    # Apply Copy-Paste settings
     if config is None:
         config = COMPETITION_CONFIG.copy()
-
-    # Dynamic synthetic is enabled by default, can be disabled with --no-dynamic-synthetic
-    if args.no_dynamic_synthetic:
-        config["dynamic_synthetic_enabled"] = False
-    elif args.dynamic_synthetic or args.backgrounds_dir or args.annotated_dir:
-        config["dynamic_synthetic_enabled"] = True
-
-    if args.backgrounds_dir:
-        config["backgrounds_dir"] = args.backgrounds_dir
-    if args.annotated_dir:
-        config["annotated_dir"] = args.annotated_dir
-    if args.synthetic_ratio:
-        config["synthetic_ratio"] = args.synthetic_ratio
 
     # Create trainer
     trainer = CompetitionTrainer(

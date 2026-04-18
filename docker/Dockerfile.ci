@@ -61,9 +61,8 @@ WORKDIR /workspace
 RUN mkdir -p /workspace/datasets \
              /workspace/models/pretrained \
              /workspace/models/finetuned \
-             /workspace/profiles \
              /workspace/runs \
-             /workspace/src
+             /workspace/app_data/tasks
 
 # =============================================================================
 # Layer 6: Application Code
