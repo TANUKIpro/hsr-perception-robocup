@@ -5,94 +5,149 @@ Although the text is written in English, please respond to any questions or clar
 
 ## Project Overview
 
-HSR (Human Support Robot) perception pipeline for RoboCup@Home competitions. The system handles object detection under time constraints, where models must be fine-tuned within 2-3 hours on competition day.
+HSR (Human Support Robot) perception pipeline for RoboCup@Home competitions. This branch is a
+**training + evaluation consumer** of datasets produced by the separate `pybullet_hsr` repository
+(BlenderProc-based synthetic data generation). Data collection, auto-annotation, and the ROS2
+capture node used to live here but have been removed — they are no longer in scope.
 
-**Environment**: Ubuntu 22.04 / ROS2 Humble / Python
+**Environment**: Ubuntu 22.04 / Python 3.10 / CUDA 12.1 (Docker)
 
-**Python Virtual Environment**: `/home/roboworks/Documents/hsr-perception-robocup/venv/perception/bin/python`
-- Use this venv when running Python scripts locally for testing
+**Companion repo**: `/home/roboworks/repos/pybullet_hsr`
+- Dataset dumps live under `pybullet_hsr/annotation_data/<name>_<YYYYMMDD_HHMM>/`
+- Each dump carries a **`manifest.json` (schema v1.0)** declaring paths, label format, class list, and
+  stats. This repo reads the manifest as the single source of truth; `configs/datasets/*.yaml` is
+  not consumed directly anymore.
+- If a dump was generated before the manifest was added, run pybullet_hsr's
+  `scripts/write_manifest.py --dump-dir <dir> --classes-yaml configs/datasets/<name>.yaml`
+  once to emit the manifest retroactively.
 
-## Architecture
+## Pipeline (3 steps)
 
-### Competition Day Workflow
 ```
-Data Collection → Auto-Annotation → Fine-tuning → Evaluation → Deploy
-   (ROS2 node)    (背景差分/SAM2)    (YOLOv8m)    (mAP check)   (HSR)
-     ~40min         ~25min           ~45min        ~15min
+prepare-dataset → train → evaluate
+  (scripts/data/  (scripts/training/  (scripts/evaluation/
+   prepare_dataset.py)  quick_finetune.py)   evaluate_model.py)
 ```
 
-### Detection Strategy
-- **Primary**: YOLOv8m fine-tuning (target: mAP ≥85%, inference ≤100ms)
-- **Auto-annotation**: Background subtraction (primary) + SAM2 (fallback)
+1. **prepare-dataset** — Read `<dump>/manifest.json`, split images/labels into train/val, write
+   `data.yaml`. Labels in `yolo_numeric` dumps are copied/symlinked as-is; `yolo_names` dumps
+   are translated to numeric ids using the manifest's class list.
+2. **train** — YOLOv8 fine-tuning with GPU auto-scaling, OOM recovery, TensorBoard, optional LLRD/SWA.
+3. **evaluate** — mAP@50 / mAP@50-95 / inference-time check against the competition targets
+   (mAP ≥ 85%, inference ≤ 100ms).
 
-## Implemented Components
-
-### Configuration
-- `config/object_classes.json` - Class/category definitions with sample tracking
-
-### Auto-Annotation (`scripts/annotation/`)
-- `annotation_utils.py` - YOLO format conversion, dataset split utilities
-- `background_subtraction.py` - Background subtraction annotator (fast, simple)
-- `sam2_annotator.py` - SAM2 annotator (accurate, GPU required)
-- `auto_annotate.py` - Main orchestration pipeline
-
-### Training (`scripts/training/`)
-- `quick_finetune.py` - Competition-optimized YOLOv8 fine-tuning
-
-### Evaluation (`scripts/evaluation/`)
-- `evaluate_model.py` - mAP, inference time, requirements verification
-- `visual_verification.py` - Interactive prediction visualization
-
-### ROS2 Package (`src/hsr_perception/`)
-- `continuous_capture_node.py` - Data collection node with burst capture
-- `srv/SetClass.srv`, `srv/StartBurst.srv`, `srv/GetStatus.srv` - Service definitions
-- `launch/capture.launch.py` - Launch file for capture node
-
-## Build & Run Commands
+## Build & Run
 
 ```bash
-# Install Python dependencies
+# Local (requires Python 3.10 venv with torch + ultralytics):
 pip install -r requirements.txt
 
-# ROS2 package build (from src directory)
-colcon build --packages-select hsr_perception
-source install/setup.bash
+# --- Fast path: sync the newest dump + train in one go -----------------
+# `sync_latest.py` is a no-op when the local dataset is already in sync
+# with the newest manifest-bearing dump, so it's safe to run on every
+# training attempt. Use --force to rebuild unconditionally.
+python scripts/data/sync_latest.py                             # prepare only
+./start.sh sync                                                # same, in Docker
+./start.sh train-latest -- --fast --epochs 1                   # sync + train, Docker
+docker compose run --rm app train-latest --fast --epochs 1     # same, explicit form
 
-# Launch capture node
-ros2 launch hsr_perception capture.launch.py
+# --- Manual step-by-step (equivalent) ----------------------------------
 
-# Run annotation
-python scripts/annotation/auto_annotate.py --method background \
-    --background path/to/bg.jpg --input-dir raw/ --output-dir dataset/
+# 1. Prepare dataset. --latest picks the newest manifest-bearing dump under
+#    $PYBULLET_HSR_ROOT/annotation_data/ automatically. If a prior prepare
+#    for the same dump + settings exists, this is a no-op (pass --force to
+#    rebuild).
+python scripts/data/prepare_dataset.py \
+    --source /home/roboworks/repos/pybullet_hsr/annotation_data --latest --symlink
 
-# Run training
-python scripts/training/quick_finetune.py --dataset dataset/data.yaml
+# or point at a specific dump:
+python scripts/data/prepare_dataset.py \
+    --source /home/roboworks/repos/pybullet_hsr/annotation_data/<name>_<ts> --symlink
 
-# Evaluate model
-python scripts/evaluation/evaluate_model.py --model best.pt --dataset data.yaml
+# 2. Train (dataset defaults to datasets/<dataset_name>/data.yaml).
+python scripts/training/quick_finetune.py --dataset datasets/<dataset_name>/data.yaml --fast --epochs 1
+
+# 3. Evaluate.
+python scripts/evaluation/evaluate_model.py \
+    --model models/finetuned/<run>/weights/best.pt \
+    --dataset datasets/<dataset_name>/data.yaml
+
+# Streamlit UI (auto-discovers dumps via manifest + exposes a one-click
+# "Sync latest dump" / "Prepare & Train on latest dump" button on
+# Dashboard and Training):
+./run_app.sh
+
+# Docker (recommended — matches CI):
+./start.sh                      # build + run Streamlit at http://localhost:8501
+./start.sh --tensorboard        # also bring TensorBoard up on 6006
+docker compose run --rm app prepare-dataset --source /pybullet_hsr/annotation_data --latest --symlink
+docker compose run --rm app train --dataset datasets/<dataset_name>/data.yaml --fast
 ```
+
+### Dataset freshness tracking
+
+`prepare_dataset.py` writes a `.prepare_meta.json` sidecar into the
+destination (`datasets/<name>/.prepare_meta.json`) recording the source
+dump path, manifest `created_at`, val ratio, seed, and symlink mode.
+Subsequent runs with the same source detect this and exit early — that's
+what makes `sync` / `train-latest` idempotent. Pass `--force` to rebuild
+unconditionally (e.g. after tweaking val ratio or seed).
+
+The Streamlit Dashboard compares the sidecar against the newest dump and
+shows ✅ in sync / ⚠️ stale / ⚠️ not prepared yet. The Training page
+exposes the same status at the top with a "Prepare & Train on latest
+dump" primary button.
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `config/object_classes.json` | Class definitions (edit for each competition) |
-| `scripts/annotation/auto_annotate.py` | Main annotation pipeline |
-| `scripts/training/quick_finetune.py` | Competition day training |
-| `scripts/evaluation/evaluate_model.py` | Model verification |
+| `scripts/data/manifest.py` | Manifest reader + dump discovery (schema v1.0) |
+| `scripts/data/prepare_dataset.py` | Manifest-driven YOLO dataset preparer + `.prepare_meta.json` sidecar |
+| `scripts/data/sync_latest.py` | Thin wrapper that preps the newest dump (no-op if fresh) |
+| `scripts/training/quick_finetune.py` | YOLOv8 fine-tuning entrypoint |
+| `scripts/evaluation/evaluate_model.py` | mAP / inference-time evaluator |
+| `app/main.py` + `app/pages/` | Streamlit UI (Dashboard, Training, Evaluation, Settings) |
+| `docker/Dockerfile`, `docker-compose.yml` | Container build + runtime wiring |
+
+## Environment variables
+
+- `PYBULLET_HSR_ROOT` — path to the pybullet_hsr clone. Default: `/home/roboworks/repos/pybullet_hsr`
+  (inside Docker: `/pybullet_hsr`, mounted read-only).
+
+## Manifest schema (v1.0 contract)
+
+Consumed fields (read via `scripts/data/manifest.py`):
+
+- `schema_version`: must be `"1.0"` (reader fails fast on mismatch).
+- `dataset_name`: used as the default output directory name.
+- `paths.images_subdir` / `paths.labels_subdir`: where to find the image and label files inside the dump.
+- `label_format`: `"yolo_numeric"` (labels already carry class_ids) or `"yolo_names"` (labels carry
+  class names, reader translates to numeric ids using `classes[]`).
+- `image_extension`: e.g., `"png"`.
+- `classes[]`: ordered `{id, name}` list, must be contiguous from 0.
+- `stats`: displayed in the Dashboard / Training picker; not load-bearing.
+
+If the schema bumps to v2.0 upstream, update `SUPPORTED_SCHEMA_VERSIONS` in
+`scripts/data/manifest.py` and adjust consumers accordingly.
 
 ## Tech Stack
 
-- **Object Detection**: YOLOv8 (Ultralytics)
-- **Segmentation**: SAM2 (Meta)
-- **ROS2**: cv_bridge, sensor_msgs, custom services
+- YOLOv8 (Ultralytics ≥ 8.3.0) with LLRD + SWA + OOM recovery hooks
+- PyTorch + CUDA 12.1 (Docker image)
+- Streamlit UI
+- TensorBoard for live monitoring
 
 ## Branch Strategy
 
-- `main` - Stable
-- `develop` - Development
-- `feature/*` - Feature development
-- `competition/*` - Competition-specific adjustments
+- `main` — Stable
+- `develop` — Development
+- `feature/*` — Feature development (this branch lives here)
+- `competition/*` — Competition-specific adjustments
+
+Note: This branch (`feature/pybullet-hsr-dataset-integration`) has diverged significantly from `main`;
+the pre-existing collection / annotation / ROS2 subsystems were removed and are intentionally not
+merged back. Operate via branch switching, not merges.
 
 ## Commit Message Convention
 

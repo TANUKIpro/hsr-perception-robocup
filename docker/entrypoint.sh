@@ -1,132 +1,54 @@
 #!/bin/bash
-# =============================================================================
 # HSR Perception Pipeline - Entrypoint Script
-# Supports multiple run modes for different use cases
-# =============================================================================
+# Training + evaluation container. No ROS2, no capture, no SAM2.
 
 set -e
 
-# =============================================================================
-# Environment Setup
-# =============================================================================
-
-# Source ROS2 environment
-echo "Sourcing ROS2 Humble environment..."
-source /opt/ros/humble/setup.bash
-
-# Source workspace overlay if built
-if [ -f /workspace/install/setup.bash ]; then
-    echo "Sourcing workspace overlay..."
-    source /workspace/install/setup.bash
-fi
-
-# Set FastDDS profile for SHM conflict avoidance
-export FASTRTPS_DEFAULT_PROFILES_FILE=${FASTRTPS_DEFAULT_PROFILES_FILE:-/workspace/config/fastdds_profile.xml}
-export ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-
-# Add scripts to PYTHONPATH
 export PYTHONPATH=/workspace:/workspace/scripts:${PYTHONPATH}
+export PYBULLET_HSR_ROOT=${PYBULLET_HSR_ROOT:-/pybullet_hsr}
 
-# =============================================================================
-# Helper Functions
-# =============================================================================
-
-# Check if Xtion camera is connected
-check_xtion() {
-    echo "Checking for Xtion camera..."
-    if lsusb 2>/dev/null | grep -q "1d27"; then
-        echo "  [OK] Xtion camera detected"
-        return 0
-    else
-        echo "  [WARN] Xtion camera not detected"
-        return 1
-    fi
-}
-
-# Check if GPU is available
 check_gpu() {
     echo "Checking GPU availability..."
     if command -v nvidia-smi &> /dev/null; then
         nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null || true
         echo "  [OK] GPU available"
     else
-        echo "  [WARN] GPU not available - running in CPU mode"
+        echo "  [WARN] GPU not available - training will be slow on CPU"
     fi
 }
-
-# Check if X11 display is available
-check_display() {
-    echo "Checking X11 display..."
-    if [ -z "$DISPLAY" ]; then
-        echo "  [WARN] DISPLAY not set - GUI apps will not work"
-        return 1
-    fi
-    if ! xdpyinfo &>/dev/null 2>&1; then
-        echo "  [WARN] Cannot connect to X server - run 'xhost +local:docker' on host"
-        return 1
-    fi
-    echo "  [OK] X11 display available (${DISPLAY})"
-    return 0
-}
-
-# Print environment info
-print_info() {
-    echo "=============================================="
-    echo "HSR Perception Pipeline"
-    echo "=============================================="
-    echo "ROS_DOMAIN_ID: ${ROS_DOMAIN_ID}"
-    echo "FastDDS Profile: ${FASTRTPS_DEFAULT_PROFILES_FILE}"
-    echo "Python: $(python3 --version)"
-    check_gpu
-    check_display || true
-    echo "=============================================="
-}
-
-# =============================================================================
-# Pre-cached Model Sync
-# =============================================================================
-# Copy pre-downloaded models from /opt/model-cache/ to /workspace/models/pretrained/
-# This ensures models downloaded during docker build are available at runtime
 
 sync_pretrained_models() {
     local cache_dir="/opt/model-cache"
     local target_dir="/workspace/models/pretrained"
-
-    if [ -d "$cache_dir" ]; then
-        # Ensure target directory exists
-        mkdir -p "$target_dir"
-
-        for model in "$cache_dir"/*.pt; do
-            if [ -f "$model" ]; then
-                local model_name=$(basename "$model")
-                local target_path="$target_dir/$model_name"
-
-                if [ ! -f "$target_path" ]; then
-                    echo "  Copying cached model: $model_name"
-                    cp "$model" "$target_path"
-                fi
-            fi
-        done
-    fi
+    [ -d "$cache_dir" ] || return 0
+    mkdir -p "$target_dir"
+    for model in "$cache_dir"/*.pt; do
+        [ -f "$model" ] || continue
+        local name
+        name=$(basename "$model")
+        if [ ! -f "$target_dir/$name" ]; then
+            echo "  Copying cached model: $name"
+            cp "$model" "$target_dir/$name"
+        fi
+    done
 }
 
-# Sync models before starting any service
+print_info() {
+    echo "=============================================="
+    echo "HSR Perception - Training + Evaluation"
+    echo "=============================================="
+    echo "PYBULLET_HSR_ROOT: ${PYBULLET_HSR_ROOT}"
+    echo "Python: $(python3 --version)"
+    check_gpu
+    echo "=============================================="
+}
+
 sync_pretrained_models
 
-# =============================================================================
-# Command Handlers
-# =============================================================================
-
 case "${1:-streamlit}" in
-    # -------------------------------------------------------------------------
-    # Streamlit Web UI (Default)
-    # -------------------------------------------------------------------------
     streamlit)
         print_info
-        echo ""
-        echo "Starting HSR Object Manager (Streamlit)..."
-        echo "Access the UI at: http://localhost:8501"
-        echo ""
+        echo "Starting Streamlit UI at http://localhost:8501 ..."
         cd /workspace
         exec streamlit run app/main.py \
             --server.headless true \
@@ -134,155 +56,120 @@ case "${1:-streamlit}" in
             --server.address 0.0.0.0
         ;;
 
-    # -------------------------------------------------------------------------
-    # ROS2 OpenNI2 Camera Node (Xtion)
-    # -------------------------------------------------------------------------
-    ros2-camera)
+    prepare-dataset)
+        shift
         print_info
-        check_xtion
-        echo ""
-        echo "Starting ROS2 OpenNI2 Camera Node..."
-        exec ros2 launch openni2_camera camera_only.launch.py
+        exec python3 /workspace/scripts/data/prepare_dataset.py "$@"
         ;;
 
-    # -------------------------------------------------------------------------
-    # ROS2 HSR Capture Node
-    # -------------------------------------------------------------------------
-    ros2-capture)
+    sync)
+        shift
         print_info
-        echo ""
-        echo "Starting ROS2 HSR Capture Node..."
-        exec ros2 launch hsr_perception capture.launch.py
+        exec python3 /workspace/scripts/data/sync_latest.py "$@"
         ;;
 
-    # -------------------------------------------------------------------------
-    # Training Mode
-    # -------------------------------------------------------------------------
     train)
         shift
         print_info
-        echo ""
-        echo "Starting YOLOv8 Training..."
         exec python3 -m scripts.training.quick_finetune "$@"
         ;;
 
-    # -------------------------------------------------------------------------
-    # Annotation Mode
-    # -------------------------------------------------------------------------
-    annotate)
+    train-latest)
         shift
         print_info
-        echo ""
-        echo "Starting Auto-Annotation..."
-        exec python3 /workspace/scripts/annotation/auto_annotate.py "$@"
+        echo "[train-latest] syncing newest dump ..."
+        python3 /workspace/scripts/data/sync_latest.py \
+            --annotation-root "${PYBULLET_HSR_ROOT}/annotation_data"
+        data_yaml=$(python3 - "$PYBULLET_HSR_ROOT" <<'PY'
+import json, os, sys
+from pathlib import Path
+sys.path.insert(0, "/workspace/scripts/data")
+from manifest import discover_dumps  # type: ignore
+root = Path(sys.argv[1]) / "annotation_data"
+dumps = discover_dumps(root)
+if not dumps:
+    sys.exit("no manifest-bearing dumps found")
+name = dumps[0]["manifest"].get("dataset_name") or dumps[0]["path"].name
+print(f"/workspace/datasets/{name}/data.yaml")
+PY
+)
+        echo "[train-latest] training with ${data_yaml}"
+        exec python3 -m scripts.training.quick_finetune --dataset "${data_yaml}" "$@"
         ;;
 
-    # -------------------------------------------------------------------------
-    # Evaluation Mode
-    # -------------------------------------------------------------------------
     evaluate)
         shift
         print_info
-        echo ""
-        echo "Starting Model Evaluation..."
         exec python3 /workspace/scripts/evaluation/evaluate_model.py "$@"
         ;;
 
-    # -------------------------------------------------------------------------
-    # Visual Verification Mode
-    # -------------------------------------------------------------------------
     verify)
         shift
         print_info
-        echo ""
-        echo "Starting Visual Verification..."
         exec python3 /workspace/scripts/evaluation/visual_verification.py "$@"
         ;;
 
-    # -------------------------------------------------------------------------
-    # Run Tests (pytest)
-    # -------------------------------------------------------------------------
     test)
         shift
         print_info
-        echo ""
-        echo "Running pytest..."
         cd /workspace
         exec python3 -m pytest "$@"
         ;;
 
-    # -------------------------------------------------------------------------
-    # TensorBoard
-    # -------------------------------------------------------------------------
     tensorboard)
         shift
         print_info
         LOGDIR="${1:-/workspace/runs}"
-        echo ""
-        echo "Starting TensorBoard..."
-        echo "Log directory: ${LOGDIR}"
-        echo "Access at: http://localhost:6006"
+        echo "Starting TensorBoard at http://localhost:6006 ..."
         exec tensorboard --logdir="${LOGDIR}" --bind_all --port=6006
         ;;
 
-    # -------------------------------------------------------------------------
-    # Interactive Shell
-    # -------------------------------------------------------------------------
     bash|sh)
         print_info
-        echo ""
-        echo "Starting interactive shell..."
         exec /bin/bash
         ;;
 
-    # -------------------------------------------------------------------------
-    # ROS2 Command Pass-through
-    # -------------------------------------------------------------------------
-    ros2)
-        shift
-        exec ros2 "$@"
-        ;;
-
-    # -------------------------------------------------------------------------
-    # Python Script Pass-through
-    # -------------------------------------------------------------------------
     python|python3)
         shift
         exec python3 "$@"
         ;;
 
-    # -------------------------------------------------------------------------
-    # Help
-    # -------------------------------------------------------------------------
     help|--help|-h)
-        echo "HSR Perception Pipeline - Docker Entrypoint"
-        echo ""
-        echo "Usage: docker run hsr-perception [COMMAND] [ARGS]"
-        echo ""
-        echo "Commands:"
-        echo "  streamlit     Start Streamlit Web UI (default)"
-        echo "  ros2-camera   Start ROS2 OpenNI2 camera node"
-        echo "  ros2-capture  Start ROS2 HSR capture node"
-        echo "  train         Run YOLOv8 training"
-        echo "  annotate      Run auto-annotation"
-        echo "  evaluate      Run model evaluation"
-        echo "  verify        Run visual verification"
-        echo "  test          Run pytest tests"
-        echo "  tensorboard   Start TensorBoard server"
-        echo "  bash          Start interactive shell"
-        echo "  ros2 [cmd]    Run ROS2 command"
-        echo "  python [cmd]  Run Python script"
-        echo "  help          Show this help message"
-        echo ""
-        echo "Examples:"
-        echo "  docker compose up                    # Start Streamlit UI"
-        echo "  docker compose run hsr-perception train --dataset /workspace/datasets/data.yaml"
-        echo "  docker compose exec hsr-perception bash"
+        cat <<EOF
+HSR Perception Pipeline - Docker Entrypoint
+
+Usage: docker run hsr-perception [COMMAND] [ARGS]
+
+Commands:
+  streamlit         Start Streamlit UI (default)
+  prepare-dataset   Turn a manifest-bearing pybullet_hsr dump into a YOLO dataset.
+                    Reads <dump>/manifest.json (schema v1.0) for paths + classes.
+                    Pass --latest with an annotation_data/ root to auto-pick the
+                    newest dump. No --classes-yaml flag — the manifest carries it.
+  sync              Prepare the newest manifest-bearing dump under
+                    \$PYBULLET_HSR_ROOT/annotation_data/. No-op if the local
+                    dataset is already in sync (add --force to rebuild).
+  train             Run YOLOv8 training
+  train-latest      Sync the newest dump, then run training against it. Extra
+                    args (e.g. --fast --epochs 1) are forwarded to quick_finetune.
+  evaluate          Run model evaluation
+  verify            Run visual verification
+  test              Run pytest tests
+  tensorboard       Start TensorBoard server
+  bash              Start interactive shell
+  python [cmd]      Run Python script
+  help              Show this help message
+
+Examples:
+  docker compose up
+  docker compose run --rm app sync
+  docker compose run --rm app train-latest --fast --epochs 1
+  docker compose run --rm app prepare-dataset \\
+      --source /pybullet_hsr/annotation_data --latest --symlink
+  docker compose run --rm app train --dataset datasets/<dataset_name>/data.yaml --fast --epochs 1
+EOF
         ;;
 
-    # -------------------------------------------------------------------------
-    # Custom Command
-    # -------------------------------------------------------------------------
     *)
         exec "$@"
         ;;
