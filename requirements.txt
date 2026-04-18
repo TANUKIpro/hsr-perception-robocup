@@ -2,9 +2,11 @@
 # Training + evaluation over YOLO datasets produced by pybullet_hsr.
 
 # Core ML / CV
+# torch / torchvision are installed separately in the Dockerfile from the
+# CUDA 12.1 wheel index. Do NOT list them here — pip would re-resolve
+# against the default PyPI index and overwrite the cu121 build with a
+# newer CUDA wheel incompatible with the host driver.
 ultralytics>=8.3.0
-torch>=2.1.0
-torchvision>=0.16.0
 opencv-python>=4.8.0
 numpy>=1.24.0
 pillow>=10.0.0

@@ -39,10 +39,13 @@ RUN pip3 install --upgrade pip setuptools wheel
 
 # -----------------------------------------------------------------------------
 # PyTorch + CUDA 12.1
+# Pinned: torch 2.5.x is the last series with cu121 wheels. Later PyTorch
+# releases (2.6 → cu124, 2.7+ → cu126+) require newer NVIDIA drivers than
+# the host 535-series. Do not float this without also bumping the driver.
 # -----------------------------------------------------------------------------
 RUN pip3 install --no-cache-dir --ignore-installed \
-    "torch>=2.1.0" \
-    "torchvision>=0.16.0" \
+    "torch==2.5.1" \
+    "torchvision==0.20.1" \
     --index-url https://download.pytorch.org/whl/cu121
 
 # -----------------------------------------------------------------------------
@@ -62,7 +65,9 @@ RUN apt-get update && apt-get install -y \
 # Python app dependencies
 # -----------------------------------------------------------------------------
 COPY requirements.txt /tmp/requirements.txt
-RUN pip3 install --no-cache-dir --ignore-installed -r /tmp/requirements.txt && \
+# Note: no --ignore-installed here — otherwise pip would reinstall torch
+# from the default PyPI index and overwrite the pinned cu121 build above.
+RUN pip3 install --no-cache-dir -r /tmp/requirements.txt && \
     rm /tmp/requirements.txt
 
 # -----------------------------------------------------------------------------
