@@ -242,10 +242,16 @@ class CompetitionTensorBoardCallback:
         self.total_epochs = trainer.epochs
         self.start_time = time.time()
 
-        # Log initial configuration
+        # `trainer.model` is not yet set when `on_pretrain_routine_start` fires
+        # in Ultralytics >= 8.4 (callback runs inside BaseTrainer.__init__,
+        # before `self.model` is assigned). Fall back to args.model.
+        model_attr = getattr(trainer, "model", None)
+        model_name = getattr(model_attr, "yaml_file", None) or getattr(
+            trainer.args, "model", "unknown"
+        )
         config_text = (
             f"**Training Configuration**\n\n"
-            f"- Model: {getattr(trainer.model, 'yaml_file', 'unknown')}\n"
+            f"- Model: {model_name}\n"
             f"- Epochs: {self.total_epochs}\n"
             f"- Batch Size: {trainer.batch_size}\n"
             f"- Image Size: {trainer.args.imgsz}\n"

@@ -16,7 +16,6 @@ from colorama import Fore, Style
 
 from .gpu_scaler import OOMRecoveryStrategy
 from .memory_utils import log_memory_snapshot
-from .synthetic_data_manager import SYNTHETIC_CONFIG_KEYS
 
 
 # Maximum OOM retry attempts
@@ -200,8 +199,8 @@ class TrainingExecutor:
         )
 
         # Build overrides for LLRDDetectionTrainer
-        # Remove LLRD-specific keys and synthetic keys from config
-        excluded_keys = {"llrd_enabled", "llrd_decay_rate"} | SYNTHETIC_CONFIG_KEYS
+        # Remove LLRD-specific keys from config
+        excluded_keys = {"llrd_enabled", "llrd_decay_rate"}
         trainer_config = {
             k: v for k, v in self.config.items() if k not in excluded_keys
         }
@@ -323,7 +322,7 @@ class TrainingExecutor:
 
     def _filter_yolo_config(self, config: Dict) -> Dict:
         """Filter out non-YOLO keys from config."""
-        excluded_keys = {"llrd_enabled", "llrd_decay_rate"} | SYNTHETIC_CONFIG_KEYS
+        excluded_keys = {"llrd_enabled", "llrd_decay_rate"}
         return {k: v for k, v in config.items() if k not in excluded_keys}
 
     def _print_config_summary(self) -> None:

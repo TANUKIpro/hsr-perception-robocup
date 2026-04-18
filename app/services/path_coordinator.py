@@ -1,556 +1,219 @@
-"""
-Path Coordinator
+"""Path resolution helpers for the train + evaluate pipeline.
 
-Standardizes paths between the Streamlit app and ML pipeline scripts.
-Handles path translation, symlink creation, and directory management.
-Supports profile-based data isolation.
+The repository is now a consumer of datasets produced by `pybullet_hsr`.
+All paths here are project-root relative or absolute; there is no
+per-profile isolation (profiles were removed along with the collection UI).
 """
 
-import shutil
+from __future__ import annotations
+
+import os
+import sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Union, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Union
 
 import streamlit as st
 
-if TYPE_CHECKING:
-    from .profile_manager import ProfileManager
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-# ========== Cached Filesystem Functions ==========
-# These functions cache expensive filesystem operations to avoid
-# re-scanning directories on every Streamlit rerender.
+PYBULLET_HSR_ROOT = Path(
+    os.environ.get("PYBULLET_HSR_ROOT", "/home/roboworks/repos/pybullet_hsr")
+)
+PYBULLET_HSR_ANNOTATION_ROOT = PYBULLET_HSR_ROOT / "annotation_data"
 
-@st.cache_data(ttl=30, show_spinner=False)
-def _cached_get_annotation_sessions(annotated_dir: str) -> List[Dict[str, str]]:
-    """Cached version of annotation session scanning."""
-    annotated_path = Path(annotated_dir)
-    sessions = []
+DATASETS_DIR = PROJECT_ROOT / "datasets"
+MODELS_DIR = PROJECT_ROOT / "models"
+FINETUNED_DIR = MODELS_DIR / "finetuned"
+PRETRAINED_DIR = MODELS_DIR / "pretrained"
+TASKS_DIR = PROJECT_ROOT / "app_data" / "tasks"
 
-    if not annotated_path.exists():
-        return sessions
-
-    for session_dir in sorted(annotated_path.iterdir(), reverse=True):
-        if session_dir.is_dir():
-            data_yaml = session_dir / "data.yaml"
-            sessions.append({
-                "name": session_dir.name,
-                "path": str(session_dir),
-                "has_data_yaml": data_yaml.exists(),
-                "created": datetime.fromtimestamp(session_dir.stat().st_ctime).isoformat(),
-            })
-
-    return sessions
+# Wire the data scripts dir onto sys.path so we can import `manifest` from
+# both CLI (relative import works) and Streamlit (no package context).
+_SCRIPTS_DATA_DIR = PROJECT_ROOT / "scripts" / "data"
+if str(_SCRIPTS_DATA_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DATA_DIR))
 
 
 @st.cache_data(ttl=30, show_spinner=False)
-def _cached_get_trained_models(finetuned_dir: str) -> List[Dict[str, str]]:
-    """Cached version of trained model scanning."""
+def _cached_get_trained_models(finetuned_dir: str) -> List[Dict[str, Optional[str]]]:
     finetuned_path = Path(finetuned_dir)
-    models = []
-
     if not finetuned_path.exists():
-        return models
-
+        return []
+    models: List[Dict[str, Optional[str]]] = []
     for model_dir in sorted(finetuned_path.iterdir(), reverse=True):
-        if model_dir.is_dir():
-            weights_dir = model_dir / "weights"
-            best_pt = weights_dir / "best.pt"
-            last_pt = weights_dir / "last.pt"
-
-            if best_pt.exists() or last_pt.exists():
-                models.append({
-                    "name": model_dir.name,
-                    "best_path": str(best_pt) if best_pt.exists() else None,
-                    "last_path": str(last_pt) if last_pt.exists() else None,
-                    "created": datetime.fromtimestamp(model_dir.stat().st_ctime).isoformat(),
-                })
-
+        if not model_dir.is_dir():
+            continue
+        best_pt = model_dir / "weights" / "best.pt"
+        last_pt = model_dir / "weights" / "last.pt"
+        if best_pt.exists() or last_pt.exists():
+            models.append({
+                "name": model_dir.name,
+                "best_path": str(best_pt) if best_pt.exists() else None,
+                "last_path": str(last_pt) if last_pt.exists() else None,
+                "created": datetime.fromtimestamp(model_dir.stat().st_ctime).isoformat(),
+            })
     return models
 
 
 @st.cache_data(ttl=30, show_spinner=False)
-def _cached_get_background_images(backgrounds_dir: str) -> List[Dict[str, str]]:
-    """Cached version of background image scanning."""
-    backgrounds_path = Path(backgrounds_dir)
-    images = []
-
-    if not backgrounds_path.exists():
-        return images
-
-    extensions = [".jpg", ".jpeg", ".png", ".bmp"]
-    for img_file in backgrounds_path.iterdir():
-        if img_file.suffix.lower() in extensions:
-            images.append({
-                "name": img_file.name,
-                "path": str(img_file),
+def _cached_get_datasets(datasets_dir: str) -> List[Dict[str, str]]:
+    path = Path(datasets_dir)
+    if not path.exists():
+        return []
+    out: List[Dict[str, str]] = []
+    for d in sorted(path.iterdir(), reverse=True):
+        yaml_path = d / "data.yaml"
+        if d.is_dir() and yaml_path.exists():
+            out.append({
+                "name": d.name,
+                "path": str(d),
+                "data_yaml": str(yaml_path),
+                "created": datetime.fromtimestamp(d.stat().st_ctime).isoformat(),
             })
+    return out
 
-    return images
 
-
-@st.cache_data(ttl=30, show_spinner=False)
-def _cached_get_mask_stats(annotated_dir: str) -> Dict[str, int]:
-    """
-    Get mask statistics for annotated classes (cached).
-
-    Returns:
-        Dictionary mapping class name to mask count
-    """
-    stats = {}
-    annotated_path = Path(annotated_dir)
-
-    if not annotated_path.exists():
-        return stats
-
-    for class_dir in annotated_path.iterdir():
-        if not class_dir.is_dir():
-            continue
-        masks_dir = class_dir / "masks"
-        if masks_dir.exists():
-            # Check both naming conventions
-            mask_count = len(list(masks_dir.glob("*_mask.png")))
-            if mask_count == 0:
-                mask_count = len(list(masks_dir.glob("*.png")))
-            if mask_count > 0:
-                stats[class_dir.name] = mask_count
-
-    return stats
+def _read_prepare_meta(dataset_dir: Path) -> Optional[Dict[str, Any]]:
+    import json as _json
+    path = dataset_dir / ".prepare_meta.json"
+    if not path.is_file():
+        return None
+    try:
+        return _json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
 
 
 @dataclass
 class PathConfig:
-    """Path configuration with profile-relative defaults."""
-
-    # App data paths (relative to profile root)
-    app_data_dir: str = "app_data"
-    app_reference_dir: str = "app_data/reference_images"
-    app_tasks_dir: str = "app_data/tasks"
-    app_registry_file: str = "app_data/object_registry.json"
-    app_thumbnails_dir: str = "app_data/thumbnails"
-
-    # Dataset paths (relative to profile root)
-    datasets_dir: str = "datasets"
-    raw_captures_dir: str = "datasets/raw_captures"
-    annotated_dir: str = "datasets/annotated"
-    backgrounds_dir: str = "datasets/backgrounds"
-    videos_dir: str = "datasets/videos"
-
-    # Model paths - finetuned is profile-specific
-    finetuned_dir: str = "models/finetuned"
-
-    # Shared paths (relative to project root, not profile)
-    models_dir: str = "models"
-    pretrained_dir: str = "models/pretrained"
-    config_dir: str = "config"
-    class_config_file: str = "config/object_classes.json"
+    datasets_dir: Path = DATASETS_DIR
+    models_dir: Path = MODELS_DIR
+    finetuned_dir: Path = FINETUNED_DIR
+    pretrained_dir: Path = PRETRAINED_DIR
+    tasks_dir: Path = TASKS_DIR
 
 
 class PathCoordinator:
-    """
-    Coordinates paths between app and ML pipeline with profile support.
+    """Small façade around the new path layout."""
 
-    Provides:
-    - Profile-aware path resolution
-    - Path resolution relative to project root for shared resources
-    - Session-based output directory creation
-    - Path validation utilities
-
-    Usage:
-        coordinator = PathCoordinator()
-
-        # Get absolute path (profile-aware)
-        raw_dir = coordinator.get_path("raw_captures_dir")
-
-        # Get shared path (project-level)
-        pretrained = coordinator.get_path("pretrained_dir")
-
-        # Prepare paths for annotation
-        paths = coordinator.prepare_annotation_paths()
-    """
-
-    # Paths that are shared across all profiles (resolved from project root)
-    SHARED_PATHS = {
-        "models_dir",
-        "pretrained_dir",
-        "config_dir",
-        "class_config_file",
-    }
-
-    def __init__(
-        self,
-        project_root: Optional[Union[str, Path]] = None,
-        profile_manager: Optional["ProfileManager"] = None
-    ):
-        """
-        Initialize path coordinator.
-
-        Args:
-            project_root: Project root directory. If None, auto-detected from file location.
-            profile_manager: ProfileManager instance. If None, creates a new one.
-        """
-        if project_root is None:
-            # Auto-detect: app/services/path_coordinator.py -> project root
-            self.project_root = Path(__file__).parent.parent.parent
-        else:
-            self.project_root = Path(project_root)
-
+    def __init__(self, project_root: Optional[Union[str, Path]] = None) -> None:
+        self.project_root = Path(project_root) if project_root else PROJECT_ROOT
         self.config = PathConfig()
-
-        # Initialize profile manager
-        if profile_manager is None:
-            from .profile_manager import ProfileManager
-            self._profile_manager = ProfileManager(self.project_root)
-        else:
-            self._profile_manager = profile_manager
-
-        # Ensure critical directories exist
         self._ensure_directories()
 
-    def _get_profile_root(self, profile_id: Optional[str] = None) -> Path:
-        """Get the root directory for a profile."""
-        if profile_id is None:
-            profile_id = self._profile_manager.get_active_profile_id()
-        return self._profile_manager.get_profile_path(profile_id)
-
-    def _ensure_directories(self, profile_id: Optional[str] = None) -> None:
-        """Create required directories if they don't exist."""
-        profile_root = self._get_profile_root(profile_id)
-
-        # Profile-specific directories
-        profile_directories = [
-            self.config.app_data_dir,
-            self.config.app_reference_dir,
-            self.config.app_tasks_dir,
-            self.config.app_thumbnails_dir,
+    def _ensure_directories(self) -> None:
+        for d in (
             self.config.datasets_dir,
-            self.config.raw_captures_dir,
-            self.config.annotated_dir,
-            self.config.backgrounds_dir,
-            self.config.videos_dir,
-            self.config.finetuned_dir,
-        ]
-
-        for dir_path in profile_directories:
-            full_path = profile_root / dir_path
-            full_path.mkdir(parents=True, exist_ok=True)
-
-        # Shared directories (project-level)
-        shared_directories = [
             self.config.models_dir,
+            self.config.finetuned_dir,
             self.config.pretrained_dir,
-            self.config.config_dir,
-        ]
+            self.config.tasks_dir,
+        ):
+            d.mkdir(parents=True, exist_ok=True)
 
-        for dir_path in shared_directories:
-            full_path = self.project_root / dir_path
-            full_path.mkdir(parents=True, exist_ok=True)
-
-    def get_path(self, key: str, profile_id: Optional[str] = None) -> Path:
-        """
-        Get absolute path for a configured path key.
-
-        For shared paths (pretrained, config), resolves relative to project root.
-        For profile-specific paths, resolves relative to the active profile directory.
-
-        Args:
-            key: Path configuration key (e.g., "raw_captures_dir", "class_config_file")
-            profile_id: Optional profile ID. If None, uses active profile.
-
-        Returns:
-            Absolute Path object
-
-        Raises:
-            KeyError: If key is not found in configuration
-        """
-        if not hasattr(self.config, key):
-            raise KeyError(f"Unknown path key: {key}. Available: {list(vars(self.config).keys())}")
-
-        rel_path = getattr(self.config, key)
-
-        if key in self.SHARED_PATHS:
-            # Shared paths are relative to project root
-            return self.project_root / rel_path
-        else:
-            # Profile-specific paths are relative to profile root
-            profile_root = self._get_profile_root(profile_id)
-            return profile_root / rel_path
-
-    def get_relative_path(self, key: str) -> str:
-        """
-        Get relative path string for a configured path key.
-
-        Args:
-            key: Path configuration key
-
-        Returns:
-            Relative path string
-        """
+    def get_path(self, key: str) -> Path:
         if not hasattr(self.config, key):
             raise KeyError(f"Unknown path key: {key}")
         return getattr(self.config, key)
 
-    def resolve_path(self, path: Union[str, Path], profile_id: Optional[str] = None) -> Path:
+    def resolve_path(self, path: Union[str, Path]) -> Path:
+        p = Path(path)
+        return p if p.is_absolute() else self.project_root / p
+
+    def get_datasets(self) -> List[Dict[str, str]]:
+        return _cached_get_datasets(str(self.config.datasets_dir))
+
+    def get_trained_models(self) -> List[Dict[str, Optional[str]]]:
+        return _cached_get_trained_models(str(self.config.finetuned_dir))
+
+    def get_available_pybullet_hsr_dumps(self) -> List[Dict[str, Any]]:
+        """Scan `${PYBULLET_HSR_ROOT}/annotation_data/` for dumps with a valid manifest.json.
+
+        Returns records in the form `{"path": Path, "manifest": dict}`,
+        sorted by `manifest.created_at` descending.
         """
-        Resolve a path relative to project root or profile root.
+        from manifest import discover_dumps  # lazy — avoid startup cost
+        return discover_dumps(PYBULLET_HSR_ANNOTATION_ROOT)
 
-        Args:
-            path: Relative or absolute path
-            profile_id: Optional profile ID for profile-relative paths
+    def get_dataset_meta(self, dataset_name: str) -> Optional[Dict[str, Any]]:
+        """Return the `.prepare_meta.json` sidecar for a prepared dataset, or None."""
+        return _read_prepare_meta(self.config.datasets_dir / dataset_name)
 
-        Returns:
-            Absolute Path object
+    def get_latest_sync_state(self) -> Dict[str, Any]:
+        """Compare the newest pybullet_hsr dump against the matching local dataset.
+
+        Returns a dict with keys:
+          - `state`: one of "no_dumps", "no_local", "stale", "up_to_date"
+          - `dump`: the newest dump record ({"path", "manifest"}) or None
+          - `local_meta`: the matching dataset's sidecar dict, or None
+          - `local_dataset_name`: the dataset name we expect under `datasets/`
+          - `reason`: short human-readable staleness reason (when stale)
+
+        `stale` is reported when the dump's manifest created_at, path, or
+        num_images differs from what the local sidecar recorded — that's
+        enough to tell the user "there's a newer dump you haven't synced."
         """
-        path = Path(path)
-        if path.is_absolute():
-            return path
-        # Default to profile root for relative paths
-        profile_root = self._get_profile_root(profile_id)
-        return profile_root / path
+        dumps = self.get_available_pybullet_hsr_dumps()
+        if not dumps:
+            return {"state": "no_dumps", "dump": None, "local_meta": None,
+                    "local_dataset_name": None, "reason": ""}
 
-    def get_profile_manager(self) -> "ProfileManager":
-        """Get the profile manager instance."""
-        return self._profile_manager
+        latest = dumps[0]
+        manifest = latest["manifest"]
+        dump_path = latest["path"]
+        dataset_name = manifest.get("dataset_name") or dump_path.name
+        meta = self.get_dataset_meta(dataset_name)
 
-    # ========== Session Management ==========
-
-    def create_annotation_session(self, session_name: Optional[str] = None) -> Dict[str, str]:
-        """
-        Create a new annotation session with prepared paths.
-
-        Args:
-            session_name: Optional session name. If None, generates timestamp-based name.
-
-        Returns:
-            Dictionary with keys:
-            - session_name: Name of the session
-            - input_dir: Path to raw captures
-            - output_dir: Path for annotation output
-            - class_config: Path to class configuration
-            - data_yaml: Expected path for output data.yaml
-        """
-        if session_name is None:
-            session_name = datetime.now().strftime("session_%Y%m%d_%H%M%S")
-
-        output_dir = self.get_path("annotated_dir") / session_name
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        return {
-            "session_name": session_name,
-            "input_dir": str(self.get_path("raw_captures_dir")),
-            "output_dir": str(output_dir),
-            "class_config": str(self.get_path("class_config_file")),
-            "data_yaml": str(output_dir / "data.yaml"),
+        base = {
+            "dump": latest,
+            "local_meta": meta,
+            "local_dataset_name": dataset_name,
         }
+        if not meta:
+            return {**base, "state": "no_local",
+                    "reason": f"datasets/{dataset_name} not prepared yet"}
 
-    def get_annotation_sessions(self) -> List[Dict[str, str]]:
-        """
-        Get list of existing annotation sessions.
+        if meta.get("source_dump") != str(dump_path.resolve()):
+            return {**base, "state": "stale",
+                    "reason": f"local sidecar points at {meta.get('source_dump')!r}"}
+        if meta.get("manifest_created_at") != manifest.get("created_at", ""):
+            return {**base, "state": "stale",
+                    "reason": f"dump created_at has advanced to {manifest.get('created_at')}"}
+        stats = manifest.get("stats", {}) or {}
+        if stats.get("num_images") and stats["num_images"] != meta.get("num_images_in_dump"):
+            return {**base, "state": "stale",
+                    "reason": "dump num_images changed since last prepare"}
 
-        Returns:
-            List of session info dictionaries with keys:
-            - name: Session name
-            - path: Session directory path
-            - has_data_yaml: Whether data.yaml exists
-            - created: Creation timestamp
-        """
-        annotated_dir = self.get_path("annotated_dir")
-        return _cached_get_annotation_sessions(str(annotated_dir))
-
-    def get_training_paths(self, annotation_session: str) -> Dict[str, str]:
-        """
-        Get paths for training based on an annotation session.
-
-        Args:
-            annotation_session: Name of the annotation session
-
-        Returns:
-            Dictionary with keys:
-            - dataset_yaml: Path to data.yaml
-            - output_dir: Path for model output
-
-        Raises:
-            FileNotFoundError: If dataset not found
-        """
-        session_dir = self.get_path("annotated_dir") / annotation_session
-        dataset_yaml = session_dir / "data.yaml"
-
-        if not dataset_yaml.exists():
-            raise FileNotFoundError(
-                f"Dataset not found: {dataset_yaml}. "
-                f"Run annotation first to create data.yaml"
-            )
-
-        return {
-            "dataset_yaml": str(dataset_yaml),
-            "output_dir": str(self.get_path("finetuned_dir")),
-        }
-
-    # ========== Model Management ==========
-
-    def get_trained_models(self) -> List[Dict[str, str]]:
-        """
-        Get list of trained models.
-
-        Returns:
-            List of model info dictionaries with keys:
-            - name: Model run name
-            - best_path: Path to best.pt
-            - last_path: Path to last.pt
-            - created: Creation timestamp
-        """
-        finetuned_dir = self.get_path("finetuned_dir")
-        return _cached_get_trained_models(str(finetuned_dir))
+        return {**base, "state": "up_to_date", "reason": ""}
 
     def get_pretrained_models(self) -> List[str]:
-        """
-        Get list of available pretrained models.
-
-        Returns:
-            List of model file paths
-        """
-        pretrained_dir = self.get_path("pretrained_dir")
-        models = []
-
-        if pretrained_dir.exists():
-            for model_file in pretrained_dir.glob("*.pt"):
+        models: List[str] = []
+        if self.config.pretrained_dir.exists():
+            for model_file in self.config.pretrained_dir.glob("*.pt"):
                 models.append(str(model_file))
-
-        # Also include standard YOLO model names that will be auto-downloaded
-        standard_models = ["yolov8n.pt", "yolov8s.pt", "yolov8m.pt", "yolov8l.pt", "yolov8x.pt"]
-        for model in standard_models:
-            if model not in [Path(m).name for m in models]:
-                models.append(model)
-
+        for name in ("yolov8n.pt", "yolov8s.pt", "yolov8m.pt", "yolov8l.pt", "yolov8x.pt"):
+            if name not in [Path(m).name for m in models]:
+                models.append(name)
         return models
 
-    # ========== Background Images ==========
-
-    def get_background_images(self) -> List[Dict[str, str]]:
-        """
-        Get list of available background images for annotation.
-
-        Returns:
-            List of background info dictionaries with keys:
-            - name: File name
-            - path: Full path
-        """
-        backgrounds_dir = self.get_path("backgrounds_dir")
-        return _cached_get_background_images(str(backgrounds_dir))
-
-    def get_mask_stats(self) -> Dict[str, int]:
-        """
-        Get mask statistics for annotated classes.
-
-        Returns:
-            Dictionary mapping class name to mask count
-        """
-        annotated_dir = self.get_path("annotated_dir")
-        return _cached_get_mask_stats(str(annotated_dir))
-
-    def add_background_image(self, source_path: Union[str, Path], name: Optional[str] = None) -> str:
-        """
-        Add a background image to the backgrounds directory.
-
-        Args:
-            source_path: Path to source image
-            name: Optional name for the saved file
-
-        Returns:
-            Path to saved background image
-        """
-        source = Path(source_path)
-        if name is None:
-            name = source.name
-
-        dest = self.get_path("backgrounds_dir") / name
-        shutil.copy2(source, dest)
-        return str(dest)
-
-    # ========== Validation ==========
-
-    def validate_paths(self) -> Dict[str, bool]:
-        """
-        Validate that all required paths exist.
-
-        Returns:
-            Dictionary mapping path key to existence status
-        """
-        results = {}
-        for key in vars(self.config):
-            if key.endswith("_dir") or key.endswith("_file"):
-                path = self.get_path(key)
-                if key.endswith("_file"):
-                    results[key] = path.exists()
-                else:
-                    results[key] = path.is_dir()
-        return results
+    def get_training_paths(self, dataset_yaml: Union[str, Path]) -> Dict[str, str]:
+        yaml_path = self.resolve_path(dataset_yaml)
+        if not yaml_path.exists():
+            raise FileNotFoundError(f"Dataset yaml not found: {yaml_path}")
+        return {
+            "dataset_yaml": str(yaml_path),
+            "output_dir": str(self.config.finetuned_dir),
+        }
 
     def get_path_summary(self) -> Dict[str, str]:
-        """
-        Get summary of all configured paths.
-
-        Returns:
-            Dictionary mapping path key to absolute path string
-        """
-        summary = {}
-        for key in vars(self.config):
-            path = self.get_path(key)
-            summary[key] = str(path)
-        return summary
-
-    # ========== Application Launchers ==========
-
-    def open_annotation_app(
-        self,
-        input_dir: str,
-        output_dir: str,
-        class_id: int = 0,
-        device: str = "cuda",
-        model_path: str = "sam2.1_hiera_base_plus.pt"
-    ) -> bool:
-        """
-        Launch SAM2 Interactive Annotation Application.
-
-        Opens a PyQt6-based GUI for semi-automatic object annotation
-        using SAM2 segmentation and video tracking.
-
-        Args:
-            input_dir: Directory containing images to annotate
-            output_dir: Directory for YOLO label output
-            class_id: YOLO class ID for annotations
-            device: Device for inference ("cuda" or "cpu")
-            model_path: Path to SAM2 model file
-
-        Returns:
-            True if application launched successfully, False otherwise
-        """
-        import subprocess
-        import sys
-
-        # SAM2 app is a Python module in scripts/annotation/sam2_app_qt/
-        annotation_dir = self.project_root / "scripts/annotation"
-        module_dir = annotation_dir / "sam2_app_qt"
-
-        if not module_dir.exists():
-            return False
-
-        # Ensure output directory exists
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
-
-        cmd = [
-            sys.executable,
-            "-m", "sam2_app_qt",
-            "--input-dir", input_dir,
-            "--output-dir", output_dir,
-            "--class-id", str(class_id),
-            "--device", device,
-            "--model", model_path
-        ]
-
-        try:
-            subprocess.Popen(cmd, cwd=str(annotation_dir), start_new_session=True)
-            return True
-        except Exception:
-            return False
+        return {
+            "datasets": str(self.config.datasets_dir),
+            "models": str(self.config.models_dir),
+            "finetuned": str(self.config.finetuned_dir),
+            "pretrained": str(self.config.pretrained_dir),
+            "pybullet_hsr_root": str(PYBULLET_HSR_ROOT),
+            "pybullet_hsr_annotation_root": str(PYBULLET_HSR_ANNOTATION_ROOT),
+        }

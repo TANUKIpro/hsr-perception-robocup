@@ -1,141 +1,90 @@
 #!/bin/bash
-# =============================================================================
 # HSR Perception Docker Startup Script
-# =============================================================================
-#
-# First-time startup:
-#   - Automatically builds Docker image
-#   - Automatically installs Xtion udev rules (sudo required)
 #
 # Usage:
-#   ./start.sh              # Normal startup
-#   ./start.sh --build      # Force rebuild
-#   ./start.sh --tensorboard # Start with TensorBoard
-#   ./start.sh -d           # Start in background
-#
-# =============================================================================
+#   ./start.sh                    # Build (if needed) and run Streamlit
+#   ./start.sh --build            # Force rebuild
+#   ./start.sh --tensorboard      # Also start TensorBoard
+#   ./start.sh -d                 # Detach (background)
+#   ./start.sh sync               # Prepare the newest pybullet_hsr dump (no-op if fresh)
+#   ./start.sh train-latest -- --fast --epochs 1
+#                                 # Sync newest dump + start training in one go
 
 set -e
 
-# -----------------------------------------------------------------------------
-# Configuration
-# -----------------------------------------------------------------------------
 PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
 IMAGE_NAME="hsr-perception:latest"
-XTION_VENDOR_ID="1d27"  # PrimeSense/ASUS Xtion
-UDEV_RULES_FILE="/etc/udev/rules.d/99-xtion.rules"
 
-# Option flags
 FLAG_BUILD=false
 FLAG_TENSORBOARD=false
 FLAG_DETACH=false
-FLAG_HELP=false
+SUBCOMMAND=""
+SUBCOMMAND_ARGS=()
 
-# -----------------------------------------------------------------------------
-# Colored message functions
-# -----------------------------------------------------------------------------
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
+info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
+success() { echo -e "${GREEN}[OK]${NC} $1"; }
+warn()    { echo -e "${YELLOW}[WARN]${NC} $1"; }
+error()   { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
-info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
-
-success() {
-    echo -e "${GREEN}[OK]${NC} $1"
-}
-
-warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
-
-error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-    exit 1
-}
-
-# -----------------------------------------------------------------------------
-# Show help
-# -----------------------------------------------------------------------------
 show_help() {
-    cat << EOF
-========================================
-  HSR Perception Docker Startup Script
-========================================
+    cat <<EOF
+HSR Perception Docker Startup Script
 
-Usage: ./start.sh [options]
+Usage:
+  ./start.sh [options]                  # Launch the Streamlit UI
+  ./start.sh sync [-- args...]          # Prepare the newest pybullet_hsr dump
+  ./start.sh train-latest [-- args...]  # Sync newest dump + run training
+  ./start.sh xtion-live [-- args...]    # Live YOLO inference over ROS2 image topic
 
 Options:
-  --build         Force rebuild Docker image
-  --tensorboard   Also start TensorBoard (port 6006)
-  --detach, -d    Start in background
-  --help, -h      Show this help
+  --build         Force rebuild of the Docker image
+  --tensorboard   Also start the TensorBoard service (port 6006)
+  --detach, -d    Run in the background
+  --help, -h      Show this help message
 
-Examples:
-  ./start.sh                      # Normal startup
-  ./start.sh --build              # Rebuild image and start
-  ./start.sh --tensorboard        # Start with TensorBoard
-  ./start.sh -d --tensorboard     # Start in background with TensorBoard
+Subcommands (pass extra args after --; they are forwarded to the container):
+  sync            docker compose run --rm app sync [args...]
+                  No-op if the local dataset is already in sync with the
+                  newest manifest-bearing dump; pass --force to rebuild.
+  train-latest    docker compose run --rm app train-latest [args...]
+                  e.g. ./start.sh train-latest -- --fast --epochs 1
+  xtion-live      docker compose --profile xtion run --rm xtion-live [args...]
+                  e.g. ./start.sh xtion-live -- \\
+                        --model models/finetuned/<run>/weights/best.pt
+                  Needs ROS2 publisher + X11 on host and a built
+                  hsr-perception-xtion image.
 
-How to stop:
-  Foreground mode: Ctrl+C
-  Background mode: docker compose down
-
+The script mounts PYBULLET_HSR_ROOT (default: /home/roboworks/repos/pybullet_hsr)
+into the container read-only at /pybullet_hsr so the app can read the source
+dataset and class mapping YAML.
 EOF
 }
 
-# -----------------------------------------------------------------------------
-# Parse arguments
-# -----------------------------------------------------------------------------
 parse_args() {
     while [[ $# -gt 0 ]]; do
         case $1 in
-            --build)
-                FLAG_BUILD=true
-                shift
+            --build)        FLAG_BUILD=true; shift ;;
+            --tensorboard)  FLAG_TENSORBOARD=true; shift ;;
+            --detach|-d)    FLAG_DETACH=true; shift ;;
+            --help|-h)      show_help; exit 0 ;;
+            sync|train-latest|xtion-live)
+                SUBCOMMAND="$1"; shift
+                if [[ "${1:-}" == "--" ]]; then shift; fi
+                SUBCOMMAND_ARGS=("$@")
+                return
                 ;;
-            --tensorboard)
-                FLAG_TENSORBOARD=true
-                shift
-                ;;
-            --detach|-d)
-                FLAG_DETACH=true
-                shift
-                ;;
-            --help|-h)
-                FLAG_HELP=true
-                shift
-                ;;
-            *)
-                warn "Unknown option: $1"
-                shift
-                ;;
+            *)              warn "Unknown option: $1"; shift ;;
         esac
     done
 }
 
-# -----------------------------------------------------------------------------
-# Check dependencies
-# -----------------------------------------------------------------------------
 check_dependencies() {
     info "Checking dependencies..."
-
-    # Docker
-    if ! command -v docker &>/dev/null; then
-        error "Docker is not installed. Please install Docker first."
-    fi
+    command -v docker &>/dev/null || error "Docker is not installed."
     success "Docker: installed"
-
-    # Docker Compose
-    if ! docker compose version &>/dev/null; then
-        error "Docker Compose is not available. Please install Docker Desktop or docker-compose-plugin."
-    fi
+    docker compose version &>/dev/null || error "Docker Compose is not available."
     success "Docker Compose: available"
-
-    # NVIDIA Container Toolkit (warning only)
     if docker info 2>/dev/null | grep -q "nvidia"; then
         success "NVIDIA Container Toolkit: available"
     else
@@ -143,237 +92,84 @@ check_dependencies() {
     fi
 }
 
-# -----------------------------------------------------------------------------
-# Setup udev rules (first-time only)
-# -----------------------------------------------------------------------------
-setup_xtion_udev() {
-    if [ -f "$UDEV_RULES_FILE" ]; then
-        return 0
-    fi
-
-    local source_rules="$PROJECT_ROOT/docker/99-xtion.rules"
-    if [ ! -f "$source_rules" ]; then
-        warn "udev rules file not found: $source_rules"
-        return 0
-    fi
-
-    echo ""
-    info "First-time setup: Installing Xtion udev rules"
-    echo "   (sudo password required)"
-    echo ""
-
-    if sudo cp "$source_rules" "$UDEV_RULES_FILE" && \
-       sudo udevadm control --reload-rules && \
-       sudo udevadm trigger; then
-        success "udev rules installed"
-
-        # Check if user is in video group
-        if ! groups | grep -q video; then
-            info "Attempting to add user to video group..."
-            if sudo usermod -aG video "$USER"; then
-                warn "Added to video group. Please log out and log back in for changes to take effect."
-            fi
-        fi
-    else
-        warn "Failed to install udev rules. Please install manually:"
-        echo "   sudo cp $source_rules $UDEV_RULES_FILE"
-        echo "   sudo udevadm control --reload-rules"
-        echo "   sudo udevadm trigger"
-    fi
-}
-
-# -----------------------------------------------------------------------------
-# Build Docker image
-# -----------------------------------------------------------------------------
 build_image() {
     local need_build=false
-
     if [ "$FLAG_BUILD" = true ]; then
-        info "Force rebuild specified"
-        need_build=true
+        info "Force rebuild specified"; need_build=true
     elif ! docker image inspect "$IMAGE_NAME" &>/dev/null; then
-        info "Docker image not found"
-        need_build=true
+        info "Docker image not found"; need_build=true
     fi
-
     if [ "$need_build" = true ]; then
-        echo ""
-        info "Building Docker image (this may take 10-20 minutes)..."
-        echo ""
-
-        cd "$PROJECT_ROOT"
-        if docker compose build; then
-            success "Docker image build completed"
-
-            # Clean up dangling images after successful build
-            info "Cleaning up old images..."
-            local pruned
-            pruned=$(docker image prune -f 2>/dev/null | grep "Total reclaimed space" || echo "")
-            if [ -n "$pruned" ]; then
-                success "Cleanup: $pruned"
-            else
-                success "Cleanup: no unused images to remove"
-            fi
-        else
-            error "Docker image build failed"
-        fi
+        info "Building Docker image (this may take several minutes)..."
+        cd "$PROJECT_ROOT" && docker compose build
+        success "Docker image build completed"
     else
         success "Docker image: already built"
     fi
 }
 
-# -----------------------------------------------------------------------------
-# X11 setup
-# -----------------------------------------------------------------------------
-setup_x11() {
-    info "Setting up X11 access..."
-
-    # Check if xhost is available
-    if command -v xhost &>/dev/null; then
-        if xhost +local:docker &>/dev/null; then
-            success "X11: Docker access granted"
-        else
-            warn "Failed to set X11 access (possibly headless environment)"
-        fi
-    else
-        warn "xhost not found. GUI features may be limited."
-    fi
-}
-
-# -----------------------------------------------------------------------------
-# Check Xtion connection
-# -----------------------------------------------------------------------------
-check_xtion() {
-    if lsusb 2>/dev/null | grep -q "$XTION_VENDOR_ID"; then
-        return 0  # Connected
-    else
-        return 1  # Not connected
-    fi
-}
-
-# -----------------------------------------------------------------------------
-# Start services
-# -----------------------------------------------------------------------------
 start_services() {
-    local compose_args=""
     local profiles=""
     local detach_flag=""
+    [ "$FLAG_TENSORBOARD" = true ] && profiles="$profiles --profile tensorboard"
+    [ "$FLAG_DETACH" = true ] && detach_flag="-d"
 
-    # Profile settings
-    if [ "$FLAG_TENSORBOARD" = true ]; then
-        profiles="$profiles --profile training"
-    fi
-
-    # Check Xtion connection
-    local xtion_connected=false
-    if check_xtion; then
-        xtion_connected=true
-        success "Xtion camera: detected"
-    else
-        echo ""
-        warn "Xtion camera not detected"
-        echo ""
-        echo "   To use camera features:"
-        echo "   1. Connect Xtion camera to this machine via USB"
-        echo "   2. Run the following in another terminal:"
-        echo ""
-        echo "      cd $PROJECT_ROOT"
-        echo "      docker compose run --rm hsr-perception ros2-camera"
-        echo ""
-    fi
-
-    # Detach flag
-    if [ "$FLAG_DETACH" = true ]; then
-        detach_flag="-d"
-    fi
-
-    # Startup message
-    echo ""
+    echo
     echo "========================================"
     echo "  Starting services"
     echo "========================================"
-    echo ""
-    echo "  Web app:      http://localhost:8501"
-    if [ "$FLAG_TENSORBOARD" = true ]; then
-        echo "  TensorBoard:  http://localhost:6006"
-    fi
-    if [ "$xtion_connected" = true ]; then
-        echo "  ROS2 camera:  starting"
-    fi
-    echo ""
+    echo "  Web UI:      http://localhost:8501"
+    [ "$FLAG_TENSORBOARD" = true ] && echo "  TensorBoard: http://localhost:6006"
+    echo
 
-    if [ "$FLAG_DETACH" != true ]; then
-        echo "  Press Ctrl+C to stop"
-        echo ""
-    fi
-
-    # Start Docker Compose
     cd "$PROJECT_ROOT"
-
-    # Start camera in background if Xtion is connected
-    if [ "$xtion_connected" = true ]; then
-        info "Starting ROS2 camera node in background..."
-        docker compose run -d --rm hsr-perception ros2-camera
-    fi
-
-    # Start web app
     docker compose $profiles up $detach_flag
 }
 
-# -----------------------------------------------------------------------------
-# Cleanup on exit
-# -----------------------------------------------------------------------------
 cleanup() {
-    echo ""
-    info "Shutting down..."
-
-    # Stop all containers
-    cd "$PROJECT_ROOT"
-    docker compose down
-
-    # Revoke X11 access
-    if command -v xhost &>/dev/null; then
-        xhost -local:docker &>/dev/null || true
-    fi
-
+    echo; info "Shutting down..."
+    cd "$PROJECT_ROOT" && docker compose down
     info "Shutdown complete"
     exit 0
 }
 
-# Handle Ctrl+C
 trap cleanup SIGINT SIGTERM
 
-# -----------------------------------------------------------------------------
-# Main
-# -----------------------------------------------------------------------------
+run_subcommand() {
+    info "Running '${SUBCOMMAND}' inside the container..."
+    cd "$PROJECT_ROOT"
+    if [ "$SUBCOMMAND" = "xtion-live" ]; then
+        # X11 forwarding: let the container connect to the host display.
+        if command -v xhost &>/dev/null; then
+            xhost +local:docker >/dev/null 2>&1 || true
+        else
+            warn "xhost not found — the GUI may fail to open. Install x11-xserver-utils on the host."
+        fi
+        exec docker compose --profile xtion run --rm xtion-live xtion-live "${SUBCOMMAND_ARGS[@]}"
+    fi
+    exec docker compose run --rm app "$SUBCOMMAND" "${SUBCOMMAND_ARGS[@]}"
+}
+
+build_xtion_image_if_needed() {
+    if [ "$FLAG_BUILD" = true ] || ! docker image inspect hsr-perception-xtion:latest &>/dev/null; then
+        info "Building xtion-live image (ROS2 Humble + PyQt6, this takes a while)..."
+        cd "$PROJECT_ROOT" && docker compose --profile xtion build xtion-live
+        success "xtion-live image ready"
+    else
+        success "xtion-live image: already built"
+    fi
+}
+
 main() {
     parse_args "$@"
-
-    # Show help
-    if [ "$FLAG_HELP" = true ]; then
-        show_help
-        exit 0
-    fi
-
-    # Display banner
-    echo ""
-    echo "========================================"
-    echo "  HSR Perception Docker Startup Script"
-    echo "========================================"
-    echo ""
-
-    # Change to project directory
-    cd "$PROJECT_ROOT"
-
-    # Run setup steps
     check_dependencies
-    echo ""
-    setup_xtion_udev
-    echo ""
     build_image
-    echo ""
-    setup_x11
-    echo ""
+    if [ -n "$SUBCOMMAND" ]; then
+        if [ "$SUBCOMMAND" = "xtion-live" ]; then
+            build_xtion_image_if_needed
+        fi
+        run_subcommand
+    fi
     start_services
 }
 

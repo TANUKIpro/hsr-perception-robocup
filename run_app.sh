@@ -1,26 +1,17 @@
 #!/bin/bash
-# Launch HSR Object Manager
+# Launch the HSR Perception Streamlit UI locally.
 
-# Get script directory
+set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PYBULLET_HSR_ROOT="${PYBULLET_HSR_ROOT:-/home/roboworks/repos/pybullet_hsr}"
+export PYTHONPATH="$SCRIPT_DIR:$SCRIPT_DIR/scripts:$PYTHONPATH"
 
-# Configure FastDDS to use UDP only (disable Shared Memory)
-# This fixes race conditions when Streamlit starts before ROS2 camera nodes
-export FASTRTPS_DEFAULT_PROFILES_FILE="$SCRIPT_DIR/config/fastdds_profile.xml"
-export ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-
-# Check if streamlit is installed
 if ! command -v streamlit &> /dev/null; then
-    echo "Streamlit not found. Installing..."
-    pip install streamlit Pillow
+    echo "Streamlit not found. Install with: pip install -r requirements.txt"
+    exit 1
 fi
 
-# Run the app
-echo "Starting HSR Object Manager..."
-echo "FastDDS Profile: $FASTRTPS_DEFAULT_PROFILES_FILE"
-echo "ROS_DOMAIN_ID: $ROS_DOMAIN_ID"
-echo "Open http://localhost:8501 in your browser"
-echo ""
-
+echo "PYBULLET_HSR_ROOT=$PYBULLET_HSR_ROOT"
+echo "Starting HSR Perception — http://localhost:8501"
 cd "$SCRIPT_DIR"
-streamlit run app/main.py --server.headless true
+exec streamlit run app/main.py --server.headless true

@@ -1,67 +1,34 @@
 # HSR Perception Pipeline - Python Dependencies
-# For RoboCup@Home Competition Day Workflow
+# Training + evaluation over YOLO datasets produced by pybullet_hsr.
 
-# =============================================================================
-# Core ML/Computer Vision
-# =============================================================================
-ultralytics>=8.3.0              # YOLOv8 object detection
-torch>=2.1.0                    # PyTorch (install CUDA version for GPU support)
-torchvision>=0.16.0             # PyTorch vision utilities
-opencv-python>=4.8.0            # OpenCV for image processing
-numpy>=1.24.0                   # Numerical computing
-pillow>=10.0.0                  # Image loading
+# Core ML / CV
+# torch / torchvision are installed separately in the Dockerfile from the
+# CUDA 12.1 wheel index. Do NOT list them here — pip would re-resolve
+# against the default PyPI index and overwrite the cu121 build with a
+# newer CUDA wheel incompatible with the host driver.
+ultralytics>=8.3.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+pillow>=10.0.0
 
-# =============================================================================
-# SAM2 (Segment Anything 2) - For fallback annotation
-# =============================================================================
-# Install separately:
-# pip install git+https://github.com/facebookresearch/segment-anything-2.git
-
-# =============================================================================
 # Utilities
-# =============================================================================
-pyyaml>=6.0                     # YAML configuration files
-tqdm>=4.66.0                    # Progress bars
-colorama>=0.4.6                 # Colored terminal output
-tabulate>=0.9.0                 # Table formatting for reports
+pyyaml>=6.0
+tqdm>=4.66.0
+colorama>=0.4.6
+tabulate>=0.9.0
+pandas>=2.0.0
 
-# =============================================================================
 # Visualization
-# =============================================================================
-matplotlib>=3.7.0               # Plotting and visualization
-tensorboard>=2.14.0             # Training progress visualization
-
-# =============================================================================
-# Web Application (Streamlit UI)
-# =============================================================================
-streamlit>=1.37.0               # Web application framework (fragment support)
-streamlit-paste-button>=0.1.0   # Clipboard paste support for images
-
-# =============================================================================
-# Desktop GUI (PyQt6)
-# =============================================================================
-PyQt6>=6.6.0                    # Desktop GUI framework for capture/annotation apps
-
-# =============================================================================
-# Development & Testing
-# =============================================================================
-pytest>=7.4.0                   # Testing framework
-pytest-cov>=4.1.0               # Test coverage
-black>=23.0.0                   # Code formatting
-isort>=5.12.0                   # Import sorting
-mypy>=1.5.0                     # Type checking
-
-# =============================================================================
-# System Dependencies (Install via apt, not pip)
-# =============================================================================
-# Note: PyQt6 is now used for desktop GUI applications (installed via pip above)
-# Legacy tkinter dependency (no longer required):
-# sudo apt install python3-tk
-#
-# ROS2 packages:
-# sudo apt install ros-humble-cv-bridge
-# sudo apt install ros-humble-vision-msgs
-# sudo apt install ros-humble-sensor-msgs
-# sudo apt install ros-humble-std-srvs
-# sudo apt install ros-humble-image-transport
+matplotlib>=3.7.0
+tensorboard>=2.14.0
 plotly>=5.0.0
+
+# Web UI
+streamlit>=1.37.0
+
+# Development & Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+black>=23.0.0
+isort>=5.12.0
+mypy>=1.5.0

@@ -3,7 +3,7 @@
 # Copy this file to /etc/udev/rules.d/ on the host system
 #
 # Installation:
-#   sudo cp 99-xtion.rules /etc/udev/rules.d/
+#   sudo cp docker/99-xtion.rules /etc/udev/rules.d/
 #   sudo udevadm control --reload-rules
 #   sudo udevadm trigger
 #

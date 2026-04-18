@@ -39,8 +39,6 @@ def mock_heavy_dependencies():
         'training.swa_trainer',
         'training.llrd_trainer',
         'training.memory_utils',
-        'augmentation',
-        'augmentation.copy_paste_augmentor',
     ]
 
     for mod in modules_to_mock:
@@ -55,52 +53,6 @@ def mock_heavy_dependencies():
         yield
 
     # Note: patch.dict automatically restores original values
-
-
-class TestSyntheticConfigKeys:
-    """Test SYNTHETIC_CONFIG_KEYS constant."""
-
-    def test_contains_expected_keys(self):
-        """Test that SYNTHETIC_CONFIG_KEYS contains expected keys."""
-        from training.quick_finetune import SYNTHETIC_CONFIG_KEYS
-
-        expected_keys = [
-            # Synthetic generation parameters
-            "dynamic_synthetic_enabled",
-            "backgrounds_dir",
-            "annotated_dir",
-            "synthetic_ratio",
-            "synthetic_scale_range",
-            "synthetic_rotation_range",
-            "synthetic_white_balance",
-            "synthetic_white_balance_strength",
-            "synthetic_edge_blur",
-            "synthetic_max_objects",
-            "synthetic_num_workers",
-            # LLRD parameters
-            "llrd_enabled",
-            "llrd_decay_rate",
-            # SWA parameters
-            "swa_enabled",
-            "swa_start_epoch",
-            "swa_lr",
-        ]
-
-        for key in expected_keys:
-            assert key in SYNTHETIC_CONFIG_KEYS, f"Key {key} not found"
-
-    def test_keys_are_strings(self):
-        """Test that all keys are strings."""
-        from training.quick_finetune import SYNTHETIC_CONFIG_KEYS
-
-        for key in SYNTHETIC_CONFIG_KEYS:
-            assert isinstance(key, str), f"Key {key} is not a string"
-
-    def test_is_set(self):
-        """Test that SYNTHETIC_CONFIG_KEYS is a set."""
-        from training.quick_finetune import SYNTHETIC_CONFIG_KEYS
-
-        assert isinstance(SYNTHETIC_CONFIG_KEYS, set)
 
 
 class TestCompetitionConfig:
@@ -148,13 +100,6 @@ class TestCompetitionConfig:
         assert "llrd_decay_rate" in COMPETITION_CONFIG
         # LLRD disabled by default
         assert COMPETITION_CONFIG["llrd_enabled"] is False
-
-    def test_contains_synthetic_settings(self):
-        """Test that COMPETITION_CONFIG contains synthetic settings."""
-        from training.quick_finetune import COMPETITION_CONFIG
-
-        assert "dynamic_synthetic_enabled" in COMPETITION_CONFIG
-        assert "synthetic_ratio" in COMPETITION_CONFIG
 
 
 class TestFastConfig:
@@ -574,48 +519,6 @@ class TestValidateDataset:
         assert "Val path not found" in captured.out
 
 
-class TestSyntheticConfigFiltering:
-    """Test synthetic config key filtering."""
-
-    def test_filter_synthetic_keys_from_config(self):
-        """Test that synthetic keys are filtered from YOLO config."""
-        from training.quick_finetune import SYNTHETIC_CONFIG_KEYS, COMPETITION_CONFIG
-
-        # Simulate filtering as done in the train method
-        yolo_config = {
-            k: v for k, v in COMPETITION_CONFIG.items()
-            if k not in SYNTHETIC_CONFIG_KEYS
-        }
-
-        # Check that synthetic keys are removed
-        for key in SYNTHETIC_CONFIG_KEYS:
-            assert key not in yolo_config
-
-        # Check that non-synthetic keys remain
-        assert "model" in yolo_config
-        assert "epochs" in yolo_config
-        assert "batch" in yolo_config
-
-    def test_yolo_compatible_config_only(self):
-        """Test that only YOLO-compatible config remains after filtering."""
-        from training.quick_finetune import SYNTHETIC_CONFIG_KEYS, COMPETITION_CONFIG
-
-        # Filter out synthetic keys
-        yolo_config = {
-            k: v for k, v in COMPETITION_CONFIG.items()
-            if k not in SYNTHETIC_CONFIG_KEYS
-        }
-
-        # These are standard YOLO config keys that should remain
-        expected_yolo_keys = [
-            "model", "imgsz", "epochs", "batch", "patience",
-            "optimizer", "lr0", "lrf", "momentum", "weight_decay",
-            "warmup_epochs", "freeze", "augment", "mosaic", "mixup",
-            "workers", "cache", "amp", "save",
-        ]
-
-        for key in expected_yolo_keys:
-            assert key in yolo_config, f"Expected YOLO key {key} missing"
 
 
 class TestArgumentParsing:
@@ -746,27 +649,6 @@ class TestArgumentParsing:
 
         args = parser.parse_args(["--dataset", "data.yaml", "--export", "onnx"])
         assert args.export == "onnx"
-
-    def test_dynamic_synthetic_flags(self):
-        """Test dynamic synthetic image flags."""
-        parser = argparse.ArgumentParser()
-        parser.add_argument("--dataset", "-d", required=True)
-        parser.add_argument("--dynamic-synthetic", action="store_true")
-        parser.add_argument("--no-dynamic-synthetic", action="store_true")
-        parser.add_argument("--backgrounds-dir", type=str)
-        parser.add_argument("--annotated-dir", type=str)
-        parser.add_argument("--synthetic-ratio", type=float, default=2.0)
-
-        args = parser.parse_args([
-            "--dataset", "data.yaml",
-            "--backgrounds-dir", "/path/to/bg",
-            "--annotated-dir", "/path/to/annotated",
-            "--synthetic-ratio", "1.5"
-        ])
-
-        assert args.backgrounds_dir == "/path/to/bg"
-        assert args.annotated_dir == "/path/to/annotated"
-        assert args.synthetic_ratio == 1.5
 
 
 class TestRunNameGeneration:

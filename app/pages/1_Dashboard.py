@@ -1,177 +1,177 @@
-"""
-Dashboard Page
+"""Dashboard page.
 
-Main dashboard with profile management, collection statistics,
-and training readiness overview.
+Shows the status of the train + evaluate pipeline: dataset presence,
+trained model count, and any active task. No collection / registry UI.
 """
 
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Dict, List
 
 import streamlit as st
 
-# Add app directory to path
 app_dir = Path(__file__).parent.parent
+project_root = app_dir.parent
 if str(app_dir) not in sys.path:
     sys.path.insert(0, str(app_dir))
+if str(project_root / "scripts" / "data") not in sys.path:
+    sys.path.insert(0, str(project_root / "scripts" / "data"))
 
 from components.common_sidebar import render_common_sidebar
-from object_registry import RegisteredObject
+from services.path_coordinator import (
+    DATASETS_DIR,
+    FINETUNED_DIR,
+    PYBULLET_HSR_ANNOTATION_ROOT,
+)
 
 
 def show_dashboard_page() -> None:
-    """Render the dashboard page with overview statistics."""
-    # Render common sidebar
     render_common_sidebar()
 
     st.title("📊 Dashboard")
 
-    registry = st.session_state.registry
-
-    # Update collection counts from filesystem before displaying stats
-    registry.update_all_collection_counts()
-
-    stats = registry.get_collection_stats()
-    objects = registry.get_all_objects()
-
-    # Overall progress
-    _render_overall_stats(stats)
-
-    st.markdown("---")
-
-    # Pipeline status
-    _render_pipeline_status()
-
-    st.markdown("---")
-
-    # Progress by category
-    _render_category_progress(stats)
-
-    st.markdown("---")
-
-    # Per-object progress
-    _render_object_progress(objects)
-
-    # Training readiness check
-    st.markdown("---")
-    _render_training_readiness(objects)
-
-
-def _render_overall_stats(stats: dict[str, Any]) -> None:
-    """Render overall statistics metrics."""
-    col1, col2, col3, col4 = st.columns(4)
-
-    with col1:
-        st.metric("Total Objects", stats["total_objects"])
-    with col2:
-        st.metric("Images Collected", stats["total_collected"])
-    with col3:
-        st.metric("Target Total", stats["total_target"])
-    with col4:
-        ready_pct = (stats["ready_objects"] / stats["total_objects"] * 100) if stats["total_objects"] > 0 else 0
-        st.metric("Ready for Training", f"{stats['ready_objects']}/{stats['total_objects']}", f"{ready_pct:.0f}%")
-
-
-def _render_pipeline_status() -> None:
-    """Render pipeline status section."""
-    st.subheader("Pipeline Status")
-
+    coordinator = st.session_state.path_coordinator
     task_manager = st.session_state.task_manager
-    path_coordinator = st.session_state.path_coordinator
 
-    col1, col2, col3 = st.columns(3)
+    datasets = coordinator.get_datasets()
+    trained = coordinator.get_trained_models()
+    active_tasks = task_manager.get_active_tasks()
 
-    with col1:
-        # Annotation status
-        annotation_sessions = path_coordinator.get_annotation_sessions()
-        ready_datasets = [s for s in annotation_sessions if s["has_data_yaml"]]
-        st.metric("Annotated Datasets", len(ready_datasets))
-
-    with col2:
-        # Training status
-        trained_models = path_coordinator.get_trained_models()
-        st.metric("Trained Models", len(trained_models))
-
-    with col3:
-        # Active tasks
-        active_tasks = task_manager.get_active_tasks()
-        st.metric("Active Tasks", len(active_tasks))
+    _render_counts(datasets, trained, active_tasks)
+    st.markdown("---")
+    _render_sync_state(coordinator)
+    st.markdown("---")
+    _render_pybullet_status()
+    st.markdown("---")
+    _render_datasets(datasets)
+    st.markdown("---")
+    _render_trained(trained)
 
 
-def _render_category_progress(stats: dict[str, Any]) -> None:
-    """Render progress by category."""
-    st.subheader("Progress by Category")
+def _render_sync_state(coordinator) -> None:
+    st.subheader("Dataset sync")
+    state = coordinator.get_latest_sync_state()
+    if state["state"] == "no_dumps":
+        st.info("No pybullet_hsr dump found. Generate one under "
+                f"`{PYBULLET_HSR_ANNOTATION_ROOT}` first.")
+        return
 
-    if stats["by_category"]:
-        cols = st.columns(len(stats["by_category"]))
-        for i, (cat, cat_stats) in enumerate(stats["by_category"].items()):
-            with cols[i]:
-                pct = (cat_stats["collected"] / cat_stats["target"] * 100) if cat_stats["target"] > 0 else 0
-                st.metric(cat, f"{cat_stats['collected']}/{cat_stats['target']}")
-                st.progress(min(pct / 100, 1.0))
+    dump = state["dump"]
+    dump_name = dump["path"].name
+    dataset_name = state["local_dataset_name"]
 
+    if state["state"] == "up_to_date":
+        st.success(
+            f"`datasets/{dataset_name}` is in sync with the newest dump `{dump_name}`."
+        )
+        return
 
-def _render_object_progress(objects: list[RegisteredObject]) -> None:
-    """Render per-object progress section."""
-    st.subheader("Collection Progress by Object")
-
-    if objects:
-        for obj in objects:
-            col1, col2, col3 = st.columns([3, 1, 1])
-
-            with col1:
-                pct = (obj.collected_samples / obj.target_samples) if obj.target_samples > 0 else 0
-                if pct >= 1.0:
-                    status = "🟢"
-                elif pct >= 0.5:
-                    status = "🟡"
-                else:
-                    status = "🔴"
-
-                st.write(f"{status} **{obj.display_name}** ({obj.category})")
-                st.progress(min(pct, 1.0))
-
-            with col2:
-                st.write(f"{obj.collected_samples}/{obj.target_samples}")
-
-            with col3:
-                badges = []
-                if obj.properties.is_heavy:
-                    badges.append("Heavy")
-                if obj.properties.is_tiny:
-                    badges.append("Tiny")
-                if obj.properties.has_liquid:
-                    badges.append("Liquid")
-                st.write(", ".join(badges) if badges else "-")
+    if state["state"] == "no_local":
+        st.warning(
+            f"Newest dump `{dump_name}` has not been prepared yet "
+            f"(`datasets/{dataset_name}/` missing)."
+        )
     else:
-        st.info("No objects registered yet. Go to Registry to add objects.")
+        st.warning(
+            f"`datasets/{dataset_name}` is stale vs newest dump `{dump_name}` "
+            f"— {state['reason']}."
+        )
+
+    if st.button("🔄 Sync latest dump now", type="primary"):
+        _run_sync(dump["path"])
 
 
-def _render_training_readiness(objects: list[RegisteredObject]) -> None:
-    """Render training readiness section."""
-    st.subheader("Training Readiness")
-
-    registry = st.session_state.registry
-
-    ready_count = sum(1 for obj in objects if obj.collected_samples >= 50)
-    total_count = len(objects)
-
-    if total_count == 0:
-        st.warning("No objects registered.")
-    elif ready_count == total_count:
-        st.success(f"All {total_count} objects have sufficient data for training!")
-        if st.button("Export to YOLO Config"):
-            output_path = registry.export_to_yolo_config("config/object_classes.json")
-            st.success(f"Exported to {output_path}")
+def _run_sync(dump_path) -> None:
+    from prepare_dataset import ensure_dataset
+    with st.spinner(f"Preparing {dump_path.name}…"):
+        try:
+            result = ensure_dataset(source=dump_path, symlink=True)
+        except SystemExit as exc:
+            st.error(f"prepare failed: {exc}")
+            return
+        except Exception as exc:  # pragma: no cover - UI safety net
+            st.error(f"prepare failed: {exc}")
+            return
+    counts = result.get("counts", {})
+    if result["action"] == "up-to-date":
+        st.info("Already up-to-date.")
     else:
-        st.warning(f"{total_count - ready_count} objects need more data (minimum 50 images each)")
+        st.success(
+            f"Prepared `datasets/{result['dataset_name']}` "
+            f"(train={counts.get('train', 0)}, val={counts.get('val', 0)})."
+        )
+    st.cache_data.clear()
+    st.rerun()
 
-        need_data = [obj for obj in objects if obj.collected_samples < 50]
-        for obj in need_data[:5]:
-            st.write(f"  • {obj.display_name}: {obj.collected_samples}/50 minimum")
+
+def _render_counts(datasets: List[Dict], trained: List[Dict], active: List) -> None:
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Datasets", len(datasets))
+    c2.metric("Trained models", len(trained))
+    c3.metric("Active tasks", len(active))
 
 
-# For Streamlit native multipage
+def _render_pybullet_status() -> None:
+    st.subheader("pybullet_hsr dumps")
+    if not PYBULLET_HSR_ANNOTATION_ROOT.is_dir():
+        st.warning(
+            f"`{PYBULLET_HSR_ANNOTATION_ROOT}` not found. "
+            "Set `PYBULLET_HSR_ROOT` to point at the pybullet_hsr clone."
+        )
+        return
+
+    coordinator = st.session_state.path_coordinator
+    dumps = coordinator.get_available_pybullet_hsr_dumps()
+    if not dumps:
+        st.warning(
+            f"No manifest-bearing dumps under `{PYBULLET_HSR_ANNOTATION_ROOT}`. "
+            "Run `pybullet_hsr/scripts/write_manifest.py --dump-dir <dir>` on each dump."
+        )
+        return
+
+    rows = []
+    for d in dumps:
+        m = d["manifest"]
+        rows.append({
+            "Dump": d["path"].name,
+            "Dataset": m.get("dataset_name", "?"),
+            "Created": m.get("created_at", "")[:19],
+            "Format": m.get("label_format", "?"),
+            "Classes": len(m.get("classes", [])),
+            "Images": m.get("stats", {}).get("num_images", "?"),
+        })
+    try:
+        import pandas as pd
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    except ImportError:
+        for row in rows:
+            st.write(
+                f"- `{row['Dump']}` — {row['Dataset']} "
+                f"({row['Classes']} cls, {row['Images']} imgs, {row['Format']})"
+            )
+
+
+def _render_datasets(datasets: List[Dict]) -> None:
+    st.subheader("Local datasets")
+    if not datasets:
+        st.info(
+            "No dataset found under "
+            f"`{DATASETS_DIR}`. Run `scripts/data/prepare_dataset.py` or use the Training page."
+        )
+        return
+    for d in datasets[:10]:
+        st.write(f"- `{d['name']}` ({d['created']})")
+
+
+def _render_trained(trained: List[Dict]) -> None:
+    st.subheader("Trained models")
+    if not trained:
+        st.info(f"No trained models in `{FINETUNED_DIR}`.")
+        return
+    for m in trained[:10]:
+        best = m.get("best_path") or m.get("last_path") or "-"
+        st.write(f"- `{m['name']}` ({m['created']}) → {best}")
+
+
 if __name__ == "__main__":
     show_dashboard_page()
