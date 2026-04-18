@@ -28,6 +28,7 @@ prepare-dataset → train → evaluate
 | prepare-dataset | `scripts/data/prepare_dataset.py` | pybullet_hsr の出力を train/val に分割し `data.yaml` を生成 |
 | train | `scripts/training/quick_finetune.py` | YOLOv8 fine-tuning（GPU 自動スケーリング / LLRD / SWA / TensorBoard 対応） |
 | evaluate | `scripts/evaluation/evaluate_model.py` | mAP・推論速度の検証 |
+| xtion-live (任意) | `scripts/evaluation/xtion_live_infer.py` | 学習済み `.pt` を ROS2 画像トピック（Xtion）にかけてライブで閲覧する PyQt6 ビューア |
 
 ### 前提条件（Docker 実行）
 
@@ -106,6 +107,64 @@ UI は起動時に `annotation_data/*/manifest.json` を自動 glob し、Dashbo
 UI のページ構成：Dashboard（状態サマリ） / Training（準備・学習） / Evaluation（mAP 評価） /
 Settings（環境変数とパス）。
 
+### Xtion ライブ推論（学習後の実機検証）
+
+学習済みモデル（`.pt`）を、ROS2 経由で Xtion PRO LIVE の画像トピックに
+適用し、検出結果を重ねた映像を PyQt6 ウィンドウでライブ閲覧できます。
+トピック選択 / 信頼度スライダ / FPS・検出リスト表示付き。
+
+この機能は重い依存（ROS2 Humble + OpenNI2 + PyQt6）を持つため、学習用
+イメージ `hsr-perception:latest` を汚さず、**`xtion` compose profile**
+と派生イメージ `hsr-perception-xtion:latest` に隔離しています。
+
+#### ホスト初回セットアップ（1 回だけ）
+
+```bash
+# Xtion PRO LIVE を video グループで触れるようにする udev ルール
+sudo cp docker/99-xtion.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules && sudo udevadm trigger
+sudo usermod -aG video $USER          # 反映には再ログインが必要
+
+# X11 フォワーディング用（xhost は start.sh が自動で叩く）
+sudo apt-get install -y x11-xserver-utils
+```
+
+#### 起動手順
+
+1. ホスト側で Xtion の ROS2 パブリッシャを起動（HSR 実機では常時 publish）:
+
+   ```bash
+   ros2 launch openni2_camera camera.launch.py
+   ```
+
+2. 別シェルで本リポジトリの `start.sh` を叩く（初回は xtion イメージを自動ビルド）:
+
+   ```bash
+   ./start.sh xtion-live -- \
+       --model models/finetuned/<run>/weights/best.pt \
+       --conf 0.25
+   ```
+
+   GUI が立ち上がったら、**Refresh** → トピック（例 `/camera/rgb/image_raw`）
+   を選択 → **Subscribe** で購読を開始。信頼度はスライダで調整できます。
+
+`./start.sh xtion-live` の中身：
+
+- 学習用の `hsr-perception:latest` と別に `hsr-perception-xtion:latest` を必要時のみビルド
+- `xhost +local:docker` で X11 を開放
+- `docker compose --profile xtion run --rm xtion-live xtion-live -- …` を実行
+  （`network_mode: host`、USB passthrough、GPU、X11 ソケットマウント付き）
+
+#### ホスト直接実行（Docker を使わない場合）
+
+ホストに ROS2 Humble + PyQt6 + ultralytics が入っていれば、そのまま実行可能:
+
+```bash
+source /opt/ros/humble/setup.bash
+python scripts/evaluation/xtion_live_infer.py \
+    --model models/finetuned/<run>/weights/best.pt --conf 0.25
+```
+
 ### ディレクトリ構成
 
 ```
@@ -114,9 +173,9 @@ hsr-perception-robocup/
 ├── scripts/
 │   ├── data/               # pybullet_hsr dump → YOLO dataset 変換
 │   ├── training/           # YOLOv8 fine-tuning
-│   ├── evaluation/         # 評価ツール
+│   ├── evaluation/         # 評価ツール（mAP 評価 + Xtion ライブ推論ビューア）
 │   └── common/             # 共通ユーティリティ
-├── docker/                 # Dockerfile + entrypoint
+├── docker/                 # Dockerfile + entrypoint + Dockerfile.xtion + 99-xtion.rules
 ├── config/                 # 設定ファイル（現在ほぼ空）
 ├── models/finetuned/       # 学習結果
 ├── datasets/               # 準備済み YOLO データセット
@@ -129,6 +188,8 @@ hsr-perception-robocup/
 | 変数 | 既定値 | 用途 |
 |------|--------|------|
 | `PYBULLET_HSR_ROOT` | `/home/roboworks/repos/pybullet_hsr` (ホスト) / `/pybullet_hsr` (Docker) | pybullet_hsr クローンへのパス |
+| `ROS_DOMAIN_ID` | `0` | `xtion-live` サービスが Xtion パブリッシャを発見するための ROS2 DDS ドメイン |
+| `DISPLAY` / `XAUTHORITY` | ホストから継承 | `xtion-live` サービスがホストの X サーバに PyQt6 ウィンドウを出すために必要 |
 
 ### テスト
 
@@ -165,6 +226,7 @@ prepare-dataset → train → evaluate
 | prepare-dataset | `scripts/data/prepare_dataset.py` | Split the pybullet_hsr dump into train/val + emit `data.yaml` |
 | train | `scripts/training/quick_finetune.py` | YOLOv8 fine-tuning (GPU auto-scaling, LLRD, SWA, TensorBoard) |
 | evaluate | `scripts/evaluation/evaluate_model.py` | mAP + inference-time check |
+| xtion-live (optional) | `scripts/evaluation/xtion_live_infer.py` | PyQt6 viewer that runs the trained `.pt` on a ROS2 image topic (Xtion) live |
 
 ### Quick start
 
@@ -209,11 +271,49 @@ against the newest dump and exit early when the local dataset is still
 in sync, so you can wire these into any training workflow without
 re-doing the split every time. Pass `--force` to rebuild.
 
+### Xtion live inference
+
+Once a model is trained, visualise it on a real Xtion PRO LIVE stream.
+`scripts/evaluation/xtion_live_infer.py` subscribes to a ROS2
+`sensor_msgs/Image` topic, runs the `.pt` weights on every frame, and
+renders the annotated video in a PyQt6 window (topic selector,
+confidence slider, FPS counter, per-detection list).
+
+Because the dependencies are heavy (ROS2 Humble + OpenNI2 + PyQt6), they
+live in a separate overlay image `hsr-perception-xtion:latest` behind
+the `xtion` compose profile — the default training image stays slim.
+
+```bash
+# One-time host setup
+sudo cp docker/99-xtion.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules && sudo udevadm trigger
+sudo usermod -aG video $USER         # logout/login to take effect
+sudo apt-get install -y x11-xserver-utils
+
+# Start the Xtion publisher (or HSR's camera stack) first, then:
+./start.sh xtion-live -- \
+    --model models/finetuned/<run>/weights/best.pt --conf 0.25
+```
+
+`start.sh xtion-live` auto-builds the overlay image on first run,
+invokes `xhost +local:docker`, and launches the container with
+`network_mode: host`, USB passthrough, GPU, and X11 mounted.
+
+Host path (no Docker) — if ROS2 Humble + PyQt6 are already installed:
+
+```bash
+source /opt/ros/humble/setup.bash
+python scripts/evaluation/xtion_live_infer.py \
+    --model models/finetuned/<run>/weights/best.pt --conf 0.25
+```
+
 ### Environment variables
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `PYBULLET_HSR_ROOT` | `/home/roboworks/repos/pybullet_hsr` (host) / `/pybullet_hsr` (Docker) | Path to pybullet_hsr clone (mounted read-only into the container) |
+| `ROS_DOMAIN_ID` | `0` | ROS2 DDS domain used by the `xtion-live` service to discover the Xtion publisher |
+| `DISPLAY` / `XAUTHORITY` | inherited | Needed by the `xtion-live` service to open the PyQt6 window on the host X server |
 
 ### References
 

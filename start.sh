@@ -35,6 +35,7 @@ Usage:
   ./start.sh [options]                  # Launch the Streamlit UI
   ./start.sh sync [-- args...]          # Prepare the newest pybullet_hsr dump
   ./start.sh train-latest [-- args...]  # Sync newest dump + run training
+  ./start.sh xtion-live [-- args...]    # Live YOLO inference over ROS2 image topic
 
 Options:
   --build         Force rebuild of the Docker image
@@ -48,6 +49,11 @@ Subcommands (pass extra args after --; they are forwarded to the container):
                   newest manifest-bearing dump; pass --force to rebuild.
   train-latest    docker compose run --rm app train-latest [args...]
                   e.g. ./start.sh train-latest -- --fast --epochs 1
+  xtion-live      docker compose --profile xtion run --rm xtion-live [args...]
+                  e.g. ./start.sh xtion-live -- \\
+                        --model models/finetuned/<run>/weights/best.pt
+                  Needs ROS2 publisher + X11 on host and a built
+                  hsr-perception-xtion image.
 
 The script mounts PYBULLET_HSR_ROOT (default: /home/roboworks/repos/pybullet_hsr)
 into the container read-only at /pybullet_hsr so the app can read the source
@@ -62,7 +68,7 @@ parse_args() {
             --tensorboard)  FLAG_TENSORBOARD=true; shift ;;
             --detach|-d)    FLAG_DETACH=true; shift ;;
             --help|-h)      show_help; exit 0 ;;
-            sync|train-latest)
+            sync|train-latest|xtion-live)
                 SUBCOMMAND="$1"; shift
                 if [[ "${1:-}" == "--" ]]; then shift; fi
                 SUBCOMMAND_ARGS=("$@")
@@ -132,7 +138,26 @@ trap cleanup SIGINT SIGTERM
 run_subcommand() {
     info "Running '${SUBCOMMAND}' inside the container..."
     cd "$PROJECT_ROOT"
+    if [ "$SUBCOMMAND" = "xtion-live" ]; then
+        # X11 forwarding: let the container connect to the host display.
+        if command -v xhost &>/dev/null; then
+            xhost +local:docker >/dev/null 2>&1 || true
+        else
+            warn "xhost not found — the GUI may fail to open. Install x11-xserver-utils on the host."
+        fi
+        exec docker compose --profile xtion run --rm xtion-live xtion-live "${SUBCOMMAND_ARGS[@]}"
+    fi
     exec docker compose run --rm app "$SUBCOMMAND" "${SUBCOMMAND_ARGS[@]}"
+}
+
+build_xtion_image_if_needed() {
+    if [ "$FLAG_BUILD" = true ] || ! docker image inspect hsr-perception-xtion:latest &>/dev/null; then
+        info "Building xtion-live image (ROS2 Humble + PyQt6, this takes a while)..."
+        cd "$PROJECT_ROOT" && docker compose --profile xtion build xtion-live
+        success "xtion-live image ready"
+    else
+        success "xtion-live image: already built"
+    fi
 }
 
 main() {
@@ -140,6 +165,9 @@ main() {
     check_dependencies
     build_image
     if [ -n "$SUBCOMMAND" ]; then
+        if [ "$SUBCOMMAND" = "xtion-live" ]; then
+            build_xtion_image_if_needed
+        fi
         run_subcommand
     fi
     start_services

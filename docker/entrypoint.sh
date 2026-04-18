@@ -109,6 +109,19 @@ PY
         exec python3 /workspace/scripts/evaluation/visual_verification.py "$@"
         ;;
 
+    xtion-live)
+        shift
+        print_info
+        if [ -f /opt/ros/humble/setup.bash ]; then
+            # shellcheck disable=SC1091
+            source /opt/ros/humble/setup.bash
+        else
+            echo "[xtion-live] /opt/ros/humble/setup.bash not found."
+            echo "[xtion-live] Use the xtion Docker profile or install ROS2 Humble on the host."
+        fi
+        exec python3 /workspace/scripts/evaluation/xtion_live_infer.py "$@"
+        ;;
+
     test)
         shift
         print_info
@@ -154,6 +167,9 @@ Commands:
                     args (e.g. --fast --epochs 1) are forwarded to quick_finetune.
   evaluate          Run model evaluation
   verify            Run visual verification
+  xtion-live        Live YOLO inference viewer over a ROS2 image topic
+                    (Xtion PRO LIVE). Requires the 'xtion' compose profile
+                    image (docker compose --profile xtion build xtion-live).
   test              Run pytest tests
   tensorboard       Start TensorBoard server
   bash              Start interactive shell

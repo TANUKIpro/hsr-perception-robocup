@@ -107,8 +107,44 @@ dump" primary button.
 | `scripts/data/sync_latest.py` | Thin wrapper that preps the newest dump (no-op if fresh) |
 | `scripts/training/quick_finetune.py` | YOLOv8 fine-tuning entrypoint |
 | `scripts/evaluation/evaluate_model.py` | mAP / inference-time evaluator |
+| `scripts/evaluation/xtion_live_infer.py` | PyQt6 live viewer: YOLO over ROS2 image topic (Xtion) |
 | `app/main.py` + `app/pages/` | Streamlit UI (Dashboard, Training, Evaluation, Settings) |
 | `docker/Dockerfile`, `docker-compose.yml` | Container build + runtime wiring |
+| `docker/Dockerfile.xtion`, `docker/99-xtion.rules` | ROS2 + PyQt6 overlay + Xtion udev rules |
+
+## Xtion live inference
+
+Once a model is trained, `scripts/evaluation/xtion_live_infer.py` subscribes to
+a ROS2 `sensor_msgs/Image` topic (typically from an Xtion PRO LIVE), runs the
+`.pt` weights on each frame, and renders the annotated stream in a PyQt6
+window with a topic selector, confidence slider, FPS counter, and per-detection
+list.
+
+**Docker path (recommended)** — uses an overlay image that adds ROS2 Humble +
+OpenNI2 + PyQt6 on top of `hsr-perception:latest`:
+
+```bash
+# One-time host setup
+sudo cp docker/99-xtion.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules && sudo udevadm trigger
+sudo usermod -aG video $USER    # logout/login required
+
+# First run builds hsr-perception-xtion:latest automatically.
+./start.sh xtion-live -- --model models/finetuned/<run>/weights/best.pt --conf 0.25
+```
+
+The wrapper runs `xhost +local:docker` and launches the container with
+`network_mode: host`, USB passthrough, and X11 forwarding. Requires a ROS2
+image publisher reachable from the host (e.g. `ros2 launch openni2_camera
+camera.launch.py`, or HSR's own camera stack on the same DDS domain).
+
+**Host path** — if ROS2 Humble + PyQt6 are already installed locally:
+
+```bash
+source /opt/ros/humble/setup.bash
+python scripts/evaluation/xtion_live_infer.py \
+    --model models/finetuned/<run>/weights/best.pt --conf 0.25
+```
 
 ## Environment variables
 
