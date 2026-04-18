@@ -345,6 +345,18 @@ class CompetitionTrainer:
         # Check if LLRD is enabled
         use_llrd = self.config.get("llrd_enabled", False)
 
+        # Ultralytics >= 8.3 rejects unknown keys passed via **kwargs to
+        # model.train(); strip our LLRD bookkeeping keys before use.
+        _LLRD_META_KEYS = {"llrd_enabled", "llrd_decay_rate"}
+        yolo_kwargs = {k: v for k, v in self.config.items() if k not in _LLRD_META_KEYS}
+
+        # Ultralytics >= 8.4 expects multi_scale as a float fraction in [0.0, 1.0].
+        # Legacy configs / presets store it as a bool, but `True == 1.0` triggers
+        # `random.randrange(0, ...)` which can yield size=0 and a ZeroDivisionError
+        # inside torch's upsample path.
+        if isinstance(yolo_kwargs.get("multi_scale"), bool):
+            yolo_kwargs["multi_scale"] = 0.5 if yolo_kwargs["multi_scale"] else 0.0
+
         # Use try-finally to ensure cleanup happens
         try:
             # Start training
@@ -387,8 +399,8 @@ class CompetitionTrainer:
 
                 # Training with OOM recovery
                 if enable_oom_recovery:
-                    oom_recovery = OOMRecoveryStrategy(self.config)
-                    current_config = copy.deepcopy(self.config)
+                    oom_recovery = OOMRecoveryStrategy(yolo_kwargs)
+                    current_config = copy.deepcopy(yolo_kwargs)
 
                     while True:
                         try:
@@ -447,7 +459,7 @@ class CompetitionTrainer:
                         name=self.run_name,
                         resume=resume,
                         verbose=verbose,
-                        **self.config,
+                        **yolo_kwargs,
                     )
 
             training_time = (time.time() - start_time) / 60  # minutes

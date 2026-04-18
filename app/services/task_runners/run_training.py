@@ -230,6 +230,15 @@ def main():
                 filtered_params = {k: v for k, v in advanced.items() if k in allowed_keys}
                 config.update(filtered_params)
 
+                # Ultralytics >= 8.4 expects multi_scale as a float fraction
+                # (0.0 disabled; 0.5 == +/-50% of imgsz). Our UI/presets still
+                # store it as a bool, which Python treats as 1.0 -- that makes
+                # the sampled lower bound `int(imgsz * (1 - 1.0)) == 0` and
+                # eventually crashes torch.nn.functional.interpolate with a
+                # ZeroDivisionError. Coerce bool inputs here.
+                if isinstance(config.get("multi_scale"), bool):
+                    config["multi_scale"] = 0.5 if config["multi_scale"] else 0.0
+
                 print(f"Applied {len(filtered_params)} advanced parameters:")
                 for key, value in filtered_params.items():
                     print(f"  {key}: {value}")
