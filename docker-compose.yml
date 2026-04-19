@@ -1,10 +1,14 @@
 # HSR Perception Pipeline - Docker Compose
 #
+# The base image now bundles ROS2 Humble + OpenNI2 + PyQt6, so Xtion live
+# inference shares the same container as training / Streamlit.
+#
 # Usage:
 #   docker compose up                                  # Streamlit UI
 #   docker compose --profile tensorboard up            # Include TensorBoard
 #   docker compose run --rm app bash                   # Interactive shell
 #   docker compose run --rm app train --dataset ...    # One-shot training
+#   docker compose run --rm app xtion-live --model ... # Live inference (needs X11 + Xtion on host)
 #
 
 services:
@@ -23,11 +27,22 @@ services:
               count: 1
               capabilities: [gpu]
 
+    # Host network for ROS2 DDS discovery to reach publishers outside the
+    # container (e.g. the openni2_camera node on the host).
+    network_mode: host
+
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
       - PYTHONUNBUFFERED=1
       - PYBULLET_HSR_ROOT=/pybullet_hsr
+      # ROS2
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTRTPS_DEFAULT_PROFILES_FILE=/workspace/config/fastdds_profile.xml
+      # X11 for Qt GUI (xtion-live)
+      - DISPLAY=${DISPLAY:-:0}
+      - QT_X11_NO_MITSHM=1
+      - XAUTHORITY=${XAUTHORITY:-/tmp/.docker.xauth}
 
     volumes:
       - ${DATASETS_DIR:-./datasets}:/workspace/datasets
@@ -37,11 +52,18 @@ services:
       - ./config:/workspace/config:ro
       # pybullet_hsr source dataset, read-only
       - ${PYBULLET_HSR_ROOT:-/home/roboworks/repos/pybullet_hsr}:/pybullet_hsr:ro
+      # USB passthrough for Xtion PRO LIVE
+      - /dev/bus/usb:/dev/bus/usb
+      # X11 socket for GUI apps (xtion-live)
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${XAUTHORITY:-/dev/null}:${XAUTHORITY:-/tmp/.docker.xauth}:rw
       - /dev/shm:/dev/shm
 
-    ports:
-      - "8501:8501"  # Streamlit
-      - "6006:6006"  # TensorBoard
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+
+    # Needed for direct USB access to the Xtion sensor.
+    privileged: true
 
     stdin_open: true
     tty: true
@@ -59,71 +81,11 @@ services:
   tensorboard:
     image: hsr-perception:latest
     container_name: hsr-tensorboard
+    network_mode: host
     volumes:
       - ${RUNS_DIR:-./runs}:/workspace/runs:ro
-    ports:
-      - "6006:6006"
     command: tensorboard
     profiles:
       - tensorboard
     depends_on:
       - app
-
-  # ---------------------------------------------------------------------------
-  # Xtion live inference (ROS2 + PyQt6 GUI)
-  #
-  # Requires: ROS2 publisher on the host (e.g. openni2_camera), X11 running on
-  # the host, and `xhost +local:docker` (or equivalent) to allow the container
-  # to open a window. The image extends hsr-perception:latest with ROS2 Humble
-  # + OpenNI2 + PyQt6.
-  #
-  # Build : docker compose --profile xtion build xtion-live
-  # Run   : ./start.sh xtion-live -- --model <path>
-  # ---------------------------------------------------------------------------
-  xtion-live:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.xtion
-    image: hsr-perception-xtion:latest
-    container_name: hsr-xtion-live
-    profiles:
-      - xtion
-    depends_on:
-      - app
-
-    # Host network for ROS2 DDS discovery to reach publishers outside the
-    # container.
-    network_mode: host
-
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
-      - PYTHONUNBUFFERED=1
-      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - DISPLAY=${DISPLAY:-:0}
-      - QT_X11_NO_MITSHM=1
-      - XAUTHORITY=${XAUTHORITY:-/tmp/.docker.xauth}
-
-    volumes:
-      - ${MODELS_DIR:-./models}:/workspace/models:ro
-      - ${RUNS_DIR:-./runs}:/workspace/runs:ro
-      - ./config:/workspace/config:ro
-      # USB passthrough for Xtion
-      - /dev/bus/usb:/dev/bus/usb
-      # X11 socket for GUI
-      - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      - ${XAUTHORITY:-/tmp/.docker.xauth}:${XAUTHORITY:-/tmp/.docker.xauth}:rw
-
-    # Needed for direct USB access to the Xtion sensor.
-    privileged: true
-
-    stdin_open: true
-    tty: true

@@ -109,8 +109,9 @@ dump" primary button.
 | `scripts/evaluation/evaluate_model.py` | mAP / inference-time evaluator |
 | `scripts/evaluation/xtion_live_infer.py` | PyQt6 live viewer: YOLO over ROS2 image topic (Xtion) |
 | `app/main.py` + `app/pages/` | Streamlit UI (Dashboard, Training, Evaluation, Settings) |
-| `docker/Dockerfile`, `docker-compose.yml` | Container build + runtime wiring |
-| `docker/Dockerfile.xtion`, `docker/99-xtion.rules` | ROS2 + PyQt6 overlay + Xtion udev rules |
+| `docker/Dockerfile`, `docker-compose.yml` | Container build + runtime wiring (ROS2 + CUDA + YOLO in one image) |
+| `docker/99-xtion.rules` | Xtion udev rules (installed on host for USB access) |
+| `config/fastdds_profile.xml` | FastDDS profile (SHM disabled) for ROS2 discovery stability |
 
 ## Xtion live inference
 
@@ -120,8 +121,8 @@ a ROS2 `sensor_msgs/Image` topic (typically from an Xtion PRO LIVE), runs the
 window with a topic selector, confidence slider, FPS counter, and per-detection
 list.
 
-**Docker path (recommended)** — uses an overlay image that adds ROS2 Humble +
-OpenNI2 + PyQt6 on top of `hsr-perception:latest`:
+The base `hsr-perception:latest` image now bundles ROS2 Humble + OpenNI2 +
+PyQt6 directly — there is no separate overlay image.
 
 ```bash
 # One-time host setup
@@ -129,14 +130,19 @@ sudo cp docker/99-xtion.rules /etc/udev/rules.d/
 sudo udevadm control --reload-rules && sudo udevadm trigger
 sudo usermod -aG video $USER    # logout/login required
 
-# First run builds hsr-perception-xtion:latest automatically.
-./start.sh xtion-live -- --model models/finetuned/<run>/weights/best.pt --conf 0.25
+# PC + Xtion (default) — single command starts the publisher AND viewer
+./start.sh xtion-live -- \
+    --model models/finetuned/<run>/weights/best.pt --conf 0.25
+
+# HSR / external publisher — skip the in-container openni2_camera
+./start.sh xtion-live -- --no-camera \
+    --model models/finetuned/<run>/weights/best.pt --conf 0.25
 ```
 
-The wrapper runs `xhost +local:docker` and launches the container with
-`network_mode: host`, USB passthrough, and X11 forwarding. Requires a ROS2
-image publisher reachable from the host (e.g. `ros2 launch openni2_camera
-camera.launch.py`, or HSR's own camera stack on the same DDS domain).
+`start.sh` runs `xhost +local:docker` before launching, and compose gives
+the container `network_mode: host`, USB passthrough (`/dev/bus/usb`), and
+X11 forwarding so rclpy can discover publishers on the host / same DDS
+domain.
 
 **Host path** — if ROS2 Humble + PyQt6 are already installed locally:
 

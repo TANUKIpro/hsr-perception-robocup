@@ -113,9 +113,8 @@ Settings（環境変数とパス）。
 適用し、検出結果を重ねた映像を PyQt6 ウィンドウでライブ閲覧できます。
 トピック選択 / 信頼度スライダ / FPS・検出リスト表示付き。
 
-この機能は重い依存（ROS2 Humble + OpenNI2 + PyQt6）を持つため、学習用
-イメージ `hsr-perception:latest` を汚さず、**`xtion` compose profile**
-と派生イメージ `hsr-perception-xtion:latest` に隔離しています。
+ROS2 Humble + OpenNI2 + PyQt6 は学習用イメージ `hsr-perception:latest`
+に直接同梱しており、別イメージを建てる必要はありません。
 
 #### ホスト初回セットアップ（1 回だけ）
 
@@ -131,28 +130,33 @@ sudo apt-get install -y x11-xserver-utils
 
 #### 起動手順
 
-1. ホスト側で Xtion の ROS2 パブリッシャを起動（HSR 実機では常時 publish）:
+PC + Xtion だけで完結する場合はコマンド 1 発:
 
-   ```bash
-   ros2 launch openni2_camera camera.launch.py
-   ```
+```bash
+./start.sh xtion-live -- \
+    --model models/finetuned/<run>/weights/best.pt --conf 0.25
+```
 
-2. 別シェルで本リポジトリの `start.sh` を叩く（初回は xtion イメージを自動ビルド）:
+コンテナ内で `openni2_camera` publisher がバックグラウンド起動し、
+トピック (`/camera/rgb/image_raw`) が advertise されてから
+PyQt6 ビューアが立ち上がります。GUI 終了と同時に publisher も停止します。
 
-   ```bash
-   ./start.sh xtion-live -- \
-       --model models/finetuned/<run>/weights/best.pt \
-       --conf 0.25
-   ```
+HSR や別マシンで既に publish している場合は `--no-camera` を付けて
+publisher 起動をスキップ:
 
-   GUI が立ち上がったら、**Refresh** → トピック（例 `/camera/rgb/image_raw`）
-   を選択 → **Subscribe** で購読を開始。信頼度はスライダで調整できます。
+```bash
+./start.sh xtion-live -- --no-camera \
+    --model models/finetuned/<run>/weights/best.pt --conf 0.25
+```
+
+GUI が立ち上がったら、**Refresh** → トピック（例 `/camera/rgb/image_raw`）
+を選択 → **Subscribe** で購読を開始。信頼度はスライダで調整できます。
 
 `./start.sh xtion-live` の中身：
 
-- 学習用の `hsr-perception:latest` と別に `hsr-perception-xtion:latest` を必要時のみビルド
+- 学習用と同じ `hsr-perception:latest` を再利用（追加ビルドなし）
 - `xhost +local:docker` で X11 を開放
-- `docker compose --profile xtion run --rm xtion-live xtion-live -- …` を実行
+- `docker compose run --rm app xtion-live -- …` を実行
   （`network_mode: host`、USB passthrough、GPU、X11 ソケットマウント付き）
 
 #### ホスト直接実行（Docker を使わない場合）
@@ -175,8 +179,8 @@ hsr-perception-robocup/
 │   ├── training/           # YOLOv8 fine-tuning
 │   ├── evaluation/         # 評価ツール（mAP 評価 + Xtion ライブ推論ビューア）
 │   └── common/             # 共通ユーティリティ
-├── docker/                 # Dockerfile + entrypoint + Dockerfile.xtion + 99-xtion.rules
-├── config/                 # 設定ファイル（現在ほぼ空）
+├── docker/                 # Dockerfile（ROS2 同梱）+ entrypoint + 99-xtion.rules
+├── config/                 # fastdds_profile.xml など
 ├── models/finetuned/       # 学習結果
 ├── datasets/               # 準備済み YOLO データセット
 ├── runs/                   # TensorBoard ログ
@@ -279,9 +283,8 @@ Once a model is trained, visualise it on a real Xtion PRO LIVE stream.
 renders the annotated video in a PyQt6 window (topic selector,
 confidence slider, FPS counter, per-detection list).
 
-Because the dependencies are heavy (ROS2 Humble + OpenNI2 + PyQt6), they
-live in a separate overlay image `hsr-perception-xtion:latest` behind
-the `xtion` compose profile — the default training image stays slim.
+ROS2 Humble + OpenNI2 + PyQt6 are bundled directly into
+`hsr-perception:latest`, so no separate overlay image is needed.
 
 ```bash
 # One-time host setup
@@ -290,14 +293,20 @@ sudo udevadm control --reload-rules && sudo udevadm trigger
 sudo usermod -aG video $USER         # logout/login to take effect
 sudo apt-get install -y x11-xserver-utils
 
-# Start the Xtion publisher (or HSR's camera stack) first, then:
+# PC + Xtion (default): one command; publisher and viewer run in the
+# same container, cleaned up together on exit.
 ./start.sh xtion-live -- \
+    --model models/finetuned/<run>/weights/best.pt --conf 0.25
+
+# HSR / external publisher: skip the in-container openni2_camera.
+./start.sh xtion-live -- --no-camera \
     --model models/finetuned/<run>/weights/best.pt --conf 0.25
 ```
 
-`start.sh xtion-live` auto-builds the overlay image on first run,
-invokes `xhost +local:docker`, and launches the container with
-`network_mode: host`, USB passthrough, GPU, and X11 mounted.
+`start.sh xtion-live` runs `xhost +local:docker` and invokes
+`docker compose run --rm app xtion-live -- …` against the already-built
+`hsr-perception:latest` (`network_mode: host`, USB passthrough, GPU, X11
+mounted).
 
 Host path (no Docker) — if ROS2 Humble + PyQt6 are already installed:
 
@@ -312,8 +321,8 @@ python scripts/evaluation/xtion_live_infer.py \
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `PYBULLET_HSR_ROOT` | `/home/roboworks/repos/pybullet_hsr` (host) / `/pybullet_hsr` (Docker) | Path to pybullet_hsr clone (mounted read-only into the container) |
-| `ROS_DOMAIN_ID` | `0` | ROS2 DDS domain used by the `xtion-live` service to discover the Xtion publisher |
-| `DISPLAY` / `XAUTHORITY` | inherited | Needed by the `xtion-live` service to open the PyQt6 window on the host X server |
+| `ROS_DOMAIN_ID` | `0` | ROS2 DDS domain used by `xtion-live` / `ros2-camera` to discover publishers |
+| `DISPLAY` / `XAUTHORITY` | inherited | Needed by `xtion-live` to open the PyQt6 window on the host X server |
 
 ### References
 
