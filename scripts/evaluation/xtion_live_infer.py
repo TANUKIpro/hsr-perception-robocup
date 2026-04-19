@@ -59,7 +59,7 @@ try:
 except ImportError as e:  # pragma: no cover
     _die(
         "PyQt6 is not installed. Install it via `pip install PyQt6` "
-        f"or use the `xtion` Docker profile. ({e})"
+        f"or run inside the hsr-perception container. ({e})"
     )
 
 try:
@@ -70,8 +70,8 @@ try:
 except ImportError as e:  # pragma: no cover
     _die(
         "rclpy / sensor_msgs is not available. Source a ROS2 Humble "
-        "environment (`source /opt/ros/humble/setup.bash`) or use the "
-        f"`xtion` Docker profile. ({e})"
+        "environment (`source /opt/ros/humble/setup.bash`) or run "
+        f"inside the hsr-perception container. ({e})"
     )
 
 try:

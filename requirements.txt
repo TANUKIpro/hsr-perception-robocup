@@ -26,6 +26,9 @@ plotly>=5.0.0
 # Web UI
 streamlit>=1.37.0
 
+# Desktop GUI (xtion live inference)
+PyQt6>=6.6.0
+
 # Development & Testing
 pytest>=7.4.0
 pytest-cov>=4.1.0
