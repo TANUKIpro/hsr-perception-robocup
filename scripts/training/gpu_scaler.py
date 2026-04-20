@@ -72,12 +72,18 @@ VRAM_THRESHOLDS = {
 }
 
 # Model VRAM overhead (empirical values in GB)
+# YOLO11 values are estimates based on reduced parameter counts vs v8
 MODEL_VRAM_OVERHEAD = {
     "yolov8n.pt": 1.2,
     "yolov8s.pt": 1.8,
     "yolov8m.pt": 2.5,
     "yolov8l.pt": 3.5,
     "yolov8x.pt": 5.0,
+    "yolo11n.pt": 1.0,
+    "yolo11s.pt": 1.6,
+    "yolo11m.pt": 2.2,
+    "yolo11l.pt": 2.8,
+    "yolo11x.pt": 4.5,
 }
 
 # Per-sample memory at 640x640 (empirical, in MB)
@@ -87,6 +93,11 @@ MODEL_PER_SAMPLE_MEMORY_MB = {
     "yolov8m.pt": 380,
     "yolov8l.pt": 550,
     "yolov8x.pt": 750,
+    "yolo11n.pt": 170,
+    "yolo11s.pt": 230,
+    "yolo11m.pt": 350,
+    "yolo11l.pt": 480,
+    "yolo11x.pt": 700,
 }
 
 # Standard image sizes
@@ -150,13 +161,18 @@ TIER_CONFIGS = {
     },
 }
 
-# Model downgrade path for OOM recovery
+# Model downgrade path for OOM recovery — stays within the same YOLO family
 MODEL_DOWNGRADE_PATH = {
     "yolov8x.pt": "yolov8l.pt",
     "yolov8l.pt": "yolov8m.pt",
     "yolov8m.pt": "yolov8s.pt",
     "yolov8s.pt": "yolov8n.pt",
     "yolov8n.pt": "yolov8n.pt",  # No further downgrade
+    "yolo11x.pt": "yolo11l.pt",
+    "yolo11l.pt": "yolo11m.pt",
+    "yolo11m.pt": "yolo11s.pt",
+    "yolo11s.pt": "yolo11n.pt",
+    "yolo11n.pt": "yolo11n.pt",  # No further downgrade
 }
 
 

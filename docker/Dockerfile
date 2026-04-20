@@ -152,12 +152,14 @@ COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # -----------------------------------------------------------------------------
-# Pre-cache YOLOv8 models for offline use
+# Pre-cache YOLOv8 + YOLO11 models for offline use
 # -----------------------------------------------------------------------------
 RUN mkdir -p /opt/model-cache && cd /opt/model-cache && \
     python3 -c "from ultralytics import YOLO; \
                 YOLO('yolov8n.pt'); YOLO('yolov8s.pt'); \
-                YOLO('yolov8m.pt'); YOLO('yolov8l.pt')" && \
+                YOLO('yolov8m.pt'); YOLO('yolov8l.pt'); \
+                YOLO('yolo11n.pt'); YOLO('yolo11s.pt'); \
+                YOLO('yolo11m.pt'); YOLO('yolo11l.pt')" && \
     ls -la /opt/model-cache/
 
 # -----------------------------------------------------------------------------

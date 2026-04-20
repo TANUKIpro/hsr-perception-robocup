@@ -344,6 +344,8 @@ def validate_model_path(model_path: str) -> ValidationResult:
         yolo_models = [
             "yolov8n.pt", "yolov8s.pt", "yolov8m.pt", "yolov8l.pt", "yolov8x.pt",
             "yolov8n-seg.pt", "yolov8s-seg.pt", "yolov8m-seg.pt",
+            "yolo11n.pt", "yolo11s.pt", "yolo11m.pt", "yolo11l.pt", "yolo11x.pt",
+            "yolo11n-seg.pt", "yolo11s-seg.pt", "yolo11m-seg.pt",
         ]
         if path.name in yolo_models:
             result.add_info(

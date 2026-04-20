@@ -28,6 +28,11 @@ MODEL_VRAM_OVERHEAD_GB: Dict[str, float] = {
     "yolov8m.pt": 2.5,
     "yolov8l.pt": 3.5,
     "yolov8x.pt": 5.0,
+    "yolo11n.pt": 1.0,
+    "yolo11s.pt": 1.6,
+    "yolo11m.pt": 2.2,
+    "yolo11l.pt": 2.8,
+    "yolo11x.pt": 4.5,
 }
 
 # =============================================================================
@@ -39,6 +44,11 @@ MODEL_PER_SAMPLE_MEMORY_MB: Dict[str, int] = {
     "yolov8m.pt": 380,
     "yolov8l.pt": 550,
     "yolov8x.pt": 750,
+    "yolo11n.pt": 170,
+    "yolo11s.pt": 230,
+    "yolo11m.pt": 350,
+    "yolo11l.pt": 480,
+    "yolo11x.pt": 700,
 }
 
 # =============================================================================

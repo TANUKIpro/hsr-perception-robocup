@@ -194,7 +194,10 @@ class PathCoordinator:
         if self.config.pretrained_dir.exists():
             for model_file in self.config.pretrained_dir.glob("*.pt"):
                 models.append(str(model_file))
-        for name in ("yolov8n.pt", "yolov8s.pt", "yolov8m.pt", "yolov8l.pt", "yolov8x.pt"):
+        for name in (
+            "yolov8n.pt", "yolov8s.pt", "yolov8m.pt", "yolov8l.pt", "yolov8x.pt",
+            "yolo11n.pt", "yolo11s.pt", "yolo11m.pt", "yolo11l.pt", "yolo11x.pt",
+        ):
             if name not in [Path(m).name for m in models]:
                 models.append(name)
         return models
