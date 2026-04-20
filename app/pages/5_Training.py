@@ -8,11 +8,13 @@ pipeline.
 
 from __future__ import annotations
 
+import csv
 import json
 import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 import streamlit as st
 import yaml
@@ -360,7 +362,8 @@ def _render_model_knobs(path_coordinator: PathCoordinator):
             st.caption("Model will be selected by the GPU tier at runtime.")
         else:
             options = sorted({Path(p).name for p in pretrained}
-                             | {"yolov8n.pt", "yolov8s.pt", "yolov8m.pt", "yolov8l.pt", "yolov8x.pt"})
+                             | {"yolov8n.pt", "yolov8s.pt", "yolov8m.pt", "yolov8l.pt", "yolov8x.pt",
+                                "yolo11n.pt", "yolo11s.pt", "yolo11m.pt", "yolo11l.pt", "yolo11x.pt"})
             default_idx = options.index("yolov8m.pt") if "yolov8m.pt" in options else 0
             base_model = st.selectbox("Base model", options, index=default_idx)
         epochs = st.slider("Epochs", 5, 200, 50, step=5)
@@ -429,35 +432,246 @@ def _render_launch(
         st.rerun()
 
 
+def _load_model_details(
+    model: dict, datasets_dir: Path
+) -> dict[str, Any]:
+    """Collect everything we want to show in the Models tab for one run.
+
+    Pulls from `args.yaml` (Ultralytics config), `results.csv` (final
+    epoch row), `evaluation_report.json` (post-training eval), and the
+    dataset's own `data.yaml` + `.prepare_meta.json`. Each source is
+    optional — older runs may be missing some files.
+    """
+    run_dir = Path(model["best_path"] or model["last_path"]).parent.parent
+
+    details: dict[str, Any] = {
+        "args": None,
+        "final_metrics": None,
+        "eval": None,
+        "dataset": None,
+    }
+
+    args_path = run_dir / "args.yaml"
+    if args_path.exists():
+        try:
+            details["args"] = yaml.safe_load(args_path.read_text()) or {}
+        except Exception:
+            details["args"] = None
+
+    results_csv = run_dir / "results.csv"
+    if results_csv.exists():
+        try:
+            with results_csv.open() as f:
+                rows = list(csv.DictReader(f))
+            if rows:
+                last = rows[-1]
+                details["final_metrics"] = {
+                    "epochs_completed": int(float(last.get("epoch", 0))),
+                    "training_time_s": float(last.get("time", 0) or 0),
+                    "map50": float(last.get("metrics/mAP50(B)", 0) or 0),
+                    "map50_95": float(last.get("metrics/mAP50-95(B)", 0) or 0),
+                    "precision": float(last.get("metrics/precision(B)", 0) or 0),
+                    "recall": float(last.get("metrics/recall(B)", 0) or 0),
+                }
+        except Exception:
+            details["final_metrics"] = None
+
+    eval_path = run_dir / "evaluation_report.json"
+    if eval_path.exists():
+        try:
+            details["eval"] = json.loads(eval_path.read_text())
+        except Exception:
+            details["eval"] = None
+
+    dataset_name = None
+    args = details["args"] or {}
+    data_field = args.get("data")
+    if data_field:
+        # Ultralytics records the in-container path (e.g.
+        # /workspace/datasets/<name>/data.yaml). Map back to the host
+        # dataset dir by name so we can read it from this process.
+        dataset_name = Path(data_field).parent.name
+
+    if dataset_name:
+        ds_dir = datasets_dir / dataset_name
+        ds_yaml = ds_dir / "data.yaml"
+        ds_info: dict[str, Any] = {
+            "name": dataset_name,
+            "dir": ds_dir,
+            "data_yaml": ds_yaml,
+            "exists": ds_dir.exists(),
+            "classes": [],
+            "train_images": None,
+            "val_images": None,
+            "prepare_meta": None,
+        }
+        if ds_yaml.exists():
+            try:
+                cfg = yaml.safe_load(ds_yaml.read_text()) or {}
+                names_map = cfg.get("names", {})
+                if isinstance(names_map, dict):
+                    ds_info["classes"] = [names_map[k] for k in sorted(names_map.keys())]
+                else:
+                    ds_info["classes"] = list(names_map)
+            except Exception:
+                pass
+        train_dir = ds_dir / "images" / "train"
+        val_dir = ds_dir / "images" / "val"
+        if train_dir.exists():
+            ds_info["train_images"] = sum(1 for _ in train_dir.iterdir())
+        if val_dir.exists():
+            ds_info["val_images"] = sum(1 for _ in val_dir.iterdir())
+        meta_path = ds_dir / ".prepare_meta.json"
+        if meta_path.exists():
+            try:
+                ds_info["prepare_meta"] = json.loads(meta_path.read_text())
+            except Exception:
+                pass
+        details["dataset"] = ds_info
+
+    return details
+
+
 def _render_trained(path_coordinator: PathCoordinator) -> None:
     st.subheader("Trained models")
     models = path_coordinator.get_trained_models()
     if not models:
         st.info("No trained models yet.")
         return
+
+    datasets_dir = path_coordinator.get_path("datasets_dir")
+
     for model in models:
-        with st.expander(f"📦 {model['name']}", expanded=False):
+        details = _load_model_details(model, datasets_dir)
+        eval_data = details["eval"] or {}
+        meets = eval_data.get("meets_requirements")
+        badge = ""
+        if meets is True:
+            badge = " ✅"
+        elif meets is False:
+            badge = " ⚠️"
+
+        with st.expander(f"📦 {model['name']}{badge}", expanded=False):
             st.caption(f"Created: {model['created'][:19]}")
-            run_dir = Path(model["best_path"] or model["last_path"]).parent.parent
-            result_file = run_dir / "training_result.json"
-            if result_file.exists():
-                try:
-                    result = json.loads(result_file.read_text())
-                    metrics = result.get("metrics", {})
-                    c1, c2, c3, c4 = st.columns(4)
-                    c1.metric("mAP@50", f"{metrics.get('mAP50', 0):.3f}")
-                    c2.metric("mAP@50-95", f"{metrics.get('mAP50-95', 0):.3f}")
-                    c3.metric("Time (min)", f"{result.get('training_time_minutes', 0):.0f}")
-                    c4.metric("Epochs", result.get("epochs_completed", "?"))
-                except Exception as e:
-                    st.info(f"Could not read training_result.json: {e}")
-            if model["best_path"]:
-                st.code(f"best: {model['best_path']}", language="text")
-            if model["last_path"]:
-                st.code(f"last: {model['last_path']}", language="text")
+
+            _render_model_metrics(details)
+            _render_model_dataset(details["dataset"])
+            _render_model_training_config(details["args"], details["final_metrics"])
+            _render_model_paths(model, details["dataset"])
+
             if st.button("Send to Evaluation", key=f"eval_{model['name']}"):
                 st.session_state["selected_model"] = model["best_path"] or model["last_path"]
                 st.info("Switch to the Evaluation page to run metrics.")
+
+
+def _render_model_metrics(details: dict[str, Any]) -> None:
+    eval_data = details.get("eval") or {}
+    final = details.get("final_metrics") or {}
+
+    map50 = eval_data.get("overall_map50") or final.get("map50")
+    map50_95 = eval_data.get("overall_map50_95") or final.get("map50_95")
+    inference_ms = eval_data.get("inference_time_ms")
+    train_time_min = (final.get("training_time_s") or 0) / 60 if final else None
+    epochs_completed = final.get("epochs_completed") if final else None
+
+    if not any([map50, map50_95, inference_ms, train_time_min, epochs_completed]):
+        st.caption("No metrics recorded yet.")
+        return
+
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("mAP@50", f"{map50:.3f}" if map50 is not None else "—")
+    c2.metric("mAP@50-95", f"{map50_95:.3f}" if map50_95 is not None else "—")
+    c3.metric("Inference (ms)", f"{inference_ms:.1f}" if inference_ms is not None else "—")
+    c4.metric("Train time (min)", f"{train_time_min:.1f}" if train_time_min else "—")
+    c5.metric("Epochs", epochs_completed if epochs_completed is not None else "—")
+
+    num_test = eval_data.get("num_test_images")
+    if num_test:
+        st.caption(f"Evaluated on {num_test} val images.")
+
+
+def _render_model_dataset(dataset: dict[str, Any] | None) -> None:
+    st.markdown("**📊 Dataset**")
+    if not dataset:
+        st.caption("Dataset info unavailable (args.yaml missing or unreadable).")
+        return
+    if not dataset["exists"]:
+        st.warning(
+            f"Dataset `{dataset['name']}` referenced in args.yaml is no longer "
+            f"present under `datasets/`."
+        )
+        return
+
+    train_n = dataset.get("train_images")
+    val_n = dataset.get("val_images")
+    classes = dataset.get("classes") or []
+    total = (train_n or 0) + (val_n or 0)
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Name", dataset["name"])
+    c2.metric("Train", train_n if train_n is not None else "—")
+    c3.metric("Val", val_n if val_n is not None else "—")
+    c4.metric("Classes", len(classes) if classes else "—")
+
+    meta = dataset.get("prepare_meta") or {}
+    info_bits = []
+    src_dump = meta.get("source_dump")
+    if src_dump:
+        info_bits.append(f"source dump: `{Path(src_dump).name}`")
+    if meta.get("num_images_in_dump"):
+        info_bits.append(f"dump images: {meta['num_images_in_dump']}")
+    if meta.get("val_ratio") is not None:
+        info_bits.append(f"val ratio: {meta['val_ratio']}")
+    if meta.get("seed") is not None:
+        info_bits.append(f"seed: {meta['seed']}")
+    if total:
+        info_bits.append(f"total split: {total}")
+    if info_bits:
+        st.caption(" · ".join(info_bits))
+
+    if classes:
+        with st.expander(f"Class names ({len(classes)})", expanded=False):
+            st.write(", ".join(f"{i}:{n}" for i, n in enumerate(classes)))
+
+
+def _render_model_training_config(
+    args: dict[str, Any] | None,
+    final_metrics: dict[str, Any] | None,
+) -> None:
+    if not args:
+        return
+    st.markdown("**⚙️ Training config**")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Base model", args.get("model", "—"))
+    requested_epochs = args.get("epochs", "—")
+    if final_metrics and final_metrics.get("epochs_completed"):
+        completed = final_metrics["epochs_completed"]
+        epochs_label = f"{completed} / {requested_epochs}"
+    else:
+        epochs_label = str(requested_epochs)
+    c2.metric("Epochs", epochs_label)
+    c3.metric("Batch", args.get("batch", "—"))
+    c4.metric("Image size", args.get("imgsz", "—"))
+
+    extras = []
+    for key in ("optimizer", "lr0", "patience", "freeze", "cos_lr", "amp"):
+        val = args.get(key)
+        if val is not None and val != "":
+            extras.append(f"{key}={val}")
+    if extras:
+        st.caption(" · ".join(extras))
+
+
+def _render_model_paths(
+    model: dict[str, Any], dataset: dict[str, Any] | None
+) -> None:
+    st.markdown("**📁 Paths**")
+    if dataset and dataset.get("data_yaml"):
+        st.code(f"data.yaml: {dataset['data_yaml']}", language="text")
+    if model.get("best_path"):
+        st.code(f"best: {model['best_path']}", language="text")
+    if model.get("last_path"):
+        st.code(f"last: {model['last_path']}", language="text")
 
 
 if __name__ == "__main__":
